@@ -40,7 +40,8 @@ const defaultData = {
     {id:'tr3',name:'Trailer 3',type:'Tanker'},
   ],
   jobs: [],
-  equipment: ['Liftgate','Drum Dolly','Placards','PPE','Bins','Totes']
+  equipment: ['Liftgate','Drum Dolly','Placards','PPE','Bins','Totes'],
+  locations: ['EWS','Brenntag Fresno','Brenntag Richmond','Coast','GQ','Avenal','Lost Hills','Madera','Thatcher','Bolthouse','Leprinos','Eagle Quick Lube','Faraday','PAC','PRR','Local Route','Parc/Atlas/High Bar','F&T Farms']
 };
 
 function loadData() {
@@ -68,6 +69,11 @@ function createBackup() {
 }
 
 var data = loadData();
+// Migrate: add locations if missing
+if (!data.locations) {
+  data.locations = defaultData.locations;
+  saveData(data);
+}
 createBackup();
 setInterval(createBackup, 3600000);
 
@@ -169,6 +175,26 @@ app.post('/api/equipment', function(req, res) {
 });
 app.delete('/api/equipment/:name', function(req, res) {
   data.equipment = data.equipment.filter(function(e) { return e !== req.params.name; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// LOCATIONS
+app.post('/api/locations', function(req, res) {
+  if (req.body.name && data.locations.indexOf(req.body.name) === -1) {
+    data.locations.push(req.body.name); data.locations.sort();
+    saveData(data); broadcast({type:'full-sync',data:data});
+  }
+  res.json({ok:true});
+});
+app.put('/api/locations', function(req, res) {
+  if (req.body.oldName && req.body.newName) {
+    var idx = data.locations.indexOf(req.body.oldName);
+    if (idx !== -1) { data.locations[idx] = req.body.newName; data.locations.sort(); saveData(data); broadcast({type:'full-sync',data:data}); }
+  }
+  res.json({ok:true});
+});
+app.delete('/api/locations/:name', function(req, res) {
+  data.locations = data.locations.filter(function(l) { return l !== req.params.name; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
 

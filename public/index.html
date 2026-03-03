@@ -234,7 +234,17 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
           </select></div>
         <div className="mrow"><label>Location / Job</label>
-          <input value={modal.location} onChange={e=>setModal({...modal,location:e.target.value})} placeholder="e.g. Brenntag Fresno, EWS, Coast"/></div>
+          <select value={data.locations.includes(modal.location)?modal.location:'__custom'} onChange={e=>{
+            if(e.target.value==='__custom') setModal({...modal,location:''});
+            else setModal({...modal,location:e.target.value});
+          }}>
+            <option value="">-- Select Location --</option>
+            {data.locations.map(l=><option key={l} value={l}>{l}</option>)}
+            <option value="__custom">Other (type custom)...</option>
+          </select>
+          {(!data.locations.includes(modal.location))&&(
+            <input value={modal.location} onChange={e=>setModal({...modal,location:e.target.value})} placeholder="Type custom location" style={{marginTop:4}}/>
+          )}</div>
         <div className="mrow"><label>Truck</label>
           <select value={modal.truckId} onChange={e=>setModal({...modal,truckId:e.target.value})}>
             <option value="">-- None --</option>
@@ -314,6 +324,9 @@ function Fleet({data}){
   const [tn,setTn]=useState('');const [tt,setTt]=useState('Standard');
   const [trn,setTrn]=useState('');const [trt,setTrt]=useState('Standard');
   const [eq,setEq]=useState('');
+  const [newLoc,setNewLoc]=useState('');
+  const [editingLoc,setEditingLoc]=useState(null);
+  const [editLocName,setEditLocName]=useState('');
   const [editing,setEditing]=useState(null);
   const [en,setEn]=useState('');
 
@@ -391,6 +404,27 @@ function Fleet({data}){
     <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
       {data.equipment.map((e,i)=>(<span key={i} style={{background:'#eef2ff',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}}>
         {e}<span style={{cursor:'pointer',color:'#999',fontSize:10}} onClick={()=>api('DELETE','/equipment/'+encodeURIComponent(e))}>&#10005;</span>
+      </span>))}
+    </div>
+
+    <div className="stitle" style={{marginTop:28}}>Saved Locations / Routes</div>
+    <div className="addrow">
+      <input value={newLoc} onChange={e=>setNewLoc(e.target.value)} placeholder="New location (e.g. Brenntag Fresno)" onKeyDown={async e=>{if(e.key==='Enter'&&newLoc.trim()){await api('POST','/locations',{name:newLoc.trim()});setNewLoc('');}}}/>
+      <button className="bp" onClick={async()=>{if(newLoc.trim()){await api('POST','/locations',{name:newLoc.trim()});setNewLoc('');}}}>Add</button>
+    </div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+      {(data.locations||[]).map((loc,i)=>(<span key={i} style={{background:'#f0fdf4',border:'1px solid #86efac',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+        {editingLoc===loc?(
+          <span style={{display:'flex',gap:3,alignItems:'center'}}>
+            <input className="ied" value={editLocName} onChange={e=>setEditLocName(e.target.value)} style={{width:120,fontSize:11}}
+              onKeyDown={async e=>{if(e.key==='Enter'&&editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}if(e.key==='Escape')setEditingLoc(null);}} autoFocus/>
+            <button className="bp" style={{padding:'2px 6px',fontSize:10}} onClick={async()=>{if(editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}}}>OK</button>
+          </span>
+        ):(<span>
+          {loc}
+          <span style={{cursor:'pointer',color:'var(--primary)',fontSize:10,marginLeft:2}} onClick={()=>{setEditingLoc(loc);setEditLocName(loc);}}>edit</span>
+          <span style={{cursor:'pointer',color:'#999',fontSize:10}} onClick={()=>api('DELETE','/locations/'+encodeURIComponent(loc))}>&#10005;</span>
+        </span>)}
       </span>))}
     </div>
   </div>);
