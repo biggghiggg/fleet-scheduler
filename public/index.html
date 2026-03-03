@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Scheduler</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e}
+:root{--primary:#2563eb;--danger:#dc2626;--success:#16a34a;--bg-white:#fff;--border:#e2e8f0;--text-muted:#64748b;--shadow:0 1px 3px rgba(0,0,0,.1);--shadow-lg:0 4px 12px rgba(0,0,0,.15)}
+button{cursor:pointer;border:none;border-radius:6px;font-size:13px;padding:6px 14px;transition:all .15s}
+button:hover{filter:brightness(0.92)}
+input,select,textarea{border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+
+.app-header{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.app-header h1{font-size:20px;font-weight:700}
+.conn-status{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600}
+.conn-status.ok{background:rgba(34,197,94,.3);color:#bbf7d0}
+.conn-status.bad{background:rgba(239,68,68,.3);color:#fecaca}
+
+.tabs{display:flex;gap:2px;background:var(--border);padding:3px;border-radius:8px;margin:16px 24px 0}
+.tab{flex:1;text-align:center;padding:9px 16px;border-radius:6px;font-weight:500;font-size:13px;background:transparent;color:var(--text-muted);cursor:pointer}
+.tab.on{background:var(--bg-white);color:var(--primary);box-shadow:var(--shadow)}
+.main{padding:16px 24px 40px}
+
+.week-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.week-nav button{background:var(--primary);color:#fff;padding:8px 16px;font-weight:600}
+.week-label{font-size:16px;font-weight:600;min-width:250px;text-align:center}
+
+.grid{overflow-x:auto;background:var(--bg-white);border-radius:10px;box-shadow:var(--shadow)}
+.grid table{width:100%;border-collapse:collapse;min-width:900px}
+.grid th{background:#f8fafc;padding:10px 8px;font-size:12px;font-weight:600;text-transform:uppercase;color:var(--text-muted);border-bottom:2px solid var(--border)}
+.grid th:first-child{width:120px;text-align:left;padding-left:14px}
+.grid td{border:1px solid #f1f5f9;padding:0;vertical-align:top;min-width:110px}
+.grid td:first-child{font-weight:600;font-size:13px;padding:10px 14px;background:#f8fafc;border-right:2px solid var(--border);min-width:120px;width:120px}
+.grid tr:hover td:first-child{background:#eef2ff}
+
+.cell{min-height:60px;padding:4px;cursor:pointer;transition:background .1s}
+.cell:hover{background:#f0f7ff}
+.cell.conflict{background:#fef2f2}
+.cell.today{background:#fffbeb}
+
+.chip{background:#eef2ff;border:1px solid #c7d2fe;border-radius:5px;padding:4px 6px;margin:2px 0;font-size:11px;line-height:1.3;cursor:pointer;position:relative}
+.chip:hover{background:#dbeafe}
+.chip .loc{font-weight:600;color:#1e40af}
+.chip .trk{color:#7c3aed;font-size:10px}
+.chip .tm{color:var(--text-muted);font-size:10px}
+.chip .x{position:absolute;top:1px;right:3px;font-size:10px;color:#999;cursor:pointer;display:none}
+.chip:hover .x{display:block;color:var(--danger)}
+.chip.tentative{background:#fefce8;border-color:#fde047}
+.chip.confirmed{background:#f0fdf4;border-color:#86efac}
+.chip.off,.chip.ooo{background:#f8f8f8;border-color:#ddd}
+
+.cbadge{background:var(--danger);color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;margin:2px 0;display:inline-block}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--bg-white);border-radius:12px;padding:24px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal h2{font-size:18px;margin-bottom:16px}
+.mrow{margin-bottom:12px}
+.mrow label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase}
+.mactions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.bp{background:var(--primary);color:#fff;font-weight:600;padding:8px 20px}
+.bd{background:var(--danger);color:#fff;font-weight:600;padding:8px 20px}
+.bc{background:#f1f5f9;color:#333;font-weight:500;padding:8px 20px}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--bg-white);border-radius:8px;padding:14px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center}
+.card .nm{font-weight:600;font-size:14px}
+.card .sub{font-size:12px;color:var(--text-muted)}
+.card .acts{display:flex;gap:4px}
+.card .acts button{padding:4px 8px;font-size:11px}
+.addrow{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.addrow input,.addrow select{width:auto;flex:1;min-width:120px}
+.stitle{font-size:16px;font-weight:600;margin:20px 0 12px}
+
+.rtable{background:var(--bg-white);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.rtable table{width:100%;border-collapse:collapse}
+.rtable th{background:#f8fafc;padding:10px;font-size:12px;text-transform:uppercase;color:var(--text-muted);border-bottom:2px solid var(--border);text-align:left}
+.rtable td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px}
+.rtag{display:inline-block;background:#eef2ff;color:#3b82f6;padding:2px 8px;border-radius:4px;font-size:11px;margin:1px;font-weight:500}
+
+.toast{position:fixed;bottom:20px;right:20px;background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:300;animation:su .3s ease}
+@keyframes su{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+.ebtn{background:#eef2ff;color:var(--primary);padding:3px 8px;font-size:11px;cursor:pointer;border-radius:4px;border:none;margin-left:4px}
+.ebtn:hover{background:#dbeafe}
+.ied{border:1px solid var(--primary);border-radius:4px;padding:2px 6px;font-size:13px;width:auto}
+
+/* PRINT STYLES */
+@media print {
+  body{background:#fff !important;font-family:Arial,Helvetica,sans-serif !important}
+  .app-header,.tabs,.week-nav,.no-print,.toast{display:none !important}
+  .main{padding:0 !important}
+  .print-sheet{page-break-after:always;padding:24px 20px;max-width:100%}
+  .print-sheet:last-child{page-break-after:avoid}
+  .print-sheet *{color:#000 !important}
+  .print-topbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid #000;padding-bottom:10px;margin-bottom:18px}
+  .print-topbar h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin:0;line-height:1.1}
+  .print-topbar .print-meta{text-align:right;font-size:13px;line-height:1.6}
+  .print-topbar .print-meta strong{font-size:15px}
+  .print-job-card{border:2px solid #000;border-radius:0;padding:0;margin-bottom:14px;page-break-inside:avoid}
+  .print-job-num{background:#000;color:#fff !important;font-size:14px;font-weight:700;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+  .print-job-num span{color:#fff !important}
+  .print-job-body{padding:10px 12px}
+  .print-job-loc{font-size:20px;font-weight:800;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:6px}
+  .print-job-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:6px}
+  .print-job-field{font-size:13px;line-height:1.7}
+  .print-job-field b{font-weight:700;display:inline-block;min-width:80px}
+  .print-job-notes{background:#f0f0f0;border:1px solid #ccc;padding:8px 10px;font-size:13px;white-space:pre-wrap;margin-top:6px;line-height:1.5}
+  .print-job-notes b{display:block;font-weight:700;margin-bottom:3px}
+  .print-footer{margin-top:auto;padding-top:12px;border-top:2px solid #000;font-size:10px;color:#666 !important;display:flex;justify-content:space-between}
+  .print-weekly-table{width:100%;border-collapse:collapse;font-size:11px}
+  .print-weekly-table th,.print-weekly-table td{border:2px solid #000;padding:8px;vertical-align:top;text-align:left}
+  .print-weekly-table th{background:#e5e5e5 !important;font-weight:800;font-size:12px;text-transform:uppercase}
+  .print-weekly-table td{font-size:11px;line-height:1.4}
+  .print-no-jobs{text-align:center;padding:30px;font-size:14px;color:#999 !important;font-style:italic}
+}
+/* Screen preview of print sheets */
+.print-sheet-preview{border:2px solid #ccc;background:#fff;padding:24px 20px;margin:12px 0;border-radius:0;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.print-topbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid #000;padding-bottom:10px;margin-bottom:18px}
+.print-topbar h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin:0;line-height:1.1}
+.print-topbar .print-meta{text-align:right;font-size:13px;line-height:1.6}
+.print-topbar .print-meta strong{font-size:15px}
+.print-job-card{border:2px solid #000;border-radius:0;padding:0;margin-bottom:14px}
+.print-job-num{background:#000;color:#fff;font-size:14px;font-weight:700;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+.print-job-body{padding:10px 12px}
+.print-job-loc{font-size:20px;font-weight:800;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:6px}
+.print-job-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:6px}
+.print-job-field{font-size:13px;line-height:1.7}
+.print-job-field b{font-weight:700;display:inline-block;min-width:80px}
+.print-job-notes{background:#f5f5f5;border:1px solid #ddd;padding:8px 10px;font-size:13px;white-space:pre-wrap;margin-top:6px;line-height:1.5}
+.print-job-notes b{display:block;font-weight:700;margin-bottom:3px}
+.print-footer{margin-top:16px;padding-top:12px;border-top:2px solid #000;font-size:10px;color:#999;display:flex;justify-content:space-between}
+.print-weekly-table{width:100%;border-collapse:collapse;font-size:12px}
+.print-weekly-table th,.print-weekly-table td{border:2px solid #000;padding:8px;vertical-align:top;text-align:left}
+.print-weekly-table th{background:#e5e5e5;font-weight:800;font-size:12px;text-transform:uppercase}
+.print-weekly-table td{font-size:12px;line-height:1.4}
+.print-no-jobs{text-align:center;padding:30px;font-size:14px;color:#999;font-style:italic}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo,useRef} = React;
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+async function api(method, url, body) {
+  const opts = {method, headers:{'Content-Type':'application/json'}};
+  if(body) opts.body = JSON.stringify(body);
+  return (await fetch('/api'+url, opts)).json();
+}
+
+function weekStart(d){const dt=new Date(d);const day=dt.getDay();dt.setDate(dt.getDate()+(day===0?-6:1-day));dt.setHours(0,0,0,0);return dt;}
+function fmt(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmtLong(d){return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});}
+function dk(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function weekDates(ws){return DAYS.map((_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});}
+
+function App(){
+  const [tab,setTab]=useState('schedule');
+  const [data,setData]=useState(null);
+  const [ws,setWs]=useState(()=>weekStart(new Date()));
+  const [modal,setModal]=useState(null);
+  const [eid,setEid]=useState(null);
+  const [conn,setConn]=useState(false);
+  const [toast,setToast]=useState(null);
+  const tt=useRef(null);
+  const show=(m)=>{setToast(m);if(tt.current)clearTimeout(tt.current);tt.current=setTimeout(()=>setToast(null),3000);};
+
+  useEffect(()=>{
+    let es;
+    function go(){
+      es=new EventSource('/api/events');
+      es.onopen=()=>setConn(true);
+      es.onmessage=(e)=>{
+        const m=JSON.parse(e.data);
+        if(m.type==='connected'||m.type==='full-sync') setData(m.data);
+        else if(m.type==='job-added'){setData(p=>p?{...p,jobs:[...p.jobs,m.job]}:p);show('Job added: '+(m.job.location||'New'));}
+        else if(m.type==='job-updated') setData(p=>p?{...p,jobs:p.jobs.map(j=>j.id===m.job.id?m.job:j)}:p);
+        else if(m.type==='job-deleted') setData(p=>p?{...p,jobs:p.jobs.filter(j=>j.id!==m.jobId)}:p);
+      };
+      es.onerror=()=>{setConn(false);es.close();setTimeout(go,3000);};
+    }
+    go();
+    return()=>{if(es)es.close();};
+  },[]);
+
+  const dates=useMemo(()=>weekDates(ws),[ws]);
+  const today=dk(new Date());
+  const prev=()=>{const d=new Date(ws);d.setDate(d.getDate()-7);setWs(d);};
+  const next=()=>{const d=new Date(ws);d.setDate(d.getDate()+7);setWs(d);};
+  const now=()=>setWs(weekStart(new Date()));
+
+  if(!data) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontSize:18,color:'#666'}}>Connecting to server...</div>;
+
+  const cellJobs=(did,date)=>data.jobs.filter(j=>j.driverId===did&&j.date===dk(date));
+  const cellConflict=(did,date)=>{
+    const k=dk(date);const cj=data.jobs.filter(j=>j.driverId===did&&j.date===k);
+    for(const j of cj){if(!j.truckId)continue;if(data.jobs.some(o=>o.date===k&&o.truckId===j.truckId&&o.id!==j.id))return true;}return false;
+  };
+  const dayConflicts=(date)=>{
+    const k=dk(date);const dj=data.jobs.filter(j=>j.date===k&&j.truckId);
+    const m={};dj.forEach(j=>{if(!m[j.truckId])m[j.truckId]=[];m[j.truckId].push(j);});
+    const c=[];Object.entries(m).forEach(([tid,jobs])=>{if(jobs.length>1){const t=data.trucks.find(x=>x.id===tid);c.push({tn:t?.name||tid,jobs});}});return c;
+  };
+
+  return(
+    <div>
+      <div className="app-header">
+        <h1>Fleet Scheduler</h1>
+        <span className={'conn-status '+(conn?'ok':'bad')}>{conn?'Live':'Reconnecting...'}</span>
+      </div>
+      <div className="tabs">
+        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['print','Print']].map(([k,v])=>(
+          <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
+        ))}
+      </div>
+      <div className="main">
+        {tab==='schedule'&&<Schedule {...{data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid}}/>}
+        {tab==='roster'&&<Roster data={data}/>}
+        {tab==='fleet'&&<Fleet data={data}/>}
+        {tab==='routes'&&<Routes data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
+        {tab==='print'&&<Print data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
+      </div>
+      {toast&&<div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid}){
+  const end=new Date(ws);end.setDate(end.getDate()+6);
+  const openAdd=(did,date)=>{setEid(null);setModal({driverId:did,date:dk(date),location:'',truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});};
+  const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job});};
+  const save=async()=>{if(eid)await api('PUT','/jobs/'+eid,modal);else await api('POST','/jobs',modal);setModal(null);setEid(null);};
+  const del=async(id,e)=>{if(e)e.stopPropagation();await api('DELETE','/jobs/'+id);};
+
+  return(<div>
+    <div className="week-nav">
+      <button onClick={prev}>&#9664; Prev</button>
+      <button onClick={now} style={{background:'#16a34a'}}>Today</button>
+      <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
+      <button onClick={next}>Next &#9654;</button>
+    </div>
+    <div className="grid"><table><thead><tr><th>Person</th>
+      {dates.map((d,i)=>(<th key={i} style={dk(d)===today?{background:'#fffbeb'}:{}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{d.getMonth()+1}/{d.getDate()}</span></th>))}
+    </tr></thead><tbody>
+      {data.drivers.map(driver=>(<tr key={driver.id}><td>{driver.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:400}}>{driver.role}</div></td>
+        {dates.map((date,i)=>{
+          const jobs=cellJobs(driver.id,date);const conf=cellConflict(driver.id,date);const ist=dk(date)===today;
+          return(<td key={i}><div className={'cell'+(conf?' conflict':'')+(ist?' today':'')} onClick={()=>openAdd(driver.id,date)}>
+            {conf&&<div className="cbadge">TRUCK CONFLICT</div>}
+            {jobs.map(job=>{
+              const truck=data.trucks.find(t=>t.id===job.truckId);const trailer=data.trailers.find(t=>t.id===job.trailerId);
+              const sc=job.status?(job.status.toLowerCase().replace(/\s/g,'')):'';
+              return(<div key={job.id} className={'chip '+sc} onClick={e=>openEdit(job,e)}>
+                {job.location&&<div className="loc">{job.location}</div>}
+                {truck&&<div className="trk">{truck.name}</div>}
+                {trailer&&<div className="trk">{trailer.name}</div>}
+                {job.timeWindow&&<div className="tm">{job.timeWindow}</div>}
+                {job.equipment&&job.equipment.length>0&&<div style={{fontSize:9,color:'#888'}}>{job.equipment.join(', ')}</div>}
+                {job.notes&&<div style={{fontSize:10,color:'#666',marginTop:1}}>{job.notes.length>50?job.notes.slice(0,50)+'...':job.notes}</div>}
+                <span className="x" onClick={e=>{e.stopPropagation();del(job.id);}}>&#10005;</span>
+              </div>);
+            })}
+            {jobs.length===0&&<div style={{color:'#ccc',fontSize:11,textAlign:'center',marginTop:16}}>+</div>}
+          </div></td>);
+        })}
+      </tr>))}
+    </tbody></table></div>
+
+    {dates.map((date,i)=>{const c=dayConflicts(date);if(!c.length)return null;
+      return(<div key={i} style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:10,margin:'8px 0',fontSize:12}}>
+        <strong style={{color:'var(--danger)'}}>Conflicts on {DAYS[i]} {date.getMonth()+1}/{date.getDate()}:</strong>
+        {c.map((x,j)=>(<div key={j} style={{marginTop:4}}>{x.tn} assigned to: {x.jobs.map(j2=>data.drivers.find(d=>d.id===j2.driverId)?.name).join(', ')}</div>))}
+      </div>);
+    })}
+
+    {modal&&(<div className="overlay" onClick={()=>{setModal(null);setEid(null);}}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h2>{eid?'Edit Job':'Add Job'}</h2>
+        <div className="mrow"><label>Person</label>
+          <select value={modal.driverId} onChange={e=>setModal({...modal,driverId:e.target.value})}>
+            {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
+          </select></div>
+        <div className="mrow"><label>Location / Job</label>
+          <select value={(data.locations||[]).includes(modal.location)?modal.location:'__custom'} onChange={e=>{
+            if(e.target.value==='__custom') setModal({...modal,location:''});
+            else setModal({...modal,location:e.target.value});
+          }}>
+            <option value="">-- Select Location --</option>
+            {(data.locations||[]).map(l=><option key={l} value={l}>{l}</option>)}
+            <option value="__custom">Other (type custom)...</option>
+          </select>
+          {(!(data.locations||[]).includes(modal.location))&&(
+            <input value={modal.location} onChange={e=>setModal({...modal,location:e.target.value})} placeholder="Type custom location" style={{marginTop:4}}/>
+          )}</div>
+        <div className="mrow"><label>Truck</label>
+          <select value={modal.truckId} onChange={e=>setModal({...modal,truckId:e.target.value})}>
+            <option value="">-- None --</option>
+            {data.trucks.filter(t=>t.status==='Active').map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
+          </select></div>
+        <div className="mrow"><label>Trailer</label>
+          <select value={modal.trailerId} onChange={e=>setModal({...modal,trailerId:e.target.value})}>
+            <option value="">-- None --</option>
+            {data.trailers.map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
+          </select></div>
+        <div className="mrow"><label>Time Window</label>
+          <input value={modal.timeWindow} onChange={e=>setModal({...modal,timeWindow:e.target.value})} placeholder="e.g. 8:00 AM, Be onsite by 10 AM"/></div>
+        <div className="mrow"><label>Equipment Needed</label>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {data.equipment.map(eq=>(<label key={eq} style={{fontSize:12,display:'flex',alignItems:'center',gap:3}}>
+              <input type="checkbox" checked={modal.equipment?.includes(eq)||false}
+                onChange={e=>{const eqs=modal.equipment||[];setModal({...modal,equipment:e.target.checked?[...eqs,eq]:eqs.filter(x=>x!==eq)});}}/>
+              {eq}</label>))}
+          </div></div>
+        <div className="mrow"><label>Status</label>
+          <select value={modal.status||'Scheduled'} onChange={e=>setModal({...modal,status:e.target.value})}>
+            <option>Scheduled</option><option>Tentative</option><option>Confirmed</option><option>Off</option><option>OOO</option>
+          </select></div>
+        <div className="mrow"><label>Notes</label>
+          <textarea value={modal.notes} onChange={e=>setModal({...modal,notes:e.target.value})} rows={3} placeholder="Special instructions, reference numbers, etc."/></div>
+        <div className="mactions">
+          <button className="bc" onClick={()=>{setModal(null);setEid(null);}}>Cancel</button>
+          {eid&&<button className="bd" onClick={async()=>{await del(eid);setModal(null);setEid(null);}}>Delete</button>}
+          <button className="bp" onClick={save}>{eid?'Update':'Add Job'}</button>
+        </div>
+      </div>
+    </div>)}
+  </div>);
+}
+
+function Roster({data}){
+  const [name,setName]=useState('');
+  const [role,setRole]=useState('Driver');
+  const [editing,setEditing]=useState(null);
+  const [en,setEn]=useState('');
+  const add=async()=>{if(!name.trim())return;await api('POST','/drivers',{name:name.trim(),role,skills:[]});setName('');};
+  const remove=async(d)=>{if(confirm('Remove '+d.name+'? This also removes their scheduled jobs.'))await api('DELETE','/drivers/'+d.id);};
+  const rename=async(d)=>{if(en.trim())await api('PUT','/drivers/'+d.id,{name:en.trim()});setEditing(null);};
+  return(<div>
+    <div className="stitle">Add Person</div>
+    <div className="addrow">
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="Name" onKeyDown={e=>e.key==='Enter'&&add()}/>
+      <select value={role} onChange={e=>setRole(e.target.value)} style={{maxWidth:160}}>
+        <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Sales/Driver</option>
+      </select>
+      <button className="bp" onClick={add}>Add</button>
+    </div>
+    <div className="stitle">Current Roster ({data.drivers.length})</div>
+    <div className="cards">
+      {data.drivers.map(d=>(<div key={d.id} className="card">
+        <div style={{flex:1}}>
+          {editing===d.id?(<div style={{display:'flex',gap:4,alignItems:'center'}}>
+            <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')rename(d);if(e.key==='Escape')setEditing(null);}} autoFocus/>
+            <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>rename(d)}>Save</button>
+            <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
+          </div>):(<div className="nm">{d.name} <button className="ebtn" onClick={()=>{setEditing(d.id);setEn(d.name);}}>Rename</button></div>)}
+          <select value={d.role} onChange={e=>api('PUT','/drivers/'+d.id,{role:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:4}}>
+            <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Sales/Driver</option>
+          </select>
+        </div>
+        <div className="acts"><button style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>remove(d)}>Remove</button></div>
+      </div>))}
+    </div>
+  </div>);
+}
+
+function Fleet({data}){
+  const [tn,setTn]=useState('');const [tt,setTt]=useState('Standard');
+  const [trn,setTrn]=useState('');const [trt,setTrt]=useState('Standard');
+  const [eq,setEq]=useState('');
+  const [newLoc,setNewLoc]=useState('');
+  const [editingLoc,setEditingLoc]=useState(null);
+  const [editLocName,setEditLocName]=useState('');
+  const [editing,setEditing]=useState(null);
+  const [en,setEn]=useState('');
+  const renameTruck=async(t)=>{if(en.trim())await api('PUT','/trucks/'+t.id,{name:en.trim()});setEditing(null);};
+  const renameTrailer=async(t)=>{if(en.trim())await api('PUT','/trailers/'+t.id,{name:en.trim()});setEditing(null);};
+
+  return(<div>
+    <div className="stitle">Add Truck</div>
+    <div className="addrow">
+      <input value={tn} onChange={e=>setTn(e.target.value)} placeholder="Truck name/number (e.g. Unit 401)"/>
+      <select value={tt} onChange={e=>setTt(e.target.value)} style={{maxWidth:160}}>
+        <option>Standard</option><option>Flatbed</option><option>Vac Truck</option><option>Tanker</option><option>Box Truck</option>
+      </select>
+      <button className="bp" onClick={async()=>{if(tn.trim()){await api('POST','/trucks',{name:tn.trim(),type:tt,status:'Active'});setTn('');}}}>Add</button>
+    </div>
+    <div className="stitle">Trucks ({data.trucks.length})</div>
+    <div className="cards">
+      {data.trucks.map(t=>(<div key={t.id} className="card">
+        <div style={{flex:1}}>
+          {editing===t.id?(<div style={{display:'flex',gap:4,alignItems:'center'}}>
+            <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')renameTruck(t);if(e.key==='Escape')setEditing(null);}} autoFocus/>
+            <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>renameTruck(t)}>Save</button>
+            <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
+          </div>):(<div className="nm">{t.name} <button className="ebtn" onClick={()=>{setEditing(t.id);setEn(t.name);}}>Rename</button></div>)}
+          <div style={{marginTop:2}}>
+            <select value={t.type} onChange={e=>api('PUT','/trucks/'+t.id,{type:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11}}>
+              <option>Standard</option><option>Flatbed</option><option>Vac Truck</option><option>Tanker</option><option>Box Truck</option>
+            </select>
+            <span style={{fontSize:11,marginLeft:8,color:t.status==='Active'?'var(--success)':'var(--danger)'}}>{t.status}</span>
+          </div>
+        </div>
+        <div className="acts">
+          <button style={{background:t.status==='Active'?'#fef3c7':'#d1fae5',color:t.status==='Active'?'#92400e':'#065f46'}}
+            onClick={()=>api('PUT','/trucks/'+t.id,{status:t.status==='Active'?'Out of Service':'Active'})}>
+            {t.status==='Active'?'Disable':'Enable'}</button>
+          <button style={{background:'#fee2e2',color:'var(--danger)'}} onClick={async()=>{if(confirm('Remove '+t.name+'?'))await api('DELETE','/trucks/'+t.id);}}>Remove</button>
+        </div>
+      </div>))}
+    </div>
+
+    <div className="stitle" style={{marginTop:28}}>Add Trailer</div>
+    <div className="addrow">
+      <input value={trn} onChange={e=>setTrn(e.target.value)} placeholder="Trailer name/number"/>
+      <select value={trt} onChange={e=>setTrt(e.target.value)} style={{maxWidth:160}}>
+        <option>Standard</option><option>Flatbed</option><option>Tanker</option><option>Enclosed</option><option>Dump</option>
+      </select>
+      <button className="bp" onClick={async()=>{if(trn.trim()){await api('POST','/trailers',{name:trn.trim(),type:trt});setTrn('');}}}>Add</button>
+    </div>
+    <div className="stitle">Trailers ({data.trailers.length})</div>
+    <div className="cards">
+      {data.trailers.map(t=>(<div key={t.id} className="card">
+        <div style={{flex:1}}>
+          {editing===t.id?(<div style={{display:'flex',gap:4,alignItems:'center'}}>
+            <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')renameTrailer(t);if(e.key==='Escape')setEditing(null);}} autoFocus/>
+            <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>renameTrailer(t)}>Save</button>
+            <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
+          </div>):(<div className="nm">{t.name} <button className="ebtn" onClick={()=>{setEditing(t.id);setEn(t.name);}}>Rename</button></div>)}
+          <select value={t.type} onChange={e=>api('PUT','/trailers/'+t.id,{type:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:2}}>
+            <option>Standard</option><option>Flatbed</option><option>Tanker</option><option>Enclosed</option><option>Dump</option>
+          </select>
+        </div>
+        <div className="acts"><button style={{background:'#fee2e2',color:'var(--danger)'}} onClick={async()=>{if(confirm('Remove '+t.name+'?'))await api('DELETE','/trailers/'+t.id);}}>Remove</button></div>
+      </div>))}
+    </div>
+
+    <div className="stitle" style={{marginTop:28}}>Equipment Types</div>
+    <div className="addrow">
+      <input value={eq} onChange={e=>setEq(e.target.value)} placeholder="New equipment type" onKeyDown={async e=>{if(e.key==='Enter'&&eq.trim()){await api('POST','/equipment',{name:eq.trim()});setEq('');}}}/>
+      <button className="bp" onClick={async()=>{if(eq.trim()){await api('POST','/equipment',{name:eq.trim()});setEq('');}}}>Add</button>
+    </div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+      {data.equipment.map((e,i)=>(<span key={i} style={{background:'#eef2ff',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+        {e}<span style={{cursor:'pointer',color:'#999',fontSize:10}} onClick={()=>api('DELETE','/equipment/'+encodeURIComponent(e))}>&#10005;</span>
+      </span>))}
+    </div>
+
+    <div className="stitle" style={{marginTop:28}}>Saved Locations / Routes</div>
+    <div className="addrow">
+      <input value={newLoc} onChange={e=>setNewLoc(e.target.value)} placeholder="New location (e.g. Brenntag Fresno)" onKeyDown={async e=>{if(e.key==='Enter'&&newLoc.trim()){await api('POST','/locations',{name:newLoc.trim()});setNewLoc('');}}}/>
+      <button className="bp" onClick={async()=>{if(newLoc.trim()){await api('POST','/locations',{name:newLoc.trim()});setNewLoc('');}}}>Add</button>
+    </div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+      {(data.locations||[]).map((loc,i)=>(<span key={i} style={{background:'#f0fdf4',border:'1px solid #86efac',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+        {editingLoc===loc?(<span style={{display:'flex',gap:3,alignItems:'center'}}>
+          <input className="ied" value={editLocName} onChange={e=>setEditLocName(e.target.value)} style={{width:120,fontSize:11}}
+            onKeyDown={async e=>{if(e.key==='Enter'&&editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}if(e.key==='Escape')setEditingLoc(null);}} autoFocus/>
+          <button className="bp" style={{padding:'2px 6px',fontSize:10}} onClick={async()=>{if(editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}}}>OK</button>
+        </span>):(<span>
+          {loc}
+          <span style={{cursor:'pointer',color:'var(--primary)',fontSize:10,marginLeft:2}} onClick={()=>{setEditingLoc(loc);setEditLocName(loc);}}>edit</span>
+          <span style={{cursor:'pointer',color:'#999',fontSize:10}} onClick={()=>api('DELETE','/locations/'+encodeURIComponent(loc))}>&#10005;</span>
+        </span>)}
+      </span>))}
+    </div>
+  </div>);
+}
+
+function Routes({data,dates,ws,prev,next,now}){
+  const end=new Date(ws);end.setDate(end.getDate()+6);
+  const routesForDay=(date)=>{
+    const k=dk(date);const dj=data.jobs.filter(j=>j.date===k&&j.location);
+    const m={};dj.forEach(j=>{const d=data.drivers.find(x=>x.id===j.driverId);if(!d)return;if(!m[d.name])m[d.name]=[];m[d.name].push({loc:j.location,truck:data.trucks.find(t=>t.id===j.truckId)?.name});});
+    return m;
+  };
+  const allLocs=useMemo(()=>{
+    const l={};dates.forEach(date=>{const k=dk(date);data.jobs.filter(j=>j.date===k&&j.location).forEach(j=>{const n=j.location.trim();if(!l[n])l[n]=0;l[n]++;});});
+    return Object.entries(l).sort((a,b)=>b[1]-a[1]);
+  },[data.jobs,dates]);
+  return(<div>
+    <div className="week-nav">
+      <button onClick={prev}>&#9664; Prev</button>
+      <button onClick={now} style={{background:'#16a34a'}}>Today</button>
+      <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
+      <button onClick={next}>Next &#9654;</button>
+    </div>
+    {allLocs.length>0&&(<div style={{background:'var(--bg-white)',borderRadius:10,padding:16,marginBottom:16,boxShadow:'var(--shadow)'}}>
+      <div style={{fontWeight:600,marginBottom:8}}>This Week's Locations ({allLocs.length} unique)</div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>{allLocs.map(([loc,c])=>(<span key={loc} className="rtag">{loc} <span style={{opacity:.6}}>x{c}</span></span>))}</div>
+    </div>)}
+    <div className="rtable"><table><thead><tr><th style={{width:100}}>Day</th><th>Driver Routes</th></tr></thead><tbody>
+      {dates.map((date,i)=>{
+        const r=routesForDay(date);const entries=Object.entries(r);
+        return(<tr key={i}><td style={{fontWeight:600}}>{DAYS[i]}<br/><span style={{fontSize:11,color:'var(--text-muted)'}}>{date.getMonth()+1}/{date.getDate()}</span></td>
+          <td>{entries.length===0&&<span style={{color:'#ccc'}}>No jobs scheduled</span>}
+            {entries.map(([driver,items])=>(<div key={driver} style={{marginBottom:4}}><strong style={{fontSize:12}}>{driver}:</strong>{' '}
+              {items.map((item,j)=>(<span key={j} className="rtag">{item.loc}{item.truck?' ('+item.truck+')':''}</span>))}</div>))}
+          </td></tr>);
+      })}
+    </tbody></table></div>
+  </div>);
+}
+
+/* ============ PRINT VIEW ============ */
+function Print({data,dates,ws,prev,next,now}){
+  const end=new Date(ws);end.setDate(end.getDate()+6);
+  const [mode,setMode]=useState('daily');
+  const [selDay,setSelDay]=useState(0);
+  const [selDrivers,setSelDrivers]=useState(data.drivers.map(d=>d.id));
+
+  const toggleDriver=(id)=>{setSelDrivers(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);};
+  const selectAll=()=>setSelDrivers(data.drivers.map(d=>d.id));
+  const selectNone=()=>setSelDrivers([]);
+
+  const printDate=dates[selDay];
+  const printDateStr=printDate?fmtLong(printDate):'';
+  const driverDayJobs=(did,date)=>data.jobs.filter(j=>j.driverId===did&&j.date===dk(date));
+  const printedAt=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+
+  const renderDailySheet=(did)=>{
+    const driver=data.drivers.find(d=>d.id===did);
+    if(!driver) return null;
+    const jobs=driverDayJobs(did,printDate);
+    if(jobs.length===0) return null;
+    return(
+      <div className="print-sheet print-sheet-preview" key={did}>
+        <div className="print-topbar">
+          <div>
+            <h1>{driver.name}</h1>
+            <div style={{fontSize:14,fontWeight:600,color:'#333',marginTop:2}}>{driver.role}</div>
+          </div>
+          <div className="print-meta">
+            <strong>{printDateStr}</strong><br/>
+            {jobs.length} job{jobs.length!==1?'s':''} scheduled
+          </div>
+        </div>
+
+        {jobs.map((job,idx)=>{
+          const truck=data.trucks.find(t=>t.id===job.truckId);
+          const trailer=data.trailers.find(t=>t.id===job.trailerId);
+          return(
+            <div className="print-job-card" key={job.id}>
+              <div className="print-job-num">
+                <span>JOB {idx+1} of {jobs.length}</span>
+                {job.timeWindow&&<span>{job.timeWindow}</span>}
+              </div>
+              <div className="print-job-body">
+                <div className="print-job-loc">{job.location||'No location assigned'}</div>
+                <div className="print-job-grid">
+                  {truck&&<div className="print-job-field"><b>Truck:</b> {truck.name} ({truck.type})</div>}
+                  {trailer&&<div className="print-job-field"><b>Trailer:</b> {trailer.name} ({trailer.type})</div>}
+                  {job.timeWindow&&<div className="print-job-field"><b>Time:</b> {job.timeWindow}</div>}
+                  {job.status&&job.status!=='Scheduled'&&<div className="print-job-field"><b>Status:</b> {job.status}</div>}
+                  {job.equipment&&job.equipment.length>0&&<div className="print-job-field" style={{gridColumn:'1/-1'}}><b>Equipment:</b> {job.equipment.join(', ')}</div>}
+                </div>
+                {job.notes&&<div className="print-job-notes"><b>Instructions / Notes:</b>{job.notes}</div>}
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="print-footer">
+          <span>Fleet Scheduler &mdash; Printed {printedAt}</span>
+          <span>{driver.name} &bull; {printDateStr} &bull; {jobs.length} job{jobs.length!==1?'s':''}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderWeeklySheet=(did)=>{
+    const driver=data.drivers.find(d=>d.id===did);
+    if(!driver) return null;
+    const hasAnyJobs=dates.some(date=>driverDayJobs(did,date).length>0);
+    if(!hasAnyJobs) return null;
+    const totalJobs=dates.reduce((s,date)=>s+driverDayJobs(did,date).length,0);
+    return(
+      <div className="print-sheet print-sheet-preview" key={did}>
+        <div className="print-topbar">
+          <div>
+            <h1>{driver.name}</h1>
+            <div style={{fontSize:14,fontWeight:600,color:'#333',marginTop:2}}>{driver.role} &mdash; Weekly Overview</div>
+          </div>
+          <div className="print-meta">
+            <strong>{fmt(ws)} &mdash; {fmt(end)}</strong><br/>
+            {totalJobs} job{totalJobs!==1?'s':''} this week
+          </div>
+        </div>
+        <table className="print-weekly-table">
+          <thead><tr><th style={{width:100}}>Day</th><th>Location</th><th>Truck</th><th>Trailer</th><th>Time</th><th>Equipment</th><th>Notes</th></tr></thead>
+          <tbody>
+            {dates.map((date,i)=>{
+              const jobs=driverDayJobs(did,date);
+              if(jobs.length===0) return(<tr key={i}><td style={{fontWeight:800}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{date.getMonth()+1}/{date.getDate()}</span></td><td colSpan={6} style={{color:'#999',fontStyle:'italic'}}>No jobs scheduled</td></tr>);
+              return jobs.map((job,j)=>{
+                const truck=data.trucks.find(t=>t.id===job.truckId);
+                const trailer=data.trailers.find(t=>t.id===job.trailerId);
+                return(<tr key={job.id}>
+                  {j===0&&<td rowSpan={jobs.length} style={{fontWeight:800}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{date.getMonth()+1}/{date.getDate()}</span></td>}
+                  <td style={{fontWeight:700}}>{job.location||'—'}</td>
+                  <td>{truck?truck.name:'—'}</td>
+                  <td>{trailer?trailer.name:'—'}</td>
+                  <td>{job.timeWindow||'—'}</td>
+                  <td style={{fontSize:11}}>{job.equipment&&job.equipment.length?job.equipment.join(', '):'—'}</td>
+                  <td style={{fontSize:11,maxWidth:150}}>{job.notes||'—'}</td>
+                </tr>);
+              });
+            })}
+          </tbody>
+        </table>
+        <div className="print-footer">
+          <span>Fleet Scheduler &mdash; Printed {printedAt}</span>
+          <span>{driver.name} &bull; Week of {fmt(ws)} &bull; {totalJobs} job{totalJobs!==1?'s':''}</span>
+        </div>
+      </div>
+    );
+  };
+
+  return(<div>
+    <div className="week-nav no-print">
+      <button onClick={prev}>&#9664; Prev</button>
+      <button onClick={now} style={{background:'#16a34a'}}>Today</button>
+      <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
+      <button onClick={next}>Next &#9654;</button>
+    </div>
+
+    <div className="no-print" style={{background:'var(--bg-white)',borderRadius:10,padding:20,marginBottom:16,boxShadow:'var(--shadow)'}}>
+      <div style={{display:'flex',gap:12,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
+        <label style={{fontWeight:700,fontSize:14}}>Print Mode:</label>
+        <button className={mode==='daily'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('daily')}>Daily Instruction Sheets</button>
+        <button className={mode==='weekly'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('weekly')}>Weekly Overview</button>
+      </div>
+
+      {mode==='daily'&&<div style={{marginBottom:14}}>
+        <label style={{fontWeight:700,fontSize:14,marginRight:8}}>Day:</label>
+        <select value={selDay} onChange={e=>setSelDay(Number(e.target.value))} style={{width:'auto',fontSize:14,padding:'6px 10px'}}>
+          {dates.map((d,i)=>(<option key={i} value={i}>{DAYS[i]} — {d.getMonth()+1}/{d.getDate()}</option>))}
+        </select>
+      </div>}
+
+      <div style={{marginBottom:14}}>
+        <label style={{fontWeight:700,fontSize:14}}>Print for: </label>
+        <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectAll}>All</button>
+        <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectNone}>None</button>
+        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
+          {data.drivers.map(d=>(<label key={d.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:4,padding:'4px 10px',background:selDrivers.includes(d.id)?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.includes(d.id)?'1px solid #c7d2fe':'1px solid #e2e8f0'}}>
+            <input type="checkbox" checked={selDrivers.includes(d.id)} onChange={()=>toggleDriver(d.id)}/>
+            {d.name}
+          </label>))}
+        </div>
+      </div>
+
+      <button className="bp" style={{fontSize:16,padding:'12px 40px',borderRadius:8}} onClick={()=>window.print()}>Print Sheets</button>
+      <span style={{marginLeft:12,fontSize:12,color:'#999'}}>One page per person</span>
+    </div>
+
+    {/* DAILY SHEETS */}
+    {mode==='daily'&&selDrivers.map(did=>renderDailySheet(did))}
+
+    {/* WEEKLY SHEETS */}
+    {mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did))}
+
+    {mode==='daily'&&selDrivers.every(did=>driverDayJobs(did,printDate).length===0)&&(
+      <div className="print-no-jobs">No jobs scheduled for the selected people on {printDateStr}.</div>
+    )}
+    {mode==='weekly'&&selDrivers.every(did=>!dates.some(date=>driverDayJobs(did,date).length>0))&&(
+      <div className="print-no-jobs">No jobs scheduled for the selected people this week.</div>
+    )}
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
