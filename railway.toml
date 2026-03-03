@@ -1,8 +1,0 @@
-[build]
-builder = "nixpacks"
-
-[deploy]
-startCommand = "node server.js"
-healthcheckPath = "/api/data"
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
