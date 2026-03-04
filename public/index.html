@@ -524,12 +524,16 @@ function Routes({data,dates,ws,prev,next,now}){
     </div>)}
     <div className="rtable"><table><thead><tr><th style={{width:100}}>Day</th><th>Driver Routes</th></tr></thead><tbody>
       {dates.map((date,i)=>{
-        const r=routesForDay(date);const entries=Object.entries(r);
+        const r=routesForDay(date);
         return(<tr key={i}><td style={{fontWeight:600}}>{DAYS[i]}<br/><span style={{fontSize:11,color:'var(--text-muted)'}}>{date.getMonth()+1}/{date.getDate()}</span></td>
-          <td>{entries.length===0&&<span style={{color:'#ccc'}}>No jobs scheduled</span>}
-            {entries.map(([driver,items])=>(<div key={driver} style={{marginBottom:4}}><strong style={{fontSize:12}}>{driver}:</strong>{' '}
-              {items.map((item,j)=>(<span key={j} className="rtag">{item.loc}{item.truck?' ('+item.truck+')':''}</span>))}</div>))}
-          </td></tr>);
+          <td>{data.drivers.map(driver=>{
+            const items=r[driver.name]||[];
+            return(<div key={driver.id} style={{marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
+              <strong style={{fontSize:12,minWidth:70}}>{driver.name}:</strong>
+              {items.length>0?items.map((item,j)=>(<span key={j} className="rtag">{item.loc}{item.truck?' ('+item.truck+')':''}</span>))
+                :<span style={{fontSize:11,color:'#16a34a',fontWeight:600,background:'#dcfce7',padding:'2px 8px',borderRadius:4}}>Available</span>}
+            </div>);
+          })}</td></tr>);
       })}
     </tbody></table></div>
   </div>);
