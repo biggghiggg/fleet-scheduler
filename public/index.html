@@ -1,698 +1,2075 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fleet Scheduler</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e}
-:root{--primary:#2563eb;--danger:#dc2626;--success:#16a34a;--bg-white:#fff;--border:#e2e8f0;--text-muted:#64748b;--shadow:0 1px 3px rgba(0,0,0,.1);--shadow-lg:0 4px 12px rgba(0,0,0,.15)}
-button{cursor:pointer;border:none;border-radius:6px;font-size:13px;padding:6px 14px;transition:all .15s}
-button:hover{filter:brightness(0.92)}
-input,select,textarea{border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;width:100%}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
-.app-header{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.app-header h1{font-size:20px;font-weight:700}
-.conn-status{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600}
-.conn-status.ok{background:rgba(34,197,94,.3);color:#bbf7d0}
-.conn-status.bad{background:rgba(239,68,68,.3);color:#fecaca}
-.tabs{display:flex;gap:2px;background:var(--border);padding:3px;border-radius:8px;margin:16px 24px 0}
-.tab{flex:1;text-align:center;padding:9px 16px;border-radius:6px;font-weight:500;font-size:13px;background:transparent;color:var(--text-muted);cursor:pointer}
-.tab.on{background:var(--bg-white);color:var(--primary);box-shadow:var(--shadow)}
-.main{padding:16px 24px 40px}
-.week-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}
-.week-nav button{background:var(--primary);color:#fff;padding:8px 16px;font-weight:600}
-.week-label{font-size:16px;font-weight:600;min-width:250px;text-align:center}
-.grid{overflow-x:auto;background:var(--bg-white);border-radius:10px;box-shadow:var(--shadow)}
-.grid table{width:100%;border-collapse:collapse;min-width:900px}
-.grid th{background:#f8fafc;padding:10px 8px;font-size:12px;font-weight:600;text-transform:uppercase;color:var(--text-muted);border-bottom:2px solid var(--border)}
-.grid th:first-child{width:120px;text-align:left;padding-left:14px}
-.grid td{border:1px solid #f1f5f9;padding:0;vertical-align:top;min-width:110px}
-.grid td:first-child{font-weight:600;font-size:13px;padding:10px 14px;background:#f8fafc;border-right:2px solid var(--border);min-width:120px;width:120px}
-.grid tr:hover td:first-child{background:#eef2ff}
-.cell{min-height:60px;padding:4px;cursor:pointer;transition:background .1s}
-.cell:hover{background:#f0f7ff}
-.cell.conflict{background:#fef2f2}
-.cell.today{background:#fffbeb}
-.chip{background:#eef2ff;border:1px solid #c7d2fe;border-radius:5px;padding:4px 6px;margin:2px 0;font-size:11px;line-height:1.3;cursor:pointer;position:relative}
-.chip:hover{background:#dbeafe}
-.chip .loc{font-weight:600;color:#1e40af}
-.chip .trk{color:#7c3aed;font-size:10px}
-.chip .tm{color:var(--text-muted);font-size:10px}
-.chip .x{position:absolute;top:1px;right:3px;font-size:10px;color:#999;cursor:pointer;display:none}
-.chip:hover .x{display:block;color:var(--danger)}
-.chip.tentative{background:#fefce8;border-color:#fde047}
-.chip.confirmed{background:#f0fdf4;border-color:#86efac}
-.chip.off,.chip.ooo{background:#f8f8f8;border-color:#ddd}
-.cbadge{background:var(--danger);color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;margin:2px 0;display:inline-block}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center}
-.modal{background:var(--bg-white);border-radius:12px;padding:24px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
-.modal h2{font-size:18px;margin-bottom:16px}
-.mrow{margin-bottom:12px}
-.mrow label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase}
-.mactions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
-.bp{background:var(--primary);color:#fff;font-weight:600;padding:8px 20px}
-.bd{background:var(--danger);color:#fff;font-weight:600;padding:8px 20px}
-.bc{background:#f1f5f9;color:#333;font-weight:500;padding:8px 20px}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.card{background:var(--bg-white);border-radius:8px;padding:14px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center}
-.card .nm{font-weight:600;font-size:14px}
-.card .sub{font-size:12px;color:var(--text-muted)}
-.card .acts{display:flex;gap:4px}
-.card .acts button{padding:4px 8px;font-size:11px}
-.addrow{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.addrow input,.addrow select{width:auto;flex:1;min-width:120px}
-.stitle{font-size:16px;font-weight:600;margin:20px 0 12px}
-.rtable{background:var(--bg-white);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
-.rtable table{width:100%;border-collapse:collapse}
-.rtable th{background:#f8fafc;padding:10px;font-size:12px;text-transform:uppercase;color:var(--text-muted);border-bottom:2px solid var(--border);text-align:left}
-.rtable td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px}
-.rtag{display:inline-block;background:#eef2ff;color:#3b82f6;padding:2px 8px;border-radius:4px;font-size:11px;margin:1px;font-weight:500}
-.toast{position:fixed;bottom:20px;right:20px;background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:300;animation:su .3s ease}
-@keyframes su{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-.ebtn{background:#eef2ff;color:var(--primary);padding:3px 8px;font-size:11px;cursor:pointer;border-radius:4px;border:none;margin-left:4px}
-.ebtn:hover{background:#dbeafe}
-.ied{border:1px solid var(--primary);border-radius:4px;padding:2px 6px;font-size:13px;width:auto}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet Scheduler</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-@media print {
-  body{background:#fff !important;font-family:Arial,Helvetica,sans-serif !important}
-  .app-header,.tabs,.week-nav,.no-print,.toast{display:none !important}
-  .main{padding:0 !important}
-  .print-sheet{page-break-after:always;padding:24px 20px;max-width:100%}
-  .print-sheet:last-child{page-break-after:avoid}
-  .print-sheet *{color:#000 !important}
-  .print-topbar h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin:0;line-height:1.1}
-  .print-job-num{background:#000 !important;color:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .print-job-num span{color:#fff !important}
-  .print-job-card{page-break-inside:avoid}
-  .print-footer{color:#666 !important}
-  .print-weekly-table th{background:#e5e5e5 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
+    :root {
+      --primary: #2563eb;
+      --primary-light: #dbeafe;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --warning: #f59e0b;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+    }
 
-.print-sheet{border:2px solid #ccc;background:#fff;padding:24px 20px;margin:12px 0;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.print-topbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid #000;padding-bottom:10px;margin-bottom:18px}
-.print-topbar h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin:0;line-height:1.1}
-.print-topbar .print-meta{text-align:right;font-size:13px;line-height:1.6}
-.print-topbar .print-meta strong{font-size:15px}
-.print-job-card{border:2px solid #000;padding:0;margin-bottom:14px}
-.print-job-num{background:#000;color:#fff;font-size:14px;font-weight:700;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
-.print-job-body{padding:10px 12px}
-.print-job-loc{font-size:20px;font-weight:800;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:6px}
-.print-job-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:6px}
-.print-job-field{font-size:13px;line-height:1.7}
-.print-job-field b{font-weight:700;display:inline-block;min-width:80px}
-.print-job-notes{background:#f5f5f5;border:1px solid #ddd;padding:8px 10px;font-size:13px;white-space:pre-wrap;margin-top:6px;line-height:1.5}
-.print-job-notes b{display:block;font-weight:700;margin-bottom:3px}
-.print-footer{margin-top:16px;padding-top:12px;border-top:2px solid #000;font-size:10px;color:#999;display:flex;justify-content:space-between}
-.print-weekly-table{width:100%;border-collapse:collapse;font-size:12px}
-.print-weekly-table th,.print-weekly-table td{border:2px solid #000;padding:8px;vertical-align:top;text-align:left}
-.print-weekly-table th{background:#e5e5e5;font-weight:800;font-size:12px;text-transform:uppercase}
-.print-weekly-table td{font-size:12px;line-height:1.4}
-.print-no-jobs{text-align:center;padding:30px;font-size:14px;color:#999;font-style:italic}
-</style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      line-height: 1.6;
+    }
+
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      padding: 4px 12px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.disconnected {
+      background: #ef4444;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      padding: 0 24px;
+      flex-shrink: 0;
+    }
+
+    .tab {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--gray-600);
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s;
+      text-decoration: none;
+    }
+
+    .tab:hover {
+      color: var(--primary);
+    }
+
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--gray-900);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-secondary {
+      background: var(--gray-200);
+      color: var(--gray-900);
+    }
+
+    .btn-secondary:hover {
+      background: var(--gray-300);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #b91c1c;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #15803d;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .input {
+      padding: 10px 12px;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.3s;
+      width: 100%;
+    }
+
+    .input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .input-group .input {
+      flex: 1;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--gray-700);
+      font-size: 14px;
+    }
+
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+    }
+
+    .form-group textarea {
+      padding: 10px 12px;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .checkbox-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .checkbox-item label {
+      margin: 0;
+      cursor: pointer;
+      font-weight: normal;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 500px;
+      width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px rgba(0,0,0,0.15);
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      color: var(--gray-900);
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    .modal-buttons .btn {
+      flex: 1;
+      justify-content: center;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .week-grid {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .week-grid thead {
+      background: var(--gray-100);
+      border-bottom: 2px solid var(--gray-200);
+    }
+
+    .week-grid th,
+    .week-grid td {
+      padding: 12px;
+      text-align: left;
+      border: 1px solid var(--gray-200);
+      font-size: 13px;
+    }
+
+    .week-grid th {
+      font-weight: 600;
+      color: var(--gray-700);
+      background: var(--gray-100);
+    }
+
+    .week-grid tbody tr:hover {
+      background: var(--gray-50);
+    }
+
+    .week-grid tbody tr:nth-child(even) {
+      background: var(--gray-50);
+    }
+
+    .day-cell {
+      min-height: 100px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.3s;
+    }
+
+    .day-cell:hover {
+      background: var(--primary-light) !important;
+    }
+
+    .job-chip {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 4px 4px 4px 0;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .job-chip:hover {
+      transform: scale(1.05);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .job-scheduled {
+      background: #dbeafe;
+      color: #0c4a6e;
+    }
+
+    .job-tentative {
+      background: #fef3c7;
+      color: #78350f;
+    }
+
+    .job-confirmed {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .job-off {
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .job-ooo {
+      background: #fee2e2;
+      color: #7f1d1d;
+    }
+
+    .conflict-badge {
+      display: inline-block;
+      background: var(--danger);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 4px;
+    }
+
+    .people-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .person-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: var(--gray-50);
+      border-radius: 8px;
+      border: 1px solid var(--gray-200);
+    }
+
+    .person-info {
+      flex: 1;
+    }
+
+    .person-name {
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+
+    .person-role {
+      font-size: 12px;
+      color: var(--gray-500);
+    }
+
+    .equipment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: var(--gray-50);
+      border-radius: 6px;
+      border: 1px solid var(--gray-200);
+    }
+
+    .equipment-name {
+      font-weight: 500;
+      color: var(--gray-900);
+    }
+
+    .truck-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: var(--gray-50);
+      border-radius: 8px;
+      border: 1px solid var(--gray-200);
+      margin-bottom: 12px;
+    }
+
+    .truck-info {
+      flex: 1;
+    }
+
+    .truck-name {
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+
+    .truck-type {
+      font-size: 12px;
+      color: var(--gray-500);
+      margin-bottom: 4px;
+    }
+
+    .truck-status {
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--success);
+      color: white;
+    }
+
+    .truck-status.disabled {
+      background: var(--gray-400);
+    }
+
+    .location-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: var(--gray-50);
+      border-radius: 8px;
+      border: 1px solid var(--gray-200);
+      margin-bottom: 12px;
+    }
+
+    .location-name {
+      font-weight: 600;
+      color: var(--gray-900);
+    }
+
+    .location-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .route-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .route-table thead {
+      background: var(--gray-100);
+      border-bottom: 2px solid var(--gray-200);
+    }
+
+    .route-table th,
+    .route-table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--gray-200);
+      font-size: 13px;
+    }
+
+    .route-table th {
+      font-weight: 600;
+      color: var(--gray-700);
+    }
+
+    .route-table tbody tr:nth-child(even) {
+      background: var(--gray-50);
+    }
+
+    .route-table tbody tr:hover {
+      background: var(--primary-light);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      z-index: 2000;
+      animation: slideIn 0.3s ease-out;
+      max-width: 400px;
+      font-size: 14px;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .toast.success {
+      border-left: 4px solid var(--success);
+    }
+
+    .toast.error {
+      border-left: 4px solid var(--danger);
+    }
+
+    .week-nav {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      align-items: center;
+    }
+
+    .week-date {
+      font-weight: 600;
+      color: var(--gray-900);
+      min-width: 120px;
+      text-align: center;
+    }
+
+    .print-controls {
+      background: var(--primary-light);
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .print-control-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .print-control-item {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .print-control-item label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--gray-700);
+      font-size: 14px;
+    }
+
+    .print-control-item select,
+    .print-control-item input {
+      width: 100%;
+    }
+
+    .driver-checkboxes {
+      background: white;
+      padding: 16px;
+      border-radius: 6px;
+      border: 1px solid var(--gray-300);
+      margin-top: 16px;
+    }
+
+    .driver-checkboxes label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 12px;
+      color: var(--gray-900);
+    }
+
+    .driver-checkbox-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .print-sheet {
+      background: white;
+      padding: 40px;
+      margin: 20px 0;
+      page-break-after: always;
+      border: 1px solid var(--gray-300);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .print-sheet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--gray-900);
+    }
+
+    .print-sheet-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+
+    .print-sheet-meta {
+      font-size: 12px;
+      color: var(--gray-600);
+    }
+
+    .print-sheet-stats {
+      text-align: right;
+    }
+
+    .job-card {
+      background: var(--gray-50);
+      border-left: 4px solid var(--primary);
+      margin-bottom: 20px;
+      padding: 16px;
+      border-radius: 4px;
+    }
+
+    .job-card-header {
+      background: var(--gray-900);
+      color: white;
+      padding: 12px;
+      margin: -16px -16px 16px -16px;
+      border-radius: 4px 4px 0 0;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .job-card-field {
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .job-card-field-label {
+      font-weight: 600;
+      color: var(--gray-700);
+      min-width: 100px;
+    }
+
+    .job-card-field-value {
+      flex: 1;
+      text-align: right;
+      color: var(--gray-900);
+    }
+
+    .print-sheet-footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gray-300);
+      font-size: 11px;
+      color: var(--gray-600);
+      text-align: center;
+    }
+
+    .print-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 12px;
+    }
+
+    .print-table th,
+    .print-table td {
+      padding: 10px;
+      border: 1px solid var(--gray-300);
+      text-align: left;
+    }
+
+    .print-table th {
+      background: var(--gray-100);
+      font-weight: 600;
+      color: var(--gray-900);
+    }
+
+    .print-table tbody tr:nth-child(even) {
+      background: var(--gray-50);
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .tabs {
+        padding: 0 12px;
+        overflow-x: auto;
+      }
+
+      .content {
+        padding: 12px;
+      }
+
+      .modal {
+        padding: 24px;
+        width: 95vw;
+      }
+
+      .print-sheet {
+        padding: 20px;
+      }
+    }
+
+    @media print {
+      .no-print,
+      .header,
+      .tabs,
+      .print-controls,
+      .btn {
+        display: none !important;
+      }
+
+      .app-container {
+        height: auto;
+      }
+
+      .content {
+        padding: 0;
+        overflow: visible;
+      }
+
+      .print-sheet {
+        page-break-after: always;
+        margin: 0;
+        padding: 40px;
+        box-shadow: none;
+        border: none;
+      }
+
+      .print-sheet:last-child {
+        page-break-after: avoid;
+      }
+
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const {useState,useEffect,useMemo,useRef} = React;
-const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  <div id="root"></div>
 
-async function api(method, url, body) {
-  const opts = {method, headers:{'Content-Type':'application/json'}};
-  if(body) opts.body = JSON.stringify(body);
-  return (await fetch('/api'+url, opts)).json();
-}
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
 
-function weekStart(d){const dt=new Date(d);const day=dt.getDay();dt.setDate(dt.getDate()+(day===0?-6:1-day));dt.setHours(0,0,0,0);return dt;}
-function fmt(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
-function fmtLong(d){return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});}
-function dk(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function weekDates(ws){return DAYS.map((_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});}
-
-function App(){
-  const [tab,setTab]=useState('schedule');
-  const [data,setData]=useState(null);
-  const [ws,setWs]=useState(function(){return weekStart(new Date());});
-  const [modal,setModal]=useState(null);
-  const [eid,setEid]=useState(null);
-  const [conn,setConn]=useState(false);
-  const [toast,setToast]=useState(null);
-  const tt=useRef(null);
-  const show=function(m){setToast(m);if(tt.current)clearTimeout(tt.current);tt.current=setTimeout(function(){setToast(null);},3000);};
-
-  useEffect(function(){
-    var es;
-    function go(){
-      es=new EventSource('/api/events');
-      es.onopen=function(){setConn(true);};
-      es.onmessage=function(e){
-        var m=JSON.parse(e.data);
-        if(m.type==='connected'||m.type==='full-sync') setData(m.data);
-        else if(m.type==='job-added'){setData(function(p){return p?Object.assign({},p,{jobs:p.jobs.concat([m.job])}):p;});show('Job added: '+(m.job.location||'New'));}
-        else if(m.type==='job-updated') setData(function(p){return p?Object.assign({},p,{jobs:p.jobs.map(function(j){return j.id===m.job.id?m.job:j;})}):p;});
-        else if(m.type==='job-deleted') setData(function(p){return p?Object.assign({},p,{jobs:p.jobs.filter(function(j){return j.id!==m.jobId;})}):p;});
-      };
-      es.onerror=function(){setConn(false);es.close();setTimeout(go,3000);};
+    // Helper functions
+    function weekStart(d) {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(date.setDate(diff));
     }
-    go();
-    return function(){if(es)es.close();};
-  },[]);
 
-  var dates=useMemo(function(){return weekDates(ws);},[ws]);
-  var today=dk(new Date());
-  var prev=function(){var d=new Date(ws);d.setDate(d.getDate()-7);setWs(d);};
-  var next=function(){var d=new Date(ws);d.setDate(d.getDate()+7);setWs(d);};
-  var now=function(){setWs(weekStart(new Date()));};
+    function fmt(d) {
+      const date = new Date(d);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
 
-  if(!data) return React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontSize:18,color:'#666'}},'Connecting to server...');
+    function fmtLong(d) {
+      const date = new Date(d);
+      return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    }
 
-  var cellJobs=function(did,date){return data.jobs.filter(function(j){return j.driverId===did&&j.date===dk(date);});};
-  var cellConflict=function(did,date){
-    var k=dk(date);var cj=data.jobs.filter(function(j){return j.driverId===did&&j.date===k;});
-    for(var i=0;i<cj.length;i++){var j=cj[i];if(!j.truckId)continue;if(data.jobs.some(function(o){return o.date===k&&o.truckId===j.truckId&&o.id!==j.id;}))return true;}return false;
-  };
-  var dayConflicts=function(date){
-    var k=dk(date);var dj=data.jobs.filter(function(j){return j.date===k&&j.truckId;});
-    var m={};dj.forEach(function(j){if(!m[j.truckId])m[j.truckId]=[];m[j.truckId].push(j);});
-    var c=[];Object.entries(m).forEach(function(entry){var tid=entry[0],jobs=entry[1];if(jobs.length>1){var t=data.trucks.find(function(x){return x.id===tid;});c.push({tn:t?t.name:tid,jobs:jobs});}});return c;
-  };
+    function dk(d) {
+      const date = new Date(d);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
 
-  return React.createElement('div',null,
-    React.createElement('div',{className:'app-header'},
-      React.createElement('h1',null,'Fleet Scheduler'),
-      React.createElement('span',{className:'conn-status '+(conn?'ok':'bad')},conn?'Live':'Reconnecting...')
-    ),
-    React.createElement('div',{className:'tabs'},
-      [['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['print','Print']].map(function(item){
-        return React.createElement('div',{key:item[0],className:'tab '+(tab===item[0]?'on':''),onClick:function(){setTab(item[0]);}},item[1]);
-      })
-    ),
-    React.createElement('div',{className:'main'},
-      tab==='schedule'&&React.createElement(Schedule,{data:data,ws:ws,dates:dates,today:today,cellJobs:cellJobs,cellConflict:cellConflict,dayConflicts:dayConflicts,prev:prev,next:next,now:now,modal:modal,setModal:setModal,eid:eid,setEid:setEid}),
-      tab==='roster'&&React.createElement(Roster,{data:data}),
-      tab==='fleet'&&React.createElement(Fleet,{data:data}),
-      tab==='routes'&&React.createElement(Routes,{data:data,dates:dates,ws:ws,prev:prev,next:next,now:now}),
-      tab==='print'&&React.createElement(Print,{data:data,dates:dates,ws:ws,prev:prev,next:next,now:now})
-    ),
-    toast&&React.createElement('div',{className:'toast'},toast)
-  );
-}
+    function weekDates(ws) {
+      const dates = [];
+      const start = new Date(ws);
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        dates.push(d);
+      }
+      return dates;
+    }
 
-function Schedule(props){
-  var data=props.data,ws=props.ws,dates=props.dates,today=props.today,cellJobs=props.cellJobs,cellConflict=props.cellConflict,dayConflicts=props.dayConflicts,prev=props.prev,next=props.next,now=props.now,modal=props.modal,setModal=props.setModal,eid=props.eid,setEid=props.setEid;
-  var end=new Date(ws);end.setDate(end.getDate()+6);
-  var openAdd=function(did,date){setEid(null);setModal({driverId:did,date:dk(date),location:'',truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});};
-  var openEdit=function(job,e){e.stopPropagation();setEid(job.id);setModal(Object.assign({},job));};
-  var save=function(){
-    var p;
-    if(eid) p=api('PUT','/jobs/'+eid,modal);
-    else p=api('POST','/jobs',modal);
-    p.then(function(){setModal(null);setEid(null);});
-  };
-  var del=function(id,e){if(e)e.stopPropagation();api('DELETE','/jobs/'+id);};
+    function fmtTime(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
 
-  return React.createElement('div',null,
-    React.createElement('div',{className:'week-nav'},
-      React.createElement('button',{onClick:prev},'\u25C0 Prev'),
-      React.createElement('button',{onClick:now,style:{background:'#16a34a'}},'Today'),
-      React.createElement('div',{className:'week-label'},fmt(ws)+' \u2014 '+fmt(end)),
-      React.createElement('button',{onClick:next},'Next \u25B6')
-    ),
-    React.createElement('div',{className:'grid'},
-      React.createElement('table',null,
-        React.createElement('thead',null,
-          React.createElement('tr',null,
-            React.createElement('th',null,'Person'),
-            dates.map(function(d,i){return React.createElement('th',{key:i,style:dk(d)===today?{background:'#fffbeb'}:{}},DAYS[i],React.createElement('br'),React.createElement('span',{style:{fontWeight:400,fontSize:11}},(d.getMonth()+1)+'/'+d.getDate()));})
-          )
-        ),
-        React.createElement('tbody',null,
-          data.drivers.map(function(driver){
-            return React.createElement('tr',{key:driver.id},
-              React.createElement('td',null,driver.name,React.createElement('div',{style:{fontSize:10,color:'var(--text-muted)',fontWeight:400}},driver.role)),
-              dates.map(function(date,i){
-                var jobs=cellJobs(driver.id,date);var conf=cellConflict(driver.id,date);var ist=dk(date)===today;
-                return React.createElement('td',{key:i},
-                  React.createElement('div',{className:'cell'+(conf?' conflict':'')+(ist?' today':''),onClick:function(){openAdd(driver.id,date);}},
-                    conf&&React.createElement('div',{className:'cbadge'},'TRUCK CONFLICT'),
-                    jobs.map(function(job){
-                      var truck=data.trucks.find(function(t){return t.id===job.truckId;});
-                      var trailer=data.trailers.find(function(t){return t.id===job.trailerId;});
-                      var sc=job.status?(job.status.toLowerCase().replace(/\s/g,'')):'';
-                      return React.createElement('div',{key:job.id,className:'chip '+sc,onClick:function(e){openEdit(job,e);}},
-                        job.location&&React.createElement('div',{className:'loc'},job.location),
-                        truck&&React.createElement('div',{className:'trk'},truck.name),
-                        trailer&&React.createElement('div',{className:'trk'},trailer.name),
-                        job.timeWindow&&React.createElement('div',{className:'tm'},job.timeWindow),
-                        job.equipment&&job.equipment.length>0&&React.createElement('div',{style:{fontSize:9,color:'#888'}},job.equipment.join(', ')),
-                        job.notes&&React.createElement('div',{style:{fontSize:10,color:'#666',marginTop:1}},job.notes.length>50?job.notes.slice(0,50)+'...':job.notes),
-                        React.createElement('span',{className:'x',onClick:function(e){e.stopPropagation();del(job.id);}},'\u2715')
-                      );
-                    }),
-                    jobs.length===0&&React.createElement('div',{style:{color:'#ccc',fontSize:11,textAlign:'center',marginTop:16}},'+')
-                  )
-                );
-              })
-            );
-          })
-        )
-      )
-    ),
-    dates.map(function(date,i){
-      var c=dayConflicts(date);if(!c.length)return null;
-      return React.createElement('div',{key:i,style:{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:10,margin:'8px 0',fontSize:12}},
-        React.createElement('strong',{style:{color:'var(--danger)'}},'Conflicts on '+DAYS[i]+' '+(date.getMonth()+1)+'/'+date.getDate()+':'),
-        c.map(function(x,j){return React.createElement('div',{key:j,style:{marginTop:4}},x.tn+' assigned to: '+x.jobs.map(function(j2){var d=data.drivers.find(function(d){return d.id===j2.driverId;});return d?d.name:'';}).join(', '));})
+    // API function
+    async function api(method, url, body) {
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+      const response = await fetch('/api' + url, options);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+      return response.json();
+    }
+
+    // Toast component
+    function Toast({ message, type, onClose }) {
+      useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+      }, [onClose]);
+
+      return (
+        <div className={`toast ${type}`}>
+          {message}
+        </div>
       );
-    }),
-    modal&&React.createElement('div',{className:'overlay',onClick:function(){setModal(null);setEid(null);}},
-      React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();}},
-        React.createElement('h2',null,eid?'Edit Job':'Add Job'),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Date'),
-          React.createElement('input',{type:'date',value:modal.date||'',onChange:function(e){setModal(Object.assign({},modal,{date:e.target.value}));}})
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Person'),
-          React.createElement('select',{value:modal.driverId,onChange:function(e){setModal(Object.assign({},modal,{driverId:e.target.value}));}},
-            data.drivers.map(function(d){return React.createElement('option',{key:d.id,value:d.id},d.name+' ('+d.role+')');})
-          )
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Location / Job'),
-          React.createElement('select',{value:(data.locations||[]).indexOf(modal.location)>=0?modal.location:'__custom',onChange:function(e){
-            if(e.target.value==='__custom') setModal(Object.assign({},modal,{location:''}));
-            else setModal(Object.assign({},modal,{location:e.target.value}));
-          }},
-            React.createElement('option',{value:''},'-- Select Location --'),
-            (data.locations||[]).map(function(l){return React.createElement('option',{key:l,value:l},l);}),
-            React.createElement('option',{value:'__custom'},'Other (type custom)...')
-          ),
-          (data.locations||[]).indexOf(modal.location)<0&&React.createElement('input',{value:modal.location,onChange:function(e){setModal(Object.assign({},modal,{location:e.target.value}));},placeholder:'Type custom location',style:{marginTop:4}})
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Truck'),
-          React.createElement('select',{value:modal.truckId,onChange:function(e){setModal(Object.assign({},modal,{truckId:e.target.value}));}},
-            React.createElement('option',{value:''},'-- None --'),
-            data.trucks.filter(function(t){return t.status==='Active';}).map(function(t){return React.createElement('option',{key:t.id,value:t.id},t.name+' ('+t.type+')');})
-          )
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Trailer'),
-          React.createElement('select',{value:modal.trailerId,onChange:function(e){setModal(Object.assign({},modal,{trailerId:e.target.value}));}},
-            React.createElement('option',{value:''},'-- None --'),
-            data.trailers.map(function(t){return React.createElement('option',{key:t.id,value:t.id},t.name+' ('+t.type+')');})
-          )
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Time Window'),
-          React.createElement('input',{value:modal.timeWindow,onChange:function(e){setModal(Object.assign({},modal,{timeWindow:e.target.value}));},placeholder:'e.g. 8:00 AM, Be onsite by 10 AM'})
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Equipment Needed'),
-          React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:6}},
-            data.equipment.map(function(eq){return React.createElement('label',{key:eq,style:{fontSize:12,display:'flex',alignItems:'center',gap:3}},
-              React.createElement('input',{type:'checkbox',checked:(modal.equipment||[]).indexOf(eq)>=0,onChange:function(e){var eqs=modal.equipment||[];setModal(Object.assign({},modal,{equipment:e.target.checked?eqs.concat([eq]):eqs.filter(function(x){return x!==eq;})}));}}),
-              eq
-            );})
-          )
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Status'),
-          React.createElement('select',{value:modal.status||'Scheduled',onChange:function(e){setModal(Object.assign({},modal,{status:e.target.value}));}},
-            ['Scheduled','Tentative','Confirmed','Off','OOO'].map(function(s){return React.createElement('option',{key:s},s);})
-          )
-        ),
-        React.createElement('div',{className:'mrow'},
-          React.createElement('label',null,'Notes'),
-          React.createElement('textarea',{value:modal.notes,onChange:function(e){setModal(Object.assign({},modal,{notes:e.target.value}));},rows:3,placeholder:'Special instructions, reference numbers, etc.'})
-        ),
-        React.createElement('div',{className:'mactions'},
-          React.createElement('button',{className:'bc',onClick:function(){setModal(null);setEid(null);}},'Cancel'),
-          eid&&React.createElement('button',{className:'bd',onClick:function(){del(eid);setModal(null);setEid(null);}},'Delete'),
-          React.createElement('button',{className:'bp',onClick:save},eid?'Update':'Add Job')
-        )
-      )
-    )
-  );
-}
+    }
 
-function Roster(props){
-  var data=props.data;
-  var _name=useState(''),name=_name[0],setName=_name[1];
-  var _role=useState('Driver'),role=_role[0],setRole=_role[1];
-  var _editing=useState(null),editing=_editing[0],setEditing=_editing[1];
-  var _en=useState(''),en=_en[0],setEn=_en[1];
-  var add=function(){if(!name.trim())return;api('POST','/drivers',{name:name.trim(),role:role,skills:[]});setName('');};
-  var remove=function(d){if(confirm('Remove '+d.name+'?'))api('DELETE','/drivers/'+d.id);};
-  var rename=function(d){if(en.trim())api('PUT','/drivers/'+d.id,{name:en.trim()});setEditing(null);};
-
-  return React.createElement('div',null,
-    React.createElement('div',{className:'stitle'},'Add Person'),
-    React.createElement('div',{className:'addrow'},
-      React.createElement('input',{value:name,onChange:function(e){setName(e.target.value);},placeholder:'Name',onKeyDown:function(e){if(e.key==='Enter')add();}}),
-      React.createElement('select',{value:role,onChange:function(e){setRole(e.target.value);},style:{maxWidth:160}},
-        ['Driver','Tech','Warehouse','Sales/Driver'].map(function(r){return React.createElement('option',{key:r},r);})
-      ),
-      React.createElement('button',{className:'bp',onClick:add},'Add')
-    ),
-    React.createElement('div',{className:'stitle'},'Current Roster ('+data.drivers.length+')'),
-    React.createElement('div',{className:'cards'},
-      data.drivers.map(function(d){
-        return React.createElement('div',{key:d.id,className:'card'},
-          React.createElement('div',{style:{flex:1}},
-            editing===d.id?
-              React.createElement('div',{style:{display:'flex',gap:4,alignItems:'center'}},
-                React.createElement('input',{className:'ied',value:en,onChange:function(e){setEn(e.target.value);},onKeyDown:function(e){if(e.key==='Enter')rename(d);if(e.key==='Escape')setEditing(null);},autoFocus:true}),
-                React.createElement('button',{className:'bp',style:{padding:'3px 8px',fontSize:11},onClick:function(){rename(d);}},'Save'),
-                React.createElement('button',{className:'bc',style:{padding:'3px 8px',fontSize:11},onClick:function(){setEditing(null);}},'Cancel')
-              ):
-              React.createElement('div',{className:'nm'},d.name,' ',React.createElement('button',{className:'ebtn',onClick:function(){setEditing(d.id);setEn(d.name);}},'Rename')),
-            React.createElement('select',{value:d.role,onChange:function(e){api('PUT','/drivers/'+d.id,{role:e.target.value});},style:{width:'auto',padding:'2px 6px',fontSize:11,marginTop:4}},
-              ['Driver','Tech','Warehouse','Sales/Driver'].map(function(r){return React.createElement('option',{key:r},r);})
-            )
-          ),
-          React.createElement('div',{className:'acts'},React.createElement('button',{style:{background:'#fee2e2',color:'var(--danger)'},onClick:function(){remove(d);}},'Remove'))
-        );
-      })
-    )
-  );
-}
-
-function Fleet(props){
-  var data=props.data;
-  var _tn=useState(''),tn=_tn[0],setTn=_tn[1];
-  var _tt2=useState('Standard'),tt2=_tt2[0],setTt=_tt2[1];
-  var _trn=useState(''),trn=_trn[0],setTrn=_trn[1];
-  var _trt=useState('Standard'),trt=_trt[0],setTrt=_trt[1];
-  var _eq=useState(''),eq=_eq[0],setEq=_eq[1];
-  var _newLoc=useState(''),newLoc=_newLoc[0],setNewLoc=_newLoc[1];
-  var _editingLoc=useState(null),editingLoc=_editingLoc[0],setEditingLoc=_editingLoc[1];
-  var _editLocName=useState(''),editLocName=_editLocName[0],setEditLocName=_editLocName[1];
-  var _editing=useState(null),editing=_editing[0],setEditing=_editing[1];
-  var _en=useState(''),en=_en[0],setEn=_en[1];
-
-  return React.createElement('div',null,
-    React.createElement('div',{className:'stitle'},'Add Truck'),
-    React.createElement('div',{className:'addrow'},
-      React.createElement('input',{value:tn,onChange:function(e){setTn(e.target.value);},placeholder:'Truck name/number (e.g. Unit 401)'}),
-      React.createElement('select',{value:tt2,onChange:function(e){setTt(e.target.value);},style:{maxWidth:160}},
-        ['Standard','Flatbed','Vac Truck','Tanker','Box Truck'].map(function(t){return React.createElement('option',{key:t},t);})
-      ),
-      React.createElement('button',{className:'bp',onClick:function(){if(tn.trim()){api('POST','/trucks',{name:tn.trim(),type:tt2,status:'Active'});setTn('');}}},'Add')
-    ),
-    React.createElement('div',{className:'stitle'},'Trucks ('+data.trucks.length+')'),
-    React.createElement('div',{className:'cards'},
-      data.trucks.map(function(t){
-        return React.createElement('div',{key:t.id,className:'card'},
-          React.createElement('div',{style:{flex:1}},
-            editing===t.id?
-              React.createElement('div',{style:{display:'flex',gap:4,alignItems:'center'}},
-                React.createElement('input',{className:'ied',value:en,onChange:function(e){setEn(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'){if(en.trim())api('PUT','/trucks/'+t.id,{name:en.trim()});setEditing(null);}if(e.key==='Escape')setEditing(null);},autoFocus:true}),
-                React.createElement('button',{className:'bp',style:{padding:'3px 8px',fontSize:11},onClick:function(){if(en.trim())api('PUT','/trucks/'+t.id,{name:en.trim()});setEditing(null);}},'Save'),
-                React.createElement('button',{className:'bc',style:{padding:'3px 8px',fontSize:11},onClick:function(){setEditing(null);}},'Cancel')
-              ):
-              React.createElement('div',{className:'nm'},t.name,' ',React.createElement('button',{className:'ebtn',onClick:function(){setEditing(t.id);setEn(t.name);}},'Rename')),
-            React.createElement('div',{style:{marginTop:2}},
-              React.createElement('select',{value:t.type,onChange:function(e){api('PUT','/trucks/'+t.id,{type:e.target.value});},style:{width:'auto',padding:'2px 6px',fontSize:11}},
-                ['Standard','Flatbed','Vac Truck','Tanker','Box Truck'].map(function(tp){return React.createElement('option',{key:tp},tp);})
-              ),
-              React.createElement('span',{style:{fontSize:11,marginLeft:8,color:t.status==='Active'?'var(--success)':'var(--danger)'}},t.status)
-            )
-          ),
-          React.createElement('div',{className:'acts'},
-            React.createElement('button',{style:{background:t.status==='Active'?'#fef3c7':'#d1fae5',color:t.status==='Active'?'#92400e':'#065f46'},onClick:function(){api('PUT','/trucks/'+t.id,{status:t.status==='Active'?'Out of Service':'Active'});}},t.status==='Active'?'Disable':'Enable'),
-            React.createElement('button',{style:{background:'#fee2e2',color:'var(--danger)'},onClick:function(){if(confirm('Remove '+t.name+'?'))api('DELETE','/trucks/'+t.id);}},'Remove')
-          )
-        );
-      })
-    ),
-    React.createElement('div',{className:'stitle',style:{marginTop:28}},'Add Trailer'),
-    React.createElement('div',{className:'addrow'},
-      React.createElement('input',{value:trn,onChange:function(e){setTrn(e.target.value);},placeholder:'Trailer name/number'}),
-      React.createElement('select',{value:trt,onChange:function(e){setTrt(e.target.value);},style:{maxWidth:160}},
-        ['Standard','Flatbed','Tanker','Enclosed','Dump'].map(function(t){return React.createElement('option',{key:t},t);})
-      ),
-      React.createElement('button',{className:'bp',onClick:function(){if(trn.trim()){api('POST','/trailers',{name:trn.trim(),type:trt});setTrn('');}}},'Add')
-    ),
-    React.createElement('div',{className:'stitle'},'Trailers ('+data.trailers.length+')'),
-    React.createElement('div',{className:'cards'},
-      data.trailers.map(function(t){
-        return React.createElement('div',{key:t.id,className:'card'},
-          React.createElement('div',{style:{flex:1}},
-            editing===t.id?
-              React.createElement('div',{style:{display:'flex',gap:4,alignItems:'center'}},
-                React.createElement('input',{className:'ied',value:en,onChange:function(e){setEn(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'){if(en.trim())api('PUT','/trailers/'+t.id,{name:en.trim()});setEditing(null);}if(e.key==='Escape')setEditing(null);},autoFocus:true}),
-                React.createElement('button',{className:'bp',style:{padding:'3px 8px',fontSize:11},onClick:function(){if(en.trim())api('PUT','/trailers/'+t.id,{name:en.trim()});setEditing(null);}},'Save'),
-                React.createElement('button',{className:'bc',style:{padding:'3px 8px',fontSize:11},onClick:function(){setEditing(null);}},'Cancel')
-              ):
-              React.createElement('div',{className:'nm'},t.name,' ',React.createElement('button',{className:'ebtn',onClick:function(){setEditing(t.id);setEn(t.name);}},'Rename')),
-            React.createElement('select',{value:t.type,onChange:function(e){api('PUT','/trailers/'+t.id,{type:e.target.value});},style:{width:'auto',padding:'2px 6px',fontSize:11,marginTop:2}},
-              ['Standard','Flatbed','Tanker','Enclosed','Dump'].map(function(tp){return React.createElement('option',{key:tp},tp);})
-            )
-          ),
-          React.createElement('div',{className:'acts'},React.createElement('button',{style:{background:'#fee2e2',color:'var(--danger)'},onClick:function(){if(confirm('Remove '+t.name+'?'))api('DELETE','/trailers/'+t.id);}},'Remove'))
-        );
-      })
-    ),
-    React.createElement('div',{className:'stitle',style:{marginTop:28}},'Equipment Types'),
-    React.createElement('div',{className:'addrow'},
-      React.createElement('input',{value:eq,onChange:function(e){setEq(e.target.value);},placeholder:'New equipment type',onKeyDown:function(e){if(e.key==='Enter'&&eq.trim()){api('POST','/equipment',{name:eq.trim()});setEq('');}}}),
-      React.createElement('button',{className:'bp',onClick:function(){if(eq.trim()){api('POST','/equipment',{name:eq.trim()});setEq('');}}},'Add')
-    ),
-    React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:6}},
-      data.equipment.map(function(e,i){
-        return React.createElement('span',{key:i,style:{background:'#eef2ff',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}},
-          e,React.createElement('span',{style:{cursor:'pointer',color:'#999',fontSize:10},onClick:function(){api('DELETE','/equipment/'+encodeURIComponent(e));}},'\u2715')
-        );
-      })
-    ),
-    React.createElement('div',{className:'stitle',style:{marginTop:28}},'Saved Locations / Routes'),
-    React.createElement('div',{className:'addrow'},
-      React.createElement('input',{value:newLoc,onChange:function(e){setNewLoc(e.target.value);},placeholder:'New location (e.g. Brenntag Fresno)',onKeyDown:function(e){if(e.key==='Enter'&&newLoc.trim()){api('POST','/locations',{name:newLoc.trim()});setNewLoc('');}}}),
-      React.createElement('button',{className:'bp',onClick:function(){if(newLoc.trim()){api('POST','/locations',{name:newLoc.trim()});setNewLoc('');}}},'Add')
-    ),
-    React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:6}},
-      (data.locations||[]).map(function(loc,i){
-        return React.createElement('span',{key:i,style:{background:'#f0fdf4',border:'1px solid #86efac',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}},
-          editingLoc===loc?
-            React.createElement('span',{style:{display:'flex',gap:3,alignItems:'center'}},
-              React.createElement('input',{className:'ied',value:editLocName,onChange:function(e){setEditLocName(e.target.value);},style:{width:120,fontSize:11},onKeyDown:function(e){if(e.key==='Enter'&&editLocName.trim()){api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}if(e.key==='Escape')setEditingLoc(null);},autoFocus:true}),
-              React.createElement('button',{className:'bp',style:{padding:'2px 6px',fontSize:10},onClick:function(){if(editLocName.trim()){api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}}},'OK')
-            ):
-            React.createElement('span',null,
-              loc,
-              React.createElement('span',{style:{cursor:'pointer',color:'var(--primary)',fontSize:10,marginLeft:2},onClick:function(){setEditingLoc(loc);setEditLocName(loc);}},'edit'),
-              React.createElement('span',{style:{cursor:'pointer',color:'#999',fontSize:10},onClick:function(){api('DELETE','/locations/'+encodeURIComponent(loc));}},'\u2715')
-            )
-        );
-      })
-    )
-  );
-}
-
-function Routes(props){
-  var data=props.data,dates=props.dates,ws=props.ws,prev=props.prev,next=props.next,now=props.now;
-  var end=new Date(ws);end.setDate(end.getDate()+6);
-  var allLocs=useMemo(function(){
-    var l={};dates.forEach(function(date){var k=dk(date);data.jobs.filter(function(j){return j.date===k&&j.location;}).forEach(function(j){var n=j.location.trim();if(!l[n])l[n]=0;l[n]++;});});
-    return Object.entries(l).sort(function(a,b){return b[1]-a[1];});
-  },[data.jobs,dates]);
-
-  return React.createElement('div',null,
-    React.createElement('div',{className:'week-nav'},
-      React.createElement('button',{onClick:prev},'\u25C0 Prev'),
-      React.createElement('button',{onClick:now,style:{background:'#16a34a'}},'Today'),
-      React.createElement('div',{className:'week-label'},fmt(ws)+' \u2014 '+fmt(end)),
-      React.createElement('button',{onClick:next},'Next \u25B6')
-    ),
-    allLocs.length>0&&React.createElement('div',{style:{background:'var(--bg-white)',borderRadius:10,padding:16,marginBottom:16,boxShadow:'var(--shadow)'}},
-      React.createElement('div',{style:{fontWeight:600,marginBottom:8}},'This Week\'s Locations ('+allLocs.length+' unique)'),
-      React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:4}},allLocs.map(function(item){return React.createElement('span',{key:item[0],className:'rtag'},item[0],' ',React.createElement('span',{style:{opacity:.6}},'x'+item[1]));}))
-    ),
-    React.createElement('div',{className:'rtable'},
-      React.createElement('table',null,
-        React.createElement('thead',null,React.createElement('tr',null,React.createElement('th',{style:{width:100}},'Day'),React.createElement('th',null,'Driver Routes'))),
-        React.createElement('tbody',null,
-          dates.map(function(date,i){
-            var k=dk(date);var dj=data.jobs.filter(function(j){return j.date===k&&j.location;});
-            var m={};dj.forEach(function(j){var d=data.drivers.find(function(x){return x.id===j.driverId;});if(!d)return;if(!m[d.name])m[d.name]=[];m[d.name].push({loc:j.location,truck:(data.trucks.find(function(t){return t.id===j.truckId;})||{}).name});});
-            var entries=Object.entries(m);
-            return React.createElement('tr',{key:i},
-              React.createElement('td',{style:{fontWeight:600}},DAYS[i],React.createElement('br'),React.createElement('span',{style:{fontSize:11,color:'var(--text-muted)'}},(date.getMonth()+1)+'/'+date.getDate())),
-              React.createElement('td',null,
-                entries.length===0&&React.createElement('span',{style:{color:'#ccc'}},'No jobs scheduled'),
-                entries.map(function(entry){return React.createElement('div',{key:entry[0],style:{marginBottom:4}},React.createElement('strong',{style:{fontSize:12}},entry[0]+':'),' ',
-                  entry[1].map(function(item,j){return React.createElement('span',{key:j,className:'rtag'},item.loc+(item.truck?' ('+item.truck+')':''));})
-                );})
-              )
-            );
-          })
-        )
-      )
-    )
-  );
-}
-
-function Print(props){
-  var data=props.data,dates=props.dates,ws=props.ws,prev=props.prev,next=props.next,now=props.now;
-  var end=new Date(ws);end.setDate(end.getDate()+6);
-  var _mode=useState('daily'),mode=_mode[0],setMode=_mode[1];
-  var _selDay=useState(0),selDay=_selDay[0],setSelDay=_selDay[1];
-  var _selDrivers=useState(data.drivers.map(function(d){return d.id;})),selDrivers=_selDrivers[0],setSelDrivers=_selDrivers[1];
-
-  var toggleDriver=function(id){setSelDrivers(function(s){return s.indexOf(id)>=0?s.filter(function(x){return x!==id;}):s.concat([id]);});};
-  var selectAll=function(){setSelDrivers(data.drivers.map(function(d){return d.id;}));};
-  var selectNone=function(){setSelDrivers([]);};
-
-  var printDate=dates[selDay];
-  var printDateStr=printDate?fmtLong(printDate):'';
-  var driverDayJobs=function(did,date){return data.jobs.filter(function(j){return j.driverId===did&&j.date===dk(date);});};
-  var printedAt=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-
-  var handlePrint=function(){window.print();};
-
-  return React.createElement('div',null,
-    React.createElement('div',{className:'week-nav no-print'},
-      React.createElement('button',{onClick:prev},'\u25C0 Prev'),
-      React.createElement('button',{onClick:now,style:{background:'#16a34a'}},'Today'),
-      React.createElement('div',{className:'week-label'},fmt(ws)+' \u2014 '+fmt(end)),
-      React.createElement('button',{onClick:next},'Next \u25B6')
-    ),
-    React.createElement('div',{className:'no-print',style:{background:'var(--bg-white)',borderRadius:10,padding:20,marginBottom:16,boxShadow:'var(--shadow)'}},
-      React.createElement('div',{style:{display:'flex',gap:12,marginBottom:14,alignItems:'center',flexWrap:'wrap'}},
-        React.createElement('label',{style:{fontWeight:700,fontSize:14}},'Print Mode:'),
-        React.createElement('button',{className:mode==='daily'?'bp':'bc',style:{padding:'8px 20px'},onClick:function(){setMode('daily');}},'Daily Instruction Sheets'),
-        React.createElement('button',{className:mode==='weekly'?'bp':'bc',style:{padding:'8px 20px'},onClick:function(){setMode('weekly');}},'Weekly Overview')
-      ),
-      mode==='daily'&&React.createElement('div',{style:{marginBottom:14}},
-        React.createElement('label',{style:{fontWeight:700,fontSize:14,marginRight:8}},'Day:'),
-        React.createElement('select',{value:selDay,onChange:function(e){setSelDay(Number(e.target.value));},style:{width:'auto',fontSize:14,padding:'6px 10px'}},
-          dates.map(function(d,i){return React.createElement('option',{key:i,value:i},DAYS[i]+' \u2014 '+(d.getMonth()+1)+'/'+d.getDate());})
-        )
-      ),
-      React.createElement('div',{style:{marginBottom:14}},
-        React.createElement('label',{style:{fontWeight:700,fontSize:14}},'Print for: '),
-        React.createElement('button',{className:'ebtn',style:{fontSize:12,padding:'4px 10px'},onClick:selectAll},'All'),
-        React.createElement('button',{className:'ebtn',style:{fontSize:12,padding:'4px 10px'},onClick:selectNone},'None'),
-        React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}},
-          data.drivers.map(function(d){return React.createElement('label',{key:d.id,style:{fontSize:13,display:'flex',alignItems:'center',gap:4,padding:'4px 10px',background:selDrivers.indexOf(d.id)>=0?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.indexOf(d.id)>=0?'1px solid #c7d2fe':'1px solid #e2e8f0'}},
-            React.createElement('input',{type:'checkbox',checked:selDrivers.indexOf(d.id)>=0,onChange:function(){toggleDriver(d.id);}}),
-            d.name
-          );})
-        )
-      ),
-      React.createElement('button',{className:'bp',style:{fontSize:16,padding:'12px 40px',borderRadius:8},onClick:handlePrint},'Print Sheets'),
-      React.createElement('span',{style:{marginLeft:12,fontSize:12,color:'#999'}},'One page per person')
-    ),
-    mode==='daily'&&selDrivers.map(function(did){
-      var driver=data.drivers.find(function(d){return d.id===did;});
-      if(!driver) return null;
-      var jobs=driverDayJobs(did,printDate);
-      if(jobs.length===0) return null;
-      return React.createElement('div',{className:'print-sheet',key:did},
-        React.createElement('div',{className:'print-topbar'},
-          React.createElement('div',null,
-            React.createElement('h1',null,driver.name),
-            React.createElement('div',{style:{fontSize:14,fontWeight:600,color:'#333',marginTop:2}},driver.role)
-          ),
-          React.createElement('div',{className:'print-meta'},
-            React.createElement('strong',null,printDateStr),React.createElement('br'),
-            jobs.length+' job'+(jobs.length!==1?'s':'')+' scheduled'
-          )
-        ),
-        jobs.map(function(job,idx){
-          var truck=data.trucks.find(function(t){return t.id===job.truckId;});
-          var trailer=data.trailers.find(function(t){return t.id===job.trailerId;});
-          return React.createElement('div',{className:'print-job-card',key:job.id},
-            React.createElement('div',{className:'print-job-num'},
-              React.createElement('span',null,'JOB '+(idx+1)+' of '+jobs.length),
-              job.timeWindow&&React.createElement('span',null,job.timeWindow)
-            ),
-            React.createElement('div',{className:'print-job-body'},
-              React.createElement('div',{className:'print-job-loc'},job.location||'No location assigned'),
-              React.createElement('div',{className:'print-job-grid'},
-                truck&&React.createElement('div',{className:'print-job-field'},React.createElement('b',null,'Truck:'),' '+truck.name+' ('+truck.type+')'),
-                trailer&&React.createElement('div',{className:'print-job-field'},React.createElement('b',null,'Trailer:'),' '+trailer.name+' ('+trailer.type+')'),
-                job.timeWindow&&React.createElement('div',{className:'print-job-field'},React.createElement('b',null,'Time:'),' '+job.timeWindow),
-                job.status&&job.status!=='Scheduled'&&React.createElement('div',{className:'print-job-field'},React.createElement('b',null,'Status:'),' '+job.status),
-                job.equipment&&job.equipment.length>0&&React.createElement('div',{className:'print-job-field',style:{gridColumn:'1/-1'}},React.createElement('b',null,'Equipment:'),' '+job.equipment.join(', '))
-              ),
-              job.notes&&React.createElement('div',{className:'print-job-notes'},React.createElement('b',null,'Instructions / Notes:'),job.notes)
-            )
-          );
-        }),
-        React.createElement('div',{className:'print-footer'},
-          React.createElement('span',null,'Fleet Scheduler \u2014 Printed '+printedAt),
-          React.createElement('span',null,driver.name+' \u2022 '+printDateStr+' \u2022 '+jobs.length+' job'+(jobs.length!==1?'s':''))
-        )
-      );
-    }),
-    mode==='weekly'&&selDrivers.map(function(did){
-      var driver=data.drivers.find(function(d){return d.id===did;});
-      if(!driver) return null;
-      var hasAnyJobs=dates.some(function(date){return driverDayJobs(did,date).length>0;});
-      if(!hasAnyJobs) return null;
-      var totalJobs=dates.reduce(function(s,date){return s+driverDayJobs(did,date).length;},0);
-      var rows=[];
-      dates.forEach(function(date,i){
-        var jobs=driverDayJobs(did,date);
-        if(jobs.length===0){
-          rows.push(React.createElement('tr',{key:'empty-'+i},
-            React.createElement('td',{style:{fontWeight:800}},DAYS[i],React.createElement('br'),React.createElement('span',{style:{fontWeight:400,fontSize:11}},(date.getMonth()+1)+'/'+date.getDate())),
-            React.createElement('td',{colSpan:6,style:{color:'#999',fontStyle:'italic'}},'No jobs scheduled')
-          ));
-        } else {
-          jobs.forEach(function(job,j){
-            var truck=data.trucks.find(function(t){return t.id===job.truckId;});
-            var trailer=data.trailers.find(function(t){return t.id===job.trailerId;});
-            var cells=[];
-            if(j===0) cells.push(React.createElement('td',{key:'day',rowSpan:jobs.length,style:{fontWeight:800}},DAYS[i],React.createElement('br'),React.createElement('span',{style:{fontWeight:400,fontSize:11}},(date.getMonth()+1)+'/'+date.getDate())));
-            cells.push(React.createElement('td',{key:'loc',style:{fontWeight:700}},job.location||'\u2014'));
-            cells.push(React.createElement('td',{key:'truck'},truck?truck.name:'\u2014'));
-            cells.push(React.createElement('td',{key:'trailer'},trailer?trailer.name:'\u2014'));
-            cells.push(React.createElement('td',{key:'time'},job.timeWindow||'\u2014'));
-            cells.push(React.createElement('td',{key:'equip',style:{fontSize:11}},job.equipment&&job.equipment.length?job.equipment.join(', '):'\u2014'));
-            cells.push(React.createElement('td',{key:'notes',style:{fontSize:11,maxWidth:150}},job.notes||'\u2014'));
-            rows.push(React.createElement('tr',{key:job.id},cells));
-          });
-        }
+    // Job modal
+    function JobModal({ isOpen, job, date, drivers, trucks, trailers, locations, equipment, onSave, onClose, onDelete }) {
+      const [formData, setFormData] = useState({
+        date: job ? dk(job.date) : (date ? dk(date) : dk(new Date())),
+        driver: job?.driver || '',
+        location: job?.location || '',
+        customLocation: job?.customLocation || '',
+        truck: job?.truck || '',
+        trailer: job?.trailer || '',
+        timeWindow: job?.timeWindow || '',
+        status: job?.status || 'Scheduled',
+        notes: job?.notes || '',
+        equipment: job?.equipment || []
       });
-      return React.createElement('div',{className:'print-sheet',key:did},
-        React.createElement('div',{className:'print-topbar'},
-          React.createElement('div',null,
-            React.createElement('h1',null,driver.name),
-            React.createElement('div',{style:{fontSize:14,fontWeight:600,color:'#333',marginTop:2}},driver.role+' \u2014 Weekly Overview')
-          ),
-          React.createElement('div',{className:'print-meta'},
-            React.createElement('strong',null,fmt(ws)+' \u2014 '+fmt(end)),React.createElement('br'),
-            totalJobs+' job'+(totalJobs!==1?'s':'')+' this week'
-          )
-        ),
-        React.createElement('table',{className:'print-weekly-table'},
-          React.createElement('thead',null,React.createElement('tr',null,
-            React.createElement('th',{style:{width:100}},'Day'),
-            React.createElement('th',null,'Location'),React.createElement('th',null,'Truck'),React.createElement('th',null,'Trailer'),
-            React.createElement('th',null,'Time'),React.createElement('th',null,'Equipment'),React.createElement('th',null,'Notes')
-          )),
-          React.createElement('tbody',null,rows)
-        ),
-        React.createElement('div',{className:'print-footer'},
-          React.createElement('span',null,'Fleet Scheduler \u2014 Printed '+printedAt),
-          React.createElement('span',null,driver.name+' \u2022 Week of '+fmt(ws)+' \u2022 '+totalJobs+' job'+(totalJobs!==1?'s':''))
-        )
-      );
-    }),
-    mode==='daily'&&selDrivers.every(function(did){return driverDayJobs(did,printDate).length===0;})&&React.createElement('div',{className:'print-no-jobs'},'No jobs scheduled for the selected people on '+printDateStr+'.'),
-    mode==='weekly'&&selDrivers.every(function(did){return !dates.some(function(date){return driverDayJobs(did,date).length>0;});})&&React.createElement('div',{className:'print-no-jobs'},'No jobs scheduled for the selected people this week.')
-  );
-}
 
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
-</script>
+      const [showCustomLocation, setShowCustomLocation] = useState(!job || !locations.some(l => l.name === job.location));
+
+      const handleEquipmentChange = (equipName) => {
+        setFormData(prev => ({
+          ...prev,
+          equipment: prev.equipment.includes(equipName)
+            ? prev.equipment.filter(e => e !== equipName)
+            : [...prev.equipment, equipName]
+        }));
+      };
+
+      const handleLocationChange = (e) => {
+        const value = e.target.value;
+        if (value === '__custom__') {
+          setShowCustomLocation(true);
+          setFormData(prev => ({ ...prev, location: '' }));
+        } else {
+          setShowCustomLocation(false);
+          setFormData(prev => ({ ...prev, location: value, customLocation: '' }));
+        }
+      };
+
+      const handleSave = () => {
+        const finalLocation = showCustomLocation ? formData.customLocation : formData.location;
+        if (!formData.driver || !finalLocation || !formData.truck || !formData.status) {
+          alert('Please fill in all required fields');
+          return;
+        }
+        onSave({
+          ...formData,
+          location: finalLocation,
+          customLocation: showCustomLocation ? formData.customLocation : '',
+          date: new Date(formData.date)
+        });
+      };
+
+      if (!isOpen) return null;
+
+      return (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2 className="modal-title">{job ? 'Edit Job' : 'Add Job'}</h2>
+
+            <div className="form-group">
+              <label>Date</label>
+              <input
+                type="date"
+                className="input"
+                value={formData.date}
+                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Person</label>
+              <select
+                className="input"
+                value={formData.driver}
+                onChange={(e) => setFormData(prev => ({ ...prev, driver: e.target.value }))}
+              >
+                <option value="">Select a driver...</option>
+                {drivers.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Location / Job</label>
+              <select className="input" onChange={handleLocationChange} value={showCustomLocation ? '__custom__' : formData.location}>
+                <option value="">Select location...</option>
+                {locations.map(l => (
+                  <option key={l.id} value={l.name}>{l.name}</option>
+                ))}
+                <option value="__custom__">Other (type custom)...</option>
+              </select>
+              {showCustomLocation && (
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Enter custom location"
+                  value={formData.customLocation}
+                  onChange={(e) => setFormData(prev => ({ ...prev, customLocation: e.target.value }))}
+                  style={{ marginTop: '8px' }}
+                />
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Truck</label>
+              <select
+                className="input"
+                value={formData.truck}
+                onChange={(e) => setFormData(prev => ({ ...prev, truck: e.target.value }))}
+              >
+                <option value="">Select a truck...</option>
+                {trucks.filter(t => t.enabled).map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Trailer</label>
+              <select
+                className="input"
+                value={formData.trailer}
+                onChange={(e) => setFormData(prev => ({ ...prev, trailer: e.target.value }))}
+              >
+                <option value="">Select a trailer...</option>
+                {trailers.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Time Window</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g., 9:00 AM - 12:00 PM"
+                value={formData.timeWindow}
+                onChange={(e) => setFormData(prev => ({ ...prev, timeWindow: e.target.value }))}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Equipment Needed</label>
+              <div className="checkbox-group">
+                {equipment.map(eq => (
+                  <div key={eq.id} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id={`eq-${eq.id}`}
+                      checked={formData.equipment.includes(eq.name)}
+                      onChange={() => handleEquipmentChange(eq.name)}
+                    />
+                    <label htmlFor={`eq-${eq.id}`}>{eq.name}</label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Status</label>
+              <select
+                className="input"
+                value={formData.status}
+                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+              >
+                <option value="Scheduled">Scheduled</option>
+                <option value="Tentative">Tentative</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Off">Off</option>
+                <option value="OOO">OOO</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Notes</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="modal-buttons">
+              <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+              {job && (
+                <button className="btn btn-danger" onClick={() => { onDelete(job.id); onClose(); }}>Delete</button>
+              )}
+              <button className="btn btn-primary" onClick={handleSave}>{job ? 'Update' : 'Add Job'}</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Weekly Schedule Tab
+    function WeeklyScheduleTab({ data, currentWeek, onChangeWeek, onAddJob, onEditJob, onDeleteJob }) {
+      const days = weekDates(currentWeek);
+      const drivers = data.drivers || [];
+
+      const getTruckConflicts = (driver, date) => {
+        const dayJobs = (data.jobs || []).filter(j => dk(j.date) === dk(date) && j.driver === driver);
+        const trucks = dayJobs.map(j => j.truck).filter(Boolean);
+        return new Set(trucks).size > 1 ? `${new Set(trucks).size} trucks` : null;
+      };
+
+      return (
+        <div>
+          <div className="week-nav">
+            <button className="btn btn-secondary btn-small" onClick={() => onChangeWeek(new Date(currentWeek.getTime() - 7*24*60*60*1000))}>Prev</button>
+            <span className="week-date">{fmt(days[0])} - {fmt(days[6])}</span>
+            <button className="btn btn-secondary btn-small" onClick={() => onChangeWeek(weekStart(new Date()))}>Today</button>
+            <button className="btn btn-secondary btn-small" onClick={() => onChangeWeek(new Date(currentWeek.getTime() + 7*24*60*60*1000))}>Next</button>
+          </div>
+
+          <div className="card">
+            <table className="week-grid">
+              <thead>
+                <tr>
+                  <th style={{ width: '12%' }}>Driver</th>
+                  {days.map(d => (
+                    <th key={dk(d)} style={{ width: '12.5%' }}>{fmt(d)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {drivers.map(driver => (
+                  <tr key={driver.id}>
+                    <td style={{ fontWeight: 600 }}>{driver.name}</td>
+                    {days.map(day => {
+                      const dayKey = dk(day);
+                      const dayJobs = (data.jobs || []).filter(j => dk(j.date) === dayKey && j.driver === driver.id);
+                      const conflict = getTruckConflicts(driver.id, day);
+                      return (
+                        <td
+                          key={dayKey}
+                          className="day-cell"
+                          onClick={() => onAddJob(day, driver.id)}
+                        >
+                          <div>
+                            {dayJobs.map(job => {
+                              const locationName = job.location || job.customLocation || 'Unknown';
+                              return (
+                                <div
+                                  key={job.id}
+                                  className={`job-chip job-${job.status?.toLowerCase()}`}
+                                  onClick={(e) => { e.stopPropagation(); onEditJob(job); }}
+                                  title={locationName}
+                                >
+                                  {locationName.substring(0, 15)}
+                                </div>
+                              );
+                            })}
+                            {conflict && <span className="conflict-badge">{conflict}</span>}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // People Tab
+    function PeopleTab({ data, onAddPerson, onRemovePerson, onRenamePerson }) {
+      const [newName, setNewName] = useState('');
+      const [newRole, setNewRole] = useState('Driver');
+      const [editingId, setEditingId] = useState(null);
+      const [editName, setEditName] = useState('');
+
+      const handleAdd = () => {
+        if (newName.trim()) {
+          onAddPerson({ name: newName, role: newRole });
+          setNewName('');
+          setNewRole('Driver');
+        }
+      };
+
+      const handleRename = (id, name) => {
+        onRenamePerson(id, name);
+        setEditingId(null);
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <h3 className="card-title">Add Driver</h3>
+            <div className="form-group">
+              <label>Name</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Driver name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
+              />
+            </div>
+            <div className="form-group">
+              <label>Role</label>
+              <select className="input" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+                <option>Driver</option>
+                <option>Tech</option>
+                <option>Warehouse</option>
+                <option>Sales/Driver</option>
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={handleAdd}>Add Driver</button>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Drivers</h3>
+            <div className="people-list">
+              {(data.drivers || []).map(driver => (
+                <div key={driver.id} className="person-item">
+                  {editingId === driver.id ? (
+                    <div style={{ flex: 1, display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        className="input"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        autoFocus
+                      />
+                      <button className="btn btn-primary btn-small" onClick={() => handleRename(driver.id, editName)}>Save</button>
+                      <button className="btn btn-secondary btn-small" onClick={() => setEditingId(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="person-info">
+                        <div className="person-name">{driver.name}</div>
+                        <div className="person-role">{driver.role}</div>
+                      </div>
+                      <button className="btn btn-secondary btn-small" onClick={() => { setEditingId(driver.id); setEditName(driver.name); }}>Rename</button>
+                      <button className="btn btn-danger btn-small" onClick={() => onRemovePerson(driver.id)}>Remove</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Trucks & Trailers Tab
+    function TrucksTab({ data, onAddTruck, onRemoveTruck, onRenameTruck, onToggleTruck, onAddTrailer, onRemoveTrailer, onRenameTrailer, onAddLocation, onRemoveLocation, onRenameLocation }) {
+      const [newTruckName, setNewTruckName] = useState('');
+      const [newTruckType, setNewTruckType] = useState('Standard');
+      const [newTrailerName, setNewTrailerName] = useState('');
+      const [newTrailerType, setNewTrailerType] = useState('Standard');
+      const [newEquip, setNewEquip] = useState('');
+      const [newLocation, setNewLocation] = useState('');
+      const [editingLocationId, setEditingLocationId] = useState(null);
+      const [editLocationName, setEditLocationName] = useState('');
+
+      const handleAddTruck = () => {
+        if (newTruckName.trim()) {
+          onAddTruck({ name: newTruckName, type: newTruckType });
+          setNewTruckName('');
+          setNewTruckType('Standard');
+        }
+      };
+
+      const handleAddTrailer = () => {
+        if (newTrailerName.trim()) {
+          onAddTrailer({ name: newTrailerName, type: newTrailerType });
+          setNewTrailerName('');
+          setNewTrailerType('Standard');
+        }
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <h3 className="card-title">Add Truck</h3>
+            <div className="form-group">
+              <label>Truck Name</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g., Truck 1"
+                value={newTruckName}
+                onChange={(e) => setNewTruckName(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>Type</label>
+              <select className="input" value={newTruckType} onChange={(e) => setNewTruckType(e.target.value)}>
+                <option>Standard</option>
+                <option>Flatbed</option>
+                <option>Vac Truck</option>
+                <option>Tanker</option>
+                <option>Box Truck</option>
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={handleAddTruck}>Add Truck</button>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Trucks</h3>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {(data.trucks || []).map(truck => (
+                <div key={truck.id} className="truck-item">
+                  <div className="truck-info">
+                    <div className="truck-name">{truck.name}</div>
+                    <div className="truck-type">{truck.type}</div>
+                    <span className={`truck-status ${!truck.enabled ? 'disabled' : ''}`}>
+                      {truck.enabled ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn btn-secondary btn-small" onClick={() => onToggleTruck(truck.id)}>
+                      {truck.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                    <button className="btn btn-danger btn-small" onClick={() => onRemoveTruck(truck.id)}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Add Trailer</h3>
+            <div className="form-group">
+              <label>Trailer Name</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g., Trailer 1"
+                value={newTrailerName}
+                onChange={(e) => setNewTrailerName(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>Type</label>
+              <select className="input" value={newTrailerType} onChange={(e) => setNewTrailerType(e.target.value)}>
+                <option>Standard</option>
+                <option>Flatbed</option>
+                <option>Tanker</option>
+                <option>Enclosed</option>
+                <option>Dump</option>
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={handleAddTrailer}>Add Trailer</button>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Trailers</h3>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {(data.trailers || []).map(trailer => (
+                <div key={trailer.id} className="truck-item">
+                  <div className="truck-info">
+                    <div className="truck-name">{trailer.name}</div>
+                    <div className="truck-type">{trailer.type}</div>
+                  </div>
+                  <button className="btn btn-danger btn-small" onClick={() => onRemoveTrailer(trailer.id)}>Remove</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Equipment Types</h3>
+            <div className="input-group">
+              <input
+                type="text"
+                className="input"
+                placeholder="New equipment type"
+                value={newEquip}
+                onChange={(e) => setNewEquip(e.target.value)}
+              />
+              <button className="btn btn-primary" onClick={() => {
+                if (newEquip.trim()) {
+                  api('POST', '/equipment', { name: newEquip }).catch(() => {});
+                  setNewEquip('');
+                }
+              }}>Add</button>
+            </div>
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {(data.equipment || []).map(eq => (
+                <div key={eq.id} className="equipment-item">
+                  <span className="equipment-name">{eq.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Saved Locations</h3>
+            <div className="input-group">
+              <input
+                type="text"
+                className="input"
+                placeholder="New location"
+                value={newLocation}
+                onChange={(e) => setNewLocation(e.target.value)}
+              />
+              <button className="btn btn-primary" onClick={() => {
+                if (newLocation.trim()) {
+                  onAddLocation({ name: newLocation });
+                  setNewLocation('');
+                }
+              }}>Add</button>
+            </div>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {((data.locations || []).map(loc => (
+                <div key={loc.id} className="location-item">
+                  {editingLocationId === loc.id ? (
+                    <>
+                      <input
+                        type="text"
+                        className="input"
+                        value={editLocationName}
+                        onChange={(e) => setEditLocationName(e.target.value)}
+                        autoFocus
+                      />
+                    </>
+                  ) : (
+                    <span className="location-name">{loc.name}</span>
+                  )}
+                  <div className="location-actions">
+                    {editingLocationId === loc.id ? (
+                      <>
+                        <button className="btn btn-primary btn-small" onClick={() => { onRenameLocation(loc.id, editLocationName); setEditingLocationId(null); }}>Save</button>
+                        <button className="btn btn-secondary btn-small" onClick={() => setEditingLocationId(null)}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="btn btn-secondary btn-small" onClick={() => { setEditingLocationId(loc.id); setEditLocationName(loc.name); }}>Edit</button>
+                        <button className="btn btn-danger btn-small" onClick={() => onRemoveLocation(loc.id)}>Delete</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Route View Tab
+    function RouteViewTab({ data }) {
+      const [selectedDay, setSelectedDay] = useState(0);
+      const days = weekDates(weekStart(new Date()));
+      const selectedDate = days[selectedDay];
+      const dayKey = dk(selectedDate);
+
+      const dayJobs = (data.jobs || []).filter(j => dk(j.date) === dayKey);
+      const uniqueLocations = new Set(dayJobs.map(j => j.location || j.customLocation || 'Unknown'));
+      const weekLocations = new Set((data.jobs || []).map(j => j.location || j.customLocation || 'Unknown'));
+
+      const getDriverName = (driverId) => {
+        const driver = (data.drivers || []).find(d => d.id === driverId);
+        return driver?.name || 'Unknown';
+      };
+
+      const getTruckName = (truckId) => {
+        const truck = (data.trucks || []).find(t => t.id === truckId);
+        return truck?.name || 'Unknown';
+      };
+
+      const getTrailerName = (trailerId) => {
+        const trailer = (data.trailers || []).find(t => t.id === trailerId);
+        return trailer?.name || 'Unknown';
+      };
+
+      return (
+        <div>
+          <div className="card">
+            <div className="week-nav">
+              {days.map((d, i) => (
+                <button
+                  key={dk(d)}
+                  className={`btn ${selectedDay === i ? 'btn-primary' : 'btn-secondary'} btn-small`}
+                  onClick={() => setSelectedDay(i)}
+                >
+                  {fmt(d)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="card-title">Routes for {fmtLong(selectedDate)}</h3>
+            <div style={{ marginBottom: '16px', fontSize: '13px', color: 'var(--gray-600)' }}>
+              <strong>{uniqueLocations.size}</strong> unique locations today | <strong>{weekLocations.size}</strong> unique locations this week
+            </div>
+            {dayJobs.length === 0 ? (
+              <p style={{ color: 'var(--gray-500)' }}>No jobs scheduled for this day.</p>
+            ) : (
+              <table className="route-table">
+                <thead>
+                  <tr>
+                    <th>Driver</th>
+                    <th>Location</th>
+                    <th>Truck</th>
+                    <th>Trailer</th>
+                    <th>Time</th>
+                    <th>Equipment</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dayJobs.map(job => (
+                    <tr key={job.id}>
+                      <td>{getDriverName(job.driver)}</td>
+                      <td>{job.location || job.customLocation || 'Unknown'}</td>
+                      <td>{getTruckName(job.truck)}</td>
+                      <td>{getTrailerName(job.trailer)}</td>
+                      <td>{job.timeWindow || '-'}</td>
+                      <td>{(job.equipment || []).join(', ') || '-'}</td>
+                      <td>{job.notes || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Print Tab
+    function PrintTab({ data }) {
+      const [mode, setMode] = useState('daily');
+      const [selectedDate, setSelectedDate] = useState(dk(new Date()));
+      const [selectedDrivers, setSelectedDrivers] = useState(new Set((data.drivers || []).map(d => d.id)));
+      const printBtnRef = useRef(null);
+
+      useEffect(() => {
+        if (printBtnRef.current) {
+          printBtnRef.current.onclick = function() {
+            window.print();
+          };
+        }
+      }, []);
+
+      const getDriverName = (driverId) => {
+        const driver = (data.drivers || []).find(d => d.id === driverId);
+        return driver?.name || 'Unknown';
+      };
+
+      const getTruckName = (truckId) => {
+        const truck = (data.trucks || []).find(t => t.id === truckId);
+        return truck?.name || 'Unknown';
+      };
+
+      const getTrailerName = (trailerId) => {
+        const trailer = (data.trailers || []).find(t => t.id === trailerId);
+        return trailer?.name || 'Unknown';
+      };
+
+      const toggleDriver = (driverId) => {
+        const newSet = new Set(selectedDrivers);
+        if (newSet.has(driverId)) {
+          newSet.delete(driverId);
+        } else {
+          newSet.add(driverId);
+        }
+        setSelectedDrivers(newSet);
+      };
+
+      const getPrintDate = () => {
+        const now = new Date();
+        return now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+      };
+
+      const renderDailySheet = (driver) => {
+        const dayJobs = (data.jobs || []).filter(j => dk(j.date) === selectedDate && j.driver === driver.id);
+        return (
+          <div key={`daily-${driver.id}`} className="print-sheet">
+            <div className="print-sheet-header">
+              <div>
+                <div className="print-sheet-title">{driver.name}</div>
+                <div className="print-sheet-meta">{driver.role}</div>
+                <div className="print-sheet-meta">{fmtLong(new Date(selectedDate))}</div>
+              </div>
+              <div className="print-sheet-stats">
+                <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--gray-900)' }}>{dayJobs.length}</div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-600)' }}>Jobs</div>
+              </div>
+            </div>
+
+            {dayJobs.map((job, i) => (
+              <div key={job.id} className="job-card">
+                <div className="job-card-header">JOB {i + 1} of {dayJobs.length}</div>
+                <div className="job-card-field">
+                  <div className="job-card-field-label">Location</div>
+                  <div className="job-card-field-value" style={{ fontSize: '16px', fontWeight: 600 }}>{job.location || job.customLocation || 'Unknown'}</div>
+                </div>
+                <div className="job-card-field">
+                  <div className="job-card-field-label">Truck</div>
+                  <div className="job-card-field-value">{getTruckName(job.truck)}</div>
+                </div>
+                <div className="job-card-field">
+                  <div className="job-card-field-label">Trailer</div>
+                  <div className="job-card-field-value">{getTrailerName(job.trailer)}</div>
+                </div>
+                <div className="job-card-field">
+                  <div className="job-card-field-label">Time</div>
+                  <div className="job-card-field-value">{job.timeWindow || '-'}</div>
+                </div>
+                <div className="job-card-field">
+                  <div className="job-card-field-label">Status</div>
+                  <div className="job-card-field-value">{job.status}</div>
+                </div>
+                {(job.equipment || []).length > 0 && (
+                  <div className="job-card-field">
+                    <div className="job-card-field-label">Equipment</div>
+                    <div className="job-card-field-value">{(job.equipment || []).join(', ')}</div>
+                  </div>
+                )}
+                {job.notes && (
+                  <div className="job-card-field">
+                    <div className="job-card-field-label">Notes</div>
+                    <div className="job-card-field-value">{job.notes}</div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div className="print-sheet-footer">
+              Fleet Scheduler - Printed {getPrintDate()}
+            </div>
+          </div>
+        );
+      };
+
+      const renderWeeklySheet = (driver) => {
+        const weekStart = new Date(selectedDate);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + (weekStart.getDay() === 0 ? -6 : 1));
+        const weekDates = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(weekStart);
+          d.setDate(d.getDate() + i);
+          weekDates.push(d);
+        }
+
+        const jobsByDay = {};
+        weekDates.forEach(d => {
+          const dayKey = dk(d);
+          jobsByDay[dayKey] = (data.jobs || []).filter(j => dk(j.date) === dayKey && j.driver === driver.id);
+        });
+
+        return (
+          <div key={`weekly-${driver.id}`} className="print-sheet">
+            <div className="print-sheet-header">
+              <div>
+                <div className="print-sheet-title">{driver.name}</div>
+                <div className="print-sheet-meta">{driver.role}</div>
+                <div className="print-sheet-meta">Week of {fmtLong(weekDates[0])}</div>
+              </div>
+              <div className="print-sheet-stats">
+                <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--gray-900)' }}>{Object.values(jobsByDay).flat().length}</div>
+                <div style={{ fontSize: '12px', color: 'var(--gray-600)' }}>Jobs</div>
+              </div>
+            </div>
+
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Location</th>
+                  <th>Truck</th>
+                  <th>Trailer</th>
+                  <th>Time</th>
+                  <th>Equipment</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {weekDates.map(d => {
+                  const dayKey = dk(d);
+                  const jobs = jobsByDay[dayKey];
+                  return jobs.length === 0 ? (
+                    <tr key={dayKey}>
+                      <td colSpan="7" style={{ textAlign: 'center', color: 'var(--gray-500)' }}>-</td>
+                    </tr>
+                  ) : (
+                    jobs.map((job, i) => (
+                      <tr key={job.id}>
+                        {i === 0 && <td rowSpan={jobs.length}>{fmt(d)}</td>}
+                        <td>{job.location || job.customLocation || 'Unknown'}</td>
+                        <td>{getTruckName(job.truck)}</td>
+                        <td>{getTrailerName(job.trailer)}</td>
+                        <td>{job.timeWindow || '-'}</td>
+                        <td>{(job.equipment || []).join(', ') || '-'}</td>
+                        <td>{job.notes || '-'}</td>
+                      </tr>
+                    ))
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="print-sheet-footer">
+              Fleet Scheduler - Printed {getPrintDate()}
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div>
+          <div className="print-controls">
+            <div className="print-control-row">
+              <div className="print-control-item">
+                <label>Print Mode</label>
+                <select
+                  className="input"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                >
+                  <option value="daily">Daily Mode</option>
+                  <option value="weekly">Weekly Mode</option>
+                </select>
+              </div>
+
+              {mode === 'daily' && (
+                <div className="print-control-item">
+                  <label>Select Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div>
+                <button className="btn btn-primary" ref={printBtnRef} style={{ fontSize: '16px', padding: '12px 40px', borderRadius: '8px' }}>
+                  Print Sheets
+                </button>
+              </div>
+            </div>
+
+            <div className="driver-checkboxes">
+              <label>Select Drivers to Print</label>
+              <div className="driver-checkbox-group">
+                {(data.drivers || []).map(driver => (
+                  <div key={driver.id} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id={`driver-${driver.id}`}
+                      checked={selectedDrivers.has(driver.id)}
+                      onChange={() => toggleDriver(driver.id)}
+                    />
+                    <label htmlFor={`driver-${driver.id}`}>{driver.name}</label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="no-print">
+            <p style={{ color: 'var(--gray-600)', marginBottom: '20px', fontSize: '13px' }}>
+              Print preview below. Click "Print Sheets" button above to open the browser print dialog.
+            </p>
+          </div>
+
+          <div>
+            {Array.from(selectedDrivers).map(driverId => {
+              const driver = (data.drivers || []).find(d => d.id === driverId);
+              if (!driver) return null;
+              return mode === 'daily' ? renderDailySheet(driver) : renderWeeklySheet(driver);
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // Main App
+    function App() {
+      const [data, setData] = useState({
+        drivers: [],
+        trucks: [],
+        trailers: [],
+        equipment: [],
+        locations: [],
+        jobs: []
+      });
+      const [currentTab, setCurrentTab] = useState('weekly');
+      const [currentWeek, setCurrentWeek] = useState(weekStart(new Date()));
+      const [isConnected, setIsConnected] = useState(false);
+      const [jobModal, setJobModal] = useState({ isOpen: false, job: null, date: null, driverId: null });
+      const [toast, setToast] = useState(null);
+
+      // Load initial data
+      useEffect(() => {
+        api('GET', '/data', null)
+          .then(result => {
+            setData(result);
+            setIsConnected(true);
+          })
+          .catch(err => console.error('Failed to load data:', err));
+      }, []);
+
+      // SSE connection
+      useEffect(() => {
+        let eventSource = null;
+
+        const connect = () => {
+          eventSource = new EventSource('/api/events');
+
+          eventSource.onopen = () => setIsConnected(true);
+
+          eventSource.onmessage = (e) => {
+            const event = JSON.parse(e.data);
+            if (event.type === 'full-sync') {
+              setData(event.data);
+            }
+          };
+
+          eventSource.onerror = () => {
+            setIsConnected(false);
+            eventSource.close();
+            setTimeout(connect, 3000);
+          };
+        };
+
+        connect();
+        return () => eventSource?.close();
+      }, []);
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+      };
+
+      const handleAddJob = (date, driverId) => {
+        setJobModal({ isOpen: true, job: null, date, driverId });
+      };
+
+      const handleEditJob = (job) => {
+        setJobModal({ isOpen: true, job, date: null, driverId: null });
+      };
+
+      const handleSaveJob = (formData) => {
+        const payload = {
+          date: formData.date,
+          driver: formData.driver,
+          location: formData.location,
+          customLocation: formData.customLocation,
+          truck: formData.truck,
+          trailer: formData.trailer,
+          timeWindow: formData.timeWindow,
+          status: formData.status,
+          notes: formData.notes,
+          equipment: formData.equipment
+        };
+
+        if (jobModal.job) {
+          api('PUT', `/jobs/${jobModal.job.id}`, payload)
+            .then(() => {
+              showToast('Job updated');
+              setJobModal({ isOpen: false, job: null, date: null, driverId: null });
+            })
+            .catch(() => showToast('Failed to update job', 'error'));
+        } else {
+          api('POST', '/jobs', payload)
+            .then(() => {
+              showToast('Job added');
+              setJobModal({ isOpen: false, job: null, date: null, driverId: null });
+            })
+            .catch(() => showToast('Failed to add job', 'error'));
+        }
+      };
+
+      const handleDeleteJob = (jobId) => {
+        api('DELETE', `/jobs/${jobId}`, null)
+          .then(() => {
+            showToast('Job deleted');
+          })
+          .catch(() => showToast('Failed to delete job', 'error'));
+      };
+
+      const handleAddPerson = (person) => {
+        api('POST', '/drivers', person)
+          .then(() => showToast('Driver added'))
+          .catch(() => showToast('Failed to add driver', 'error'));
+      };
+
+      const handleRemovePerson = (driverId) => {
+        api('DELETE', `/drivers/${driverId}`, null)
+          .then(() => showToast('Driver removed'))
+          .catch(() => showToast('Failed to remove driver', 'error'));
+      };
+
+      const handleRenamePerson = (driverId, newName) => {
+        api('PUT', `/drivers/${driverId}`, { name: newName })
+          .then(() => showToast('Driver renamed'))
+          .catch(() => showToast('Failed to rename driver', 'error'));
+      };
+
+      const handleAddTruck = (truck) => {
+        api('POST', '/trucks', truck)
+          .then(() => showToast('Truck added'))
+          .catch(() => showToast('Failed to add truck', 'error'));
+      };
+
+      const handleRemoveTruck = (truckId) => {
+        api('DELETE', `/trucks/${truckId}`, null)
+          .then(() => showToast('Truck removed'))
+          .catch(() => showToast('Failed to remove truck', 'error'));
+      };
+
+      const handleToggleTruck = (truckId) => {
+        const truck = (data.trucks || []).find(t => t.id === truckId);
+        api('PUT', `/trucks/${truckId}`, { enabled: !truck.enabled })
+          .then(() => showToast(truck.enabled ? 'Truck disabled' : 'Truck enabled'))
+          .catch(() => showToast('Failed to toggle truck', 'error'));
+      };
+
+      const handleAddTrailer = (trailer) => {
+        api('POST', '/trailers', trailer)
+          .then(() => showToast('Trailer added'))
+          .catch(() => showToast('Failed to add trailer', 'error'));
+      };
+
+      const handleRemoveTrailer = (trailerId) => {
+        api('DELETE', `/trailers/${trailerId}`, null)
+          .then(() => showToast('Trailer removed'))
+          .catch(() => showToast('Failed to remove trailer', 'error'));
+      };
+
+      const handleAddLocation = (location) => {
+        api('POST', '/locations', location)
+          .then(() => showToast('Location added'))
+          .catch(() => showToast('Failed to add location', 'error'));
+      };
+
+      const handleRemoveLocation = (locationId) => {
+        api('DELETE', `/locations/${locationId}`, null)
+          .then(() => showToast('Location removed'))
+          .catch(() => showToast('Failed to remove location', 'error'));
+      };
+
+      const handleRenameLocation = (locationId, newName) => {
+        api('PUT', `/locations/${locationId}`, { name: newName })
+          .then(() => showToast('Location renamed'))
+          .catch(() => showToast('Failed to rename location', 'error'));
+      };
+
+      return (
+        <div className="app-container">
+          <div className="header">
+            <h1>Fleet Scheduler</h1>
+            <div className="header-right">
+              <span className="status-indicator">
+                <span className={`status-dot ${isConnected ? '' : 'disconnected'}`}></span>
+                {isConnected ? 'Live' : 'Reconnecting...'}
+              </span>
+            </div>
+          </div>
+
+          <div className="tabs">
+            {['weekly', 'people', 'trucks', 'routes', 'print'].map(tab => (
+              <button
+                key={tab}
+                className={`tab ${currentTab === tab ? 'active' : ''}`}
+                onClick={() => setCurrentTab(tab)}
+              >
+                {tab === 'weekly' && 'Weekly Schedule'}
+                {tab === 'people' && 'People'}
+                {tab === 'trucks' && 'Trucks & Trailers'}
+                {tab === 'routes' && 'Route View'}
+                {tab === 'print' && 'Print'}
+              </button>
+            ))}
+          </div>
+
+          <div className="content">
+            {currentTab === 'weekly' && (
+              <WeeklyScheduleTab
+                data={data}
+                currentWeek={currentWeek}
+                onChangeWeek={setCurrentWeek}
+                onAddJob={handleAddJob}
+                onEditJob={handleEditJob}
+                onDeleteJob={handleDeleteJob}
+              />
+            )}
+            {currentTab === 'people' && (
+              <PeopleTab
+                data={data}
+                onAddPerson={handleAddPerson}
+                onRemovePerson={handleRemovePerson}
+                onRenamePerson={handleRenamePerson}
+              />
+            )}
+            {currentTab === 'trucks' && (
+              <TrucksTab
+                data={data}
+                onAddTruck={handleAddTruck}
+                onRemoveTruck={handleRemoveTruck}
+                onRenameTruck={() => {}}
+                onToggleTruck={handleToggleTruck}
+                onAddTrailer={handleAddTrailer}
+                onRemoveTrailer={handleRemoveTrailer}
+                onRenameTrailer={() => {}}
+                onAddLocation={handleAddLocation}
+                onRemoveLocation={handleRemoveLocation}
+                onRenameLocation={handleRenameLocation}
+              />
+            )}
+            {currentTab === 'routes' && (
+              <RouteViewTab data={data} />
+            )}
+            {currentTab === 'print' && (
+              <PrintTab data={data} />
+            )}
+          </div>
+
+          <JobModal
+            isOpen={jobModal.isOpen}
+            job={jobModal.job}
+            date={jobModal.date}
+            drivers={data.drivers || []}
+            trucks={data.trucks || []}
+            trailers={data.trailers || []}
+            locations={data.locations || []}
+            equipment={data.equipment || []}
+            onSave={handleSaveJob}
+            onClose={() => setJobModal({ isOpen: false, job: null, date: null, driverId: null })}
+            onDelete={handleDeleteJob}
+          />
+
+          {toast && (
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(null)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
 </body>
 </html>
