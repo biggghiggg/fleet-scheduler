@@ -530,8 +530,7 @@ function Routes({data,dates,ws,prev,next,now}){
             const items=r[driver.name]||[];
             return(<div key={driver.id} style={{marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
               <strong style={{fontSize:12,minWidth:70}}>{driver.name}:</strong>
-              {items.length>0?items.map((item,j)=>(<span key={j} className="rtag">{item.loc}{item.truck?' ('+item.truck+')':''}</span>))
-                :<span style={{fontSize:11,color:'#16a34a',fontWeight:600,background:'#dcfce7',padding:'2px 8px',borderRadius:4}}>Available</span>}
+              {items.length>0&&items.map((item,j)=>(<span key={j} className="rtag">{item.loc}{item.truck?' ('+item.truck+')':''}</span>))}
             </div>);
           })}</td></tr>);
       })}
