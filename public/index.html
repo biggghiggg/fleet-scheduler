@@ -516,14 +516,7 @@ function Print({data,dates,ws,prev,next,now}){
   const [mode,setMode]=useState('daily');
   const [selDay,setSelDay]=useState(0);
   const [selDrivers,setSelDrivers]=useState(data.drivers.map(d=>d.id));
-  const printBtnRef=useRef(null);
-
-  /* SAFARI FIX: attach native onclick instead of React onClick */
-  useEffect(()=>{
-    if(printBtnRef.current){
-      printBtnRef.current.onclick=function(){window.print();};
-    }
-  });
+  const [showPreview,setShowPreview]=useState(true);
 
   const toggleDriver=(id)=>{setSelDrivers(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);};
   const selectAll=()=>setSelDrivers(data.drivers.map(d=>d.id));
@@ -664,13 +657,14 @@ function Print({data,dates,ws,prev,next,now}){
         </div>
       </div>
 
-      <button ref={printBtnRef} className="bp" style={{fontSize:16,padding:'12px 40px',borderRadius:8}}>Print Sheets</button>
+      <button id="printBtn" className="bp" style={{fontSize:16,padding:'12px 40px',borderRadius:8}}>Print Sheets</button>
+      <button className="bc" style={{fontSize:13,padding:'10px 20px',borderRadius:8,marginLeft:8}} onClick={()=>setShowPreview(!showPreview)}>{showPreview?'Hide Preview':'Show Preview'}</button>
       <span style={{marginLeft:12,fontSize:12,color:'#999'}}>One page per person</span>
     </div>
 
-    {/* Print sheets always visible on screen */}
-    {mode==='daily'&&selDrivers.map(did=>renderDailySheet(did))}
-    {mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did))}
+    {/* Print sheets - toggle with preview button */}
+    {showPreview&&mode==='daily'&&selDrivers.map(did=>renderDailySheet(did))}
+    {showPreview&&mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did))}
 
     {mode==='daily'&&selDrivers.every(did=>driverDayJobs(did,printDate).length===0)&&(
       <div className="print-no-jobs">No jobs scheduled for the selected people on {printDateStr}.</div>
@@ -682,6 +676,21 @@ function Print({data,dates,ws,prev,next,now}){
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<script>
+/* Safari-compatible print button handler - plain JS, no React/Babel */
+document.addEventListener('click', function(e) {
+  var btn = e.target;
+  while(btn && btn !== document) {
+    if(btn.id === 'printBtn') {
+      e.preventDefault();
+      e.stopPropagation();
+      window.print();
+      return;
+    }
+    btn = btn.parentElement;
+  }
+});
 </script>
 </body>
 </html>
