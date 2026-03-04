@@ -314,10 +314,10 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mrow"><label>Time Window</label>
           <input value={modal.timeWindow} onChange={e=>setModal({...modal,timeWindow:e.target.value})} placeholder="e.g. 8:00 AM, Be onsite by 10 AM"/></div>
         <div className="mrow"><label>Equipment Needed</label>
-          <div style={{columns:'2 180px',gap:8}}>
-            {data.equipment.map(eq=>(<div key={eq} style={{breakInside:'avoid',marginBottom:4}}>
-              <label style={{fontSize:13,display:'flex',alignItems:'center',gap:6,padding:'4px 6px',cursor:'pointer'}}>
-              <input type="checkbox" checked={modal.equipment?.includes(eq)||false}
+          <div style={{marginTop:4}}>
+            {data.equipment.map(eq=>(<div key={eq} style={{display:'inline-block',marginRight:14,marginBottom:6}}>
+              <label style={{fontSize:13,cursor:'pointer'}}>
+              <input type="checkbox" checked={modal.equipment?.includes(eq)||false} style={{marginRight:4,width:'auto'}}
                 onChange={e=>{const eqs=modal.equipment||[];setModal({...modal,equipment:e.target.checked?[...eqs,eq]:eqs.filter(x=>x!==eq)});}}/>
               {eq}</label></div>))}
           </div></div>
@@ -650,10 +650,10 @@ function Print({data,dates,ws,prev,next,now}){
         <label style={{fontWeight:700,fontSize:14}}>Print for: </label>
         <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectAll}>All</button>
         <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectNone}>None</button>
-        <div style={{columns:'3 150px',gap:8,marginTop:8}}>
-          {data.drivers.map(d=>(<div key={d.id} style={{breakInside:'avoid',marginBottom:4}}>
-            <label style={{fontSize:14,display:'flex',alignItems:'center',gap:6,padding:'5px 8px',background:selDrivers.includes(d.id)?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.includes(d.id)?'1px solid #c7d2fe':'1px solid #e2e8f0'}}>
-            <input type="checkbox" checked={selDrivers.includes(d.id)} onChange={()=>toggleDriver(d.id)}/>
+        <div style={{marginTop:8}}>
+          {data.drivers.map(d=>(<div key={d.id} style={{display:'inline-block',marginRight:12,marginBottom:6}}>
+            <label style={{fontSize:14,cursor:'pointer',fontWeight:selDrivers.includes(d.id)?600:400}}>
+            <input type="checkbox" checked={selDrivers.includes(d.id)} onChange={()=>toggleDriver(d.id)} style={{marginRight:4,width:'auto'}}/>
             {d.name}
           </label></div>))}
         </div>
