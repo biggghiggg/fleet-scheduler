@@ -5,8 +5,20 @@ const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data.json');
-const BACKUP_DIR = path.join(__dirname, 'backups');
+
+// Use persistent volume on Railway, local directory otherwise
+var DATA_DIR = __dirname;
+if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
+  DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+  console.log('Using Railway volume: ' + DATA_DIR);
+} else if (process.env.RAILWAY_ENVIRONMENT) {
+  DATA_DIR = '/data';
+  console.log('Using Railway data dir: ' + DATA_DIR);
+}
+if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
+
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
 const defaultData = {
   drivers: [
@@ -69,15 +81,16 @@ function createBackup() {
 }
 
 var data = loadData();
-// Migrate: add locations if missing
-if (!data.locations) {
-  data.locations = defaultData.locations;
-  saveData(data);
-}
+if (!data.locations) { data.locations = defaultData.locations; saveData(data); }
+console.log('DATA_DIR = ' + DATA_DIR);
+console.log('DATA_FILE = ' + DATA_FILE);
+console.log('RAILWAY_VOLUME_MOUNT_PATH = ' + (process.env.RAILWAY_VOLUME_MOUNT_PATH || 'NOT SET'));
+console.log('Data file exists: ' + fs.existsSync(DATA_FILE));
+console.log('Drivers count: ' + data.drivers.length);
+console.log('Jobs count: ' + data.jobs.length);
 createBackup();
 setInterval(createBackup, 3600000);
 
-// SSE clients for live updates
 var clients = [];
 function broadcast(msg) {
   var payload = 'data: ' + JSON.stringify(msg) + '\n\n';
@@ -87,7 +100,6 @@ function broadcast(msg) {
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// SSE - live connection
 app.get('/api/events', function(req, res) {
   res.writeHead(200, { 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'Connection':'keep-alive' });
   res.write('data: ' + JSON.stringify({ type:'connected', data: data }) + '\n\n');
@@ -133,20 +145,6 @@ app.delete('/api/drivers/:id', function(req, res) {
   data.jobs = data.jobs.filter(function(j) { return j.driverId !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-app.put('/api/drivers-reorder', function(req, res) {
-  var ids = req.body.order;
-  if (!ids || !Array.isArray(ids)) return res.status(400).json({error:'order array required'});
-  var reordered = [];
-  ids.forEach(function(id) {
-    var d = data.drivers.find(function(x) { return x.id === id; });
-    if (d) reordered.push(d);
-  });
-  data.drivers.forEach(function(d) {
-    if (ids.indexOf(d.id) === -1) reordered.push(d);
-  });
-  data.drivers = reordered;
-  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
-});
 
 // TRUCKS
 app.post('/api/trucks', function(req, res) {
@@ -189,6 +187,22 @@ app.post('/api/equipment', function(req, res) {
 });
 app.delete('/api/equipment/:name', function(req, res) {
   data.equipment = data.equipment.filter(function(e) { return e !== req.params.name; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// DRIVER REORDER
+app.put('/api/drivers-reorder', function(req, res) {
+  var ids = req.body.order;
+  if (!ids || !Array.isArray(ids)) return res.status(400).json({error:'order array required'});
+  var reordered = [];
+  ids.forEach(function(id) {
+    var d = data.drivers.find(function(x) { return x.id === id; });
+    if (d) reordered.push(d);
+  });
+  data.drivers.forEach(function(d) {
+    if (ids.indexOf(d.id) === -1) reordered.push(d);
+  });
+  data.drivers = reordered;
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
 
