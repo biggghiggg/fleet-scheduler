@@ -237,6 +237,13 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
   const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job});};
   const save=async()=>{if(eid)await api('PUT','/jobs/'+eid,modal);else await api('POST','/jobs',modal);setModal(null);setEid(null);};
   const del=async(id,e)=>{if(e)e.stopPropagation();await api('DELETE','/jobs/'+id);};
+  const moveDriver=async(idx,dir)=>{
+    const newIdx=idx+dir;
+    if(newIdx<0||newIdx>=data.drivers.length)return;
+    const ids=data.drivers.map(d=>d.id);
+    const tmp=ids[idx];ids[idx]=ids[newIdx];ids[newIdx]=tmp;
+    await api('PUT','/drivers-reorder',{order:ids});
+  };
 
   return(<div>
     <div className="week-nav">
@@ -248,7 +255,13 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
     <div className="grid"><table><thead><tr><th>Person</th>
       {dates.map((d,i)=>(<th key={i} style={dk(d)===today?{background:'#fffbeb'}:{}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{d.getMonth()+1}/{d.getDate()}</span></th>))}
     </tr></thead><tbody>
-      {data.drivers.map(driver=>(<tr key={driver.id}><td>{driver.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:400}}>{driver.role}</div></td>
+      {data.drivers.map((driver,dIdx)=>(<tr key={driver.id}><td><div style={{display:'flex',alignItems:'center',gap:4}}>
+            <div style={{display:'flex',flexDirection:'column',gap:1}}>
+              <span onClick={()=>moveDriver(dIdx,-1)} style={{cursor:dIdx>0?'pointer':'default',opacity:dIdx>0?1:0.2,fontSize:10,lineHeight:1,userSelect:'none'}}>&#9650;</span>
+              <span onClick={()=>moveDriver(dIdx,1)} style={{cursor:dIdx<data.drivers.length-1?'pointer':'default',opacity:dIdx<data.drivers.length-1?1:0.2,fontSize:10,lineHeight:1,userSelect:'none'}}>&#9660;</span>
+            </div>
+            <div>{driver.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:400}}>{driver.role}</div></div>
+          </div></td>
         {dates.map((date,i)=>{
           const jobs=cellJobs(driver.id,date);const conf=cellConflict(driver.id,date);const ist=dk(date)===today;
           return(<td key={i}><div className={'cell'+(conf?' conflict':'')+(ist?' today':'')} onClick={()=>openAdd(driver.id,date)}>
