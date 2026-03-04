@@ -113,6 +113,47 @@ app.get('/api/events', function(req, res) {
 
 app.get('/api/data', function(req, res) { res.json(data); });
 
+// PRINT JOB PAGE - serves a clean printable page for a single job
+app.get('/print-job', function(req, res) {
+  var q = req.query;
+  var html = '<!DOCTYPE html><html><head><title>Job - ' + (q.driver||'') + ' - ' + (q.date||'') + '</title>';
+  html += '<style>';
+  html += '*{margin:0;padding:0;box-sizing:border-box}';
+  html += 'body{font-family:Arial,Helvetica,sans-serif;padding:40px;color:#000;max-width:800px;margin:0 auto}';
+  html += '.header{text-align:center;margin-bottom:30px;padding-bottom:16px;border-bottom:4px solid #000}';
+  html += '.header h1{font-size:26px;font-weight:900;margin-bottom:4px}';
+  html += '.header .company{font-size:14px;color:#444;font-weight:600;letter-spacing:0.5px}';
+  html += '.row{display:flex;padding:12px 0;border-bottom:1px solid #ddd;font-size:16px}';
+  html += '.label{font-weight:700;min-width:170px;color:#333}';
+  html += '.value{flex:1;font-size:16px}';
+  html += '.notes-section{margin-top:20px;border:2px solid #000;padding:16px;background:#f8f8f8}';
+  html += '.notes-section h3{font-size:15px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}';
+  html += '.notes-section p{font-size:14px;line-height:1.7;white-space:pre-wrap}';
+  html += '.signature{margin-top:40px;display:flex;gap:40px}';
+  html += '.sig-line{flex:1;border-bottom:1px solid #000;padding-bottom:4px;font-size:11px;color:#666}';
+  html += '.footer{margin-top:30px;padding-top:10px;border-top:2px solid #000;font-size:10px;color:#888;display:flex;justify-content:space-between}';
+  html += '.back-link{display:inline-block;margin-bottom:20px;color:#2563eb;text-decoration:none;font-size:14px}';
+  html += '@media print{.back-link{display:none}body{padding:30px}}';
+  html += '</style></head><body>';
+  html += '<a href="javascript:history.back()" class="back-link">&larr; Back to Scheduler</a>';
+  html += '<div class="header"><h1>Job Assignment</h1><div class="company">Independence Environmental Services</div></div>';
+  html += '<div class="row"><div class="label">Date:</div><div class="value">' + (q.date||'') + '</div></div>';
+  html += '<div class="row"><div class="label">Driver:</div><div class="value"><strong>' + (q.driver||'') + '</strong></div></div>';
+  html += '<div class="row"><div class="label">Location / Job:</div><div class="value"><strong>' + (q.location||'') + '</strong></div></div>';
+  html += '<div class="row"><div class="label">Truck:</div><div class="value">' + (q.truck||'None') + '</div></div>';
+  html += '<div class="row"><div class="label">Trailer:</div><div class="value">' + (q.trailer||'None') + '</div></div>';
+  html += '<div class="row"><div class="label">Time Window:</div><div class="value">' + (q.timeWindow||'—') + '</div></div>';
+  html += '<div class="row"><div class="label">Equipment:</div><div class="value">' + (q.equipment||'None') + '</div></div>';
+  html += '<div class="row"><div class="label">Status:</div><div class="value">' + (q.status||'') + '</div></div>';
+  if(q.notes) {
+    html += '<div class="notes-section"><h3>Notes / Special Instructions</h3><p>' + q.notes + '</p></div>';
+  }
+  html += '<div class="signature"><div class="sig-line">Driver Signature</div><div class="sig-line">Date</div></div>';
+  html += '<div class="footer"><span>Independence Environmental Services</span><span>Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
+  html += '</body></html>';
+  res.send(html);
+});
+
 // JOBS
 app.post('/api/jobs', function(req, res) {
   var job = Object.assign({}, req.body, { id: 'j' + Date.now() + Math.random().toString(36).slice(2) });
@@ -143,6 +184,22 @@ app.put('/api/drivers/:id', function(req, res) {
 app.delete('/api/drivers/:id', function(req, res) {
   data.drivers = data.drivers.filter(function(d) { return d.id !== req.params.id; });
   data.jobs = data.jobs.filter(function(j) { return j.driverId !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// DRIVER REORDER
+app.put('/api/drivers-reorder', function(req, res) {
+  var ids = req.body.order;
+  if (!ids || !Array.isArray(ids)) return res.status(400).json({error:'order array required'});
+  var reordered = [];
+  ids.forEach(function(id) {
+    var d = data.drivers.find(function(x) { return x.id === id; });
+    if (d) reordered.push(d);
+  });
+  data.drivers.forEach(function(d) {
+    if (ids.indexOf(d.id) === -1) reordered.push(d);
+  });
+  data.drivers = reordered;
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
 
@@ -187,22 +244,6 @@ app.post('/api/equipment', function(req, res) {
 });
 app.delete('/api/equipment/:name', function(req, res) {
   data.equipment = data.equipment.filter(function(e) { return e !== req.params.name; });
-  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
-});
-
-// DRIVER REORDER
-app.put('/api/drivers-reorder', function(req, res) {
-  var ids = req.body.order;
-  if (!ids || !Array.isArray(ids)) return res.status(400).json({error:'order array required'});
-  var reordered = [];
-  ids.forEach(function(id) {
-    var d = data.drivers.find(function(x) { return x.id === id; });
-    if (d) reordered.push(d);
-  });
-  data.drivers.forEach(function(d) {
-    if (ids.indexOf(d.id) === -1) reordered.push(d);
-  });
-  data.drivers = reordered;
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
 
