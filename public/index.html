@@ -89,57 +89,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 .ebtn{background:#eef2ff;color:var(--primary);padding:3px 8px;font-size:11px;cursor:pointer;border-radius:4px;border:none;margin-left:4px}
 .ebtn:hover{background:#dbeafe}
 .ied{border:1px solid var(--primary);border-radius:4px;padding:2px 6px;font-size:13px;width:auto}
-
-/* PRINT STYLES */
-@media print {
-  body{background:#fff !important;font-family:Arial,Helvetica,sans-serif !important}
-  .app-header,.tabs,.week-nav,.no-print,.toast{display:none !important}
-  .main{padding:0 !important}
-  .print-sheet{page-break-after:always;padding:24px 20px;max-width:100%}
-  .print-sheet:last-child{page-break-after:avoid}
-  .print-sheet *{color:#000 !important}
-  .print-topbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid #000;padding-bottom:10px;margin-bottom:18px}
-  .print-topbar h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin:0;line-height:1.1}
-  .print-topbar .print-meta{text-align:right;font-size:13px;line-height:1.6}
-  .print-topbar .print-meta strong{font-size:15px}
-  .print-job-card{border:2px solid #000;border-radius:0;padding:0;margin-bottom:14px;page-break-inside:avoid}
-  .print-job-num{background:#000;color:#fff !important;font-size:14px;font-weight:700;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
-  .print-job-num span{color:#fff !important}
-  .print-job-body{padding:10px 12px}
-  .print-job-loc{font-size:20px;font-weight:800;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:6px}
-  .print-job-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:6px}
-  .print-job-field{font-size:13px;line-height:1.7}
-  .print-job-field b{font-weight:700;display:inline-block;min-width:80px}
-  .print-job-notes{background:#f0f0f0;border:1px solid #ccc;padding:8px 10px;font-size:13px;white-space:pre-wrap;margin-top:6px;line-height:1.5}
-  .print-job-notes b{display:block;font-weight:700;margin-bottom:3px}
-  .print-footer{margin-top:auto;padding-top:12px;border-top:2px solid #000;font-size:10px;color:#666 !important;display:flex;justify-content:space-between}
-  .print-weekly-table{width:100%;border-collapse:collapse;font-size:11px}
-  .print-weekly-table th,.print-weekly-table td{border:2px solid #000;padding:8px;vertical-align:top;text-align:left}
-  .print-weekly-table th{background:#e5e5e5 !important;font-weight:800;font-size:12px;text-transform:uppercase}
-  .print-weekly-table td{font-size:11px;line-height:1.4}
-  .print-no-jobs{text-align:center;padding:30px;font-size:14px;color:#999 !important;font-style:italic}
-}
-/* Screen preview of print sheets */
-.print-sheet-preview{border:2px solid #ccc;background:#fff;padding:24px 20px;margin:12px 0;border-radius:0;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.print-topbar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid #000;padding-bottom:10px;margin-bottom:18px}
-.print-topbar h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;margin:0;line-height:1.1}
-.print-topbar .print-meta{text-align:right;font-size:13px;line-height:1.6}
-.print-topbar .print-meta strong{font-size:15px}
-.print-job-card{border:2px solid #000;border-radius:0;padding:0;margin-bottom:14px}
-.print-job-num{background:#000;color:#fff;font-size:14px;font-weight:700;padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
-.print-job-body{padding:10px 12px}
-.print-job-loc{font-size:20px;font-weight:800;margin-bottom:8px;border-bottom:1px solid #ccc;padding-bottom:6px}
-.print-job-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:6px}
-.print-job-field{font-size:13px;line-height:1.7}
-.print-job-field b{font-weight:700;display:inline-block;min-width:80px}
-.print-job-notes{background:#f5f5f5;border:1px solid #ddd;padding:8px 10px;font-size:13px;white-space:pre-wrap;margin-top:6px;line-height:1.5}
-.print-job-notes b{display:block;font-weight:700;margin-bottom:3px}
-.print-footer{margin-top:16px;padding-top:12px;border-top:2px solid #000;font-size:10px;color:#999;display:flex;justify-content:space-between}
-.print-weekly-table{width:100%;border-collapse:collapse;font-size:12px}
-.print-weekly-table th,.print-weekly-table td{border:2px solid #000;padding:8px;vertical-align:top;text-align:left}
-.print-weekly-table th{background:#e5e5e5;font-weight:800;font-size:12px;text-transform:uppercase}
-.print-weekly-table td{font-size:12px;line-height:1.4}
-.print-no-jobs{text-align:center;padding:30px;font-size:14px;color:#999;font-style:italic}
 </style>
 </head>
 <body>
@@ -156,7 +105,6 @@ async function api(method, url, body) {
 
 function weekStart(d){const dt=new Date(d);const day=dt.getDay();dt.setDate(dt.getDate()+(day===0?-6:1-day));dt.setHours(0,0,0,0);return dt;}
 function fmt(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
-function fmtLong(d){return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});}
 function dk(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function weekDates(ws){return DAYS.map((_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d;});}
 
@@ -215,7 +163,7 @@ function App(){
         <span className={'conn-status '+(conn?'ok':'bad')}>{conn?'Live':'Reconnecting...'}</span>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['print','Print']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
@@ -224,7 +172,6 @@ function App(){
         {tab==='roster'&&<Roster data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
         {tab==='routes'&&<Routes data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
-        {tab==='print'&&<Print data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
       </div>
       {toast&&<div className="toast">{toast}</div>}
     </div>
@@ -282,20 +229,23 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
     {modal&&(<div className="overlay" onClick={()=>{setModal(null);setEid(null);}}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <h2>{eid?'Edit Job':'Add Job'}</h2>
+        <div className="mrow"><label>Date</label>
+          <input type="date" value={modal.date||''} onChange={e=>setModal({...modal,date:e.target.value})}/>
+        </div>
         <div className="mrow"><label>Person</label>
           <select value={modal.driverId} onChange={e=>setModal({...modal,driverId:e.target.value})}>
             {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
           </select></div>
         <div className="mrow"><label>Location / Job</label>
-          <select value={(data.locations||[]).includes(modal.location)?modal.location:'__custom'} onChange={e=>{
+          <select value={data.locations.includes(modal.location)?modal.location:'__custom'} onChange={e=>{
             if(e.target.value==='__custom') setModal({...modal,location:''});
             else setModal({...modal,location:e.target.value});
           }}>
             <option value="">-- Select Location --</option>
-            {(data.locations||[]).map(l=><option key={l} value={l}>{l}</option>)}
+            {data.locations.map(l=><option key={l} value={l}>{l}</option>)}
             <option value="__custom">Other (type custom)...</option>
           </select>
-          {(!(data.locations||[]).includes(modal.location))&&(
+          {(!data.locations.includes(modal.location))&&(
             <input value={modal.location} onChange={e=>setModal({...modal,location:e.target.value})} placeholder="Type custom location" style={{marginTop:4}}/>
           )}</div>
         <div className="mrow"><label>Truck</label>
@@ -338,9 +288,11 @@ function Roster({data}){
   const [role,setRole]=useState('Driver');
   const [editing,setEditing]=useState(null);
   const [en,setEn]=useState('');
+
   const add=async()=>{if(!name.trim())return;await api('POST','/drivers',{name:name.trim(),role,skills:[]});setName('');};
   const remove=async(d)=>{if(confirm('Remove '+d.name+'? This also removes their scheduled jobs.'))await api('DELETE','/drivers/'+d.id);};
   const rename=async(d)=>{if(en.trim())await api('PUT','/drivers/'+d.id,{name:en.trim()});setEditing(null);};
+
   return(<div>
     <div className="stitle">Add Person</div>
     <div className="addrow">
@@ -354,11 +306,13 @@ function Roster({data}){
     <div className="cards">
       {data.drivers.map(d=>(<div key={d.id} className="card">
         <div style={{flex:1}}>
-          {editing===d.id?(<div style={{display:'flex',gap:4,alignItems:'center'}}>
-            <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')rename(d);if(e.key==='Escape')setEditing(null);}} autoFocus/>
-            <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>rename(d)}>Save</button>
-            <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
-          </div>):(<div className="nm">{d.name} <button className="ebtn" onClick={()=>{setEditing(d.id);setEn(d.name);}}>Rename</button></div>)}
+          {editing===d.id?(
+            <div style={{display:'flex',gap:4,alignItems:'center'}}>
+              <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')rename(d);if(e.key==='Escape')setEditing(null);}} autoFocus/>
+              <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>rename(d)}>Save</button>
+              <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
+            </div>
+          ):(<div className="nm">{d.name} <button className="ebtn" onClick={()=>{setEditing(d.id);setEn(d.name);}}>Rename</button></div>)}
           <select value={d.role} onChange={e=>api('PUT','/drivers/'+d.id,{role:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:4}}>
             <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Sales/Driver</option>
           </select>
@@ -378,6 +332,7 @@ function Fleet({data}){
   const [editLocName,setEditLocName]=useState('');
   const [editing,setEditing]=useState(null);
   const [en,setEn]=useState('');
+
   const renameTruck=async(t)=>{if(en.trim())await api('PUT','/trucks/'+t.id,{name:en.trim()});setEditing(null);};
   const renameTrailer=async(t)=>{if(en.trim())await api('PUT','/trailers/'+t.id,{name:en.trim()});setEditing(null);};
 
@@ -394,11 +349,13 @@ function Fleet({data}){
     <div className="cards">
       {data.trucks.map(t=>(<div key={t.id} className="card">
         <div style={{flex:1}}>
-          {editing===t.id?(<div style={{display:'flex',gap:4,alignItems:'center'}}>
-            <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')renameTruck(t);if(e.key==='Escape')setEditing(null);}} autoFocus/>
-            <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>renameTruck(t)}>Save</button>
-            <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
-          </div>):(<div className="nm">{t.name} <button className="ebtn" onClick={()=>{setEditing(t.id);setEn(t.name);}}>Rename</button></div>)}
+          {editing===t.id?(
+            <div style={{display:'flex',gap:4,alignItems:'center'}}>
+              <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')renameTruck(t);if(e.key==='Escape')setEditing(null);}} autoFocus/>
+              <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>renameTruck(t)}>Save</button>
+              <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
+            </div>
+          ):(<div className="nm">{t.name} <button className="ebtn" onClick={()=>{setEditing(t.id);setEn(t.name);}}>Rename</button></div>)}
           <div style={{marginTop:2}}>
             <select value={t.type} onChange={e=>api('PUT','/trucks/'+t.id,{type:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11}}>
               <option>Standard</option><option>Flatbed</option><option>Vac Truck</option><option>Tanker</option><option>Box Truck</option>
@@ -427,11 +384,13 @@ function Fleet({data}){
     <div className="cards">
       {data.trailers.map(t=>(<div key={t.id} className="card">
         <div style={{flex:1}}>
-          {editing===t.id?(<div style={{display:'flex',gap:4,alignItems:'center'}}>
-            <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')renameTrailer(t);if(e.key==='Escape')setEditing(null);}} autoFocus/>
-            <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>renameTrailer(t)}>Save</button>
-            <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
-          </div>):(<div className="nm">{t.name} <button className="ebtn" onClick={()=>{setEditing(t.id);setEn(t.name);}}>Rename</button></div>)}
+          {editing===t.id?(
+            <div style={{display:'flex',gap:4,alignItems:'center'}}>
+              <input className="ied" value={en} onChange={e=>setEn(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')renameTrailer(t);if(e.key==='Escape')setEditing(null);}} autoFocus/>
+              <button className="bp" style={{padding:'3px 8px',fontSize:11}} onClick={()=>renameTrailer(t)}>Save</button>
+              <button className="bc" style={{padding:'3px 8px',fontSize:11}} onClick={()=>setEditing(null)}>Cancel</button>
+            </div>
+          ):(<div className="nm">{t.name} <button className="ebtn" onClick={()=>{setEditing(t.id);setEn(t.name);}}>Rename</button></div>)}
           <select value={t.type} onChange={e=>api('PUT','/trailers/'+t.id,{type:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:2}}>
             <option>Standard</option><option>Flatbed</option><option>Tanker</option><option>Enclosed</option><option>Dump</option>
           </select>
@@ -458,11 +417,13 @@ function Fleet({data}){
     </div>
     <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
       {(data.locations||[]).map((loc,i)=>(<span key={i} style={{background:'#f0fdf4',border:'1px solid #86efac',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}}>
-        {editingLoc===loc?(<span style={{display:'flex',gap:3,alignItems:'center'}}>
-          <input className="ied" value={editLocName} onChange={e=>setEditLocName(e.target.value)} style={{width:120,fontSize:11}}
-            onKeyDown={async e=>{if(e.key==='Enter'&&editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}if(e.key==='Escape')setEditingLoc(null);}} autoFocus/>
-          <button className="bp" style={{padding:'2px 6px',fontSize:10}} onClick={async()=>{if(editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}}}>OK</button>
-        </span>):(<span>
+        {editingLoc===loc?(
+          <span style={{display:'flex',gap:3,alignItems:'center'}}>
+            <input className="ied" value={editLocName} onChange={e=>setEditLocName(e.target.value)} style={{width:120,fontSize:11}}
+              onKeyDown={async e=>{if(e.key==='Enter'&&editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}if(e.key==='Escape')setEditingLoc(null);}} autoFocus/>
+            <button className="bp" style={{padding:'2px 6px',fontSize:10}} onClick={async()=>{if(editLocName.trim()){await api('PUT','/locations',{oldName:loc,newName:editLocName.trim()});setEditingLoc(null);}}}>OK</button>
+          </span>
+        ):(<span>
           {loc}
           <span style={{cursor:'pointer',color:'var(--primary)',fontSize:10,marginLeft:2}} onClick={()=>{setEditingLoc(loc);setEditLocName(loc);}}>edit</span>
           <span style={{cursor:'pointer',color:'#999',fontSize:10}} onClick={()=>api('DELETE','/locations/'+encodeURIComponent(loc))}>&#10005;</span>
@@ -483,6 +444,7 @@ function Routes({data,dates,ws,prev,next,now}){
     const l={};dates.forEach(date=>{const k=dk(date);data.jobs.filter(j=>j.date===k&&j.location).forEach(j=>{const n=j.location.trim();if(!l[n])l[n]=0;l[n]++;});});
     return Object.entries(l).sort((a,b)=>b[1]-a[1]);
   },[data.jobs,dates]);
+
   return(<div>
     <div className="week-nav">
       <button onClick={prev}>&#9664; Prev</button>
@@ -504,173 +466,6 @@ function Routes({data,dates,ws,prev,next,now}){
           </td></tr>);
       })}
     </tbody></table></div>
-  </div>);
-}
-
-/* ============ PRINT VIEW ============ */
-function Print({data,dates,ws,prev,next,now}){
-  const end=new Date(ws);end.setDate(end.getDate()+6);
-  const [mode,setMode]=useState('daily');
-  const [selDay,setSelDay]=useState(0);
-  const [selDrivers,setSelDrivers]=useState(data.drivers.map(d=>d.id));
-
-  const toggleDriver=(id)=>{setSelDrivers(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);};
-  const selectAll=()=>setSelDrivers(data.drivers.map(d=>d.id));
-  const selectNone=()=>setSelDrivers([]);
-
-  const printDate=dates[selDay];
-  const printDateStr=printDate?fmtLong(printDate):'';
-  const driverDayJobs=(did,date)=>data.jobs.filter(j=>j.driverId===did&&j.date===dk(date));
-  const printedAt=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-
-  const renderDailySheet=(did)=>{
-    const driver=data.drivers.find(d=>d.id===did);
-    if(!driver) return null;
-    const jobs=driverDayJobs(did,printDate);
-    if(jobs.length===0) return null;
-    return(
-      <div className="print-sheet print-sheet-preview" key={did}>
-        <div className="print-topbar">
-          <div>
-            <h1>{driver.name}</h1>
-            <div style={{fontSize:14,fontWeight:600,color:'#333',marginTop:2}}>{driver.role}</div>
-          </div>
-          <div className="print-meta">
-            <strong>{printDateStr}</strong><br/>
-            {jobs.length} job{jobs.length!==1?'s':''} scheduled
-          </div>
-        </div>
-
-        {jobs.map((job,idx)=>{
-          const truck=data.trucks.find(t=>t.id===job.truckId);
-          const trailer=data.trailers.find(t=>t.id===job.trailerId);
-          return(
-            <div className="print-job-card" key={job.id}>
-              <div className="print-job-num">
-                <span>JOB {idx+1} of {jobs.length}</span>
-                {job.timeWindow&&<span>{job.timeWindow}</span>}
-              </div>
-              <div className="print-job-body">
-                <div className="print-job-loc">{job.location||'No location assigned'}</div>
-                <div className="print-job-grid">
-                  {truck&&<div className="print-job-field"><b>Truck:</b> {truck.name} ({truck.type})</div>}
-                  {trailer&&<div className="print-job-field"><b>Trailer:</b> {trailer.name} ({trailer.type})</div>}
-                  {job.timeWindow&&<div className="print-job-field"><b>Time:</b> {job.timeWindow}</div>}
-                  {job.status&&job.status!=='Scheduled'&&<div className="print-job-field"><b>Status:</b> {job.status}</div>}
-                  {job.equipment&&job.equipment.length>0&&<div className="print-job-field" style={{gridColumn:'1/-1'}}><b>Equipment:</b> {job.equipment.join(', ')}</div>}
-                </div>
-                {job.notes&&<div className="print-job-notes"><b>Instructions / Notes:</b>{job.notes}</div>}
-              </div>
-            </div>
-          );
-        })}
-
-        <div className="print-footer">
-          <span>Fleet Scheduler &mdash; Printed {printedAt}</span>
-          <span>{driver.name} &bull; {printDateStr} &bull; {jobs.length} job{jobs.length!==1?'s':''}</span>
-        </div>
-      </div>
-    );
-  };
-
-  const renderWeeklySheet=(did)=>{
-    const driver=data.drivers.find(d=>d.id===did);
-    if(!driver) return null;
-    const hasAnyJobs=dates.some(date=>driverDayJobs(did,date).length>0);
-    if(!hasAnyJobs) return null;
-    const totalJobs=dates.reduce((s,date)=>s+driverDayJobs(did,date).length,0);
-    return(
-      <div className="print-sheet print-sheet-preview" key={did}>
-        <div className="print-topbar">
-          <div>
-            <h1>{driver.name}</h1>
-            <div style={{fontSize:14,fontWeight:600,color:'#333',marginTop:2}}>{driver.role} &mdash; Weekly Overview</div>
-          </div>
-          <div className="print-meta">
-            <strong>{fmt(ws)} &mdash; {fmt(end)}</strong><br/>
-            {totalJobs} job{totalJobs!==1?'s':''} this week
-          </div>
-        </div>
-        <table className="print-weekly-table">
-          <thead><tr><th style={{width:100}}>Day</th><th>Location</th><th>Truck</th><th>Trailer</th><th>Time</th><th>Equipment</th><th>Notes</th></tr></thead>
-          <tbody>
-            {dates.map((date,i)=>{
-              const jobs=driverDayJobs(did,date);
-              if(jobs.length===0) return(<tr key={i}><td style={{fontWeight:800}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{date.getMonth()+1}/{date.getDate()}</span></td><td colSpan={6} style={{color:'#999',fontStyle:'italic'}}>No jobs scheduled</td></tr>);
-              return jobs.map((job,j)=>{
-                const truck=data.trucks.find(t=>t.id===job.truckId);
-                const trailer=data.trailers.find(t=>t.id===job.trailerId);
-                return(<tr key={job.id}>
-                  {j===0&&<td rowSpan={jobs.length} style={{fontWeight:800}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{date.getMonth()+1}/{date.getDate()}</span></td>}
-                  <td style={{fontWeight:700}}>{job.location||'—'}</td>
-                  <td>{truck?truck.name:'—'}</td>
-                  <td>{trailer?trailer.name:'—'}</td>
-                  <td>{job.timeWindow||'—'}</td>
-                  <td style={{fontSize:11}}>{job.equipment&&job.equipment.length?job.equipment.join(', '):'—'}</td>
-                  <td style={{fontSize:11,maxWidth:150}}>{job.notes||'—'}</td>
-                </tr>);
-              });
-            })}
-          </tbody>
-        </table>
-        <div className="print-footer">
-          <span>Fleet Scheduler &mdash; Printed {printedAt}</span>
-          <span>{driver.name} &bull; Week of {fmt(ws)} &bull; {totalJobs} job{totalJobs!==1?'s':''}</span>
-        </div>
-      </div>
-    );
-  };
-
-  return(<div>
-    <div className="week-nav no-print">
-      <button onClick={prev}>&#9664; Prev</button>
-      <button onClick={now} style={{background:'#16a34a'}}>Today</button>
-      <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
-      <button onClick={next}>Next &#9654;</button>
-    </div>
-
-    <div className="no-print" style={{background:'var(--bg-white)',borderRadius:10,padding:20,marginBottom:16,boxShadow:'var(--shadow)'}}>
-      <div style={{display:'flex',gap:12,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
-        <label style={{fontWeight:700,fontSize:14}}>Print Mode:</label>
-        <button className={mode==='daily'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('daily')}>Daily Instruction Sheets</button>
-        <button className={mode==='weekly'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('weekly')}>Weekly Overview</button>
-      </div>
-
-      {mode==='daily'&&<div style={{marginBottom:14}}>
-        <label style={{fontWeight:700,fontSize:14,marginRight:8}}>Day:</label>
-        <select value={selDay} onChange={e=>setSelDay(Number(e.target.value))} style={{width:'auto',fontSize:14,padding:'6px 10px'}}>
-          {dates.map((d,i)=>(<option key={i} value={i}>{DAYS[i]} — {d.getMonth()+1}/{d.getDate()}</option>))}
-        </select>
-      </div>}
-
-      <div style={{marginBottom:14}}>
-        <label style={{fontWeight:700,fontSize:14}}>Print for: </label>
-        <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectAll}>All</button>
-        <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectNone}>None</button>
-        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
-          {data.drivers.map(d=>(<label key={d.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:4,padding:'4px 10px',background:selDrivers.includes(d.id)?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.includes(d.id)?'1px solid #c7d2fe':'1px solid #e2e8f0'}}>
-            <input type="checkbox" checked={selDrivers.includes(d.id)} onChange={()=>toggleDriver(d.id)}/>
-            {d.name}
-          </label>))}
-        </div>
-      </div>
-
-      <button className="bp" style={{fontSize:16,padding:'12px 40px',borderRadius:8}} onClick={()=>window.print()}>Print Sheets</button>
-      <span style={{marginLeft:12,fontSize:12,color:'#999'}}>One page per person</span>
-    </div>
-
-    {/* DAILY SHEETS */}
-    {mode==='daily'&&selDrivers.map(did=>renderDailySheet(did))}
-
-    {/* WEEKLY SHEETS */}
-    {mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did))}
-
-    {mode==='daily'&&selDrivers.every(did=>driverDayJobs(did,printDate).length===0)&&(
-      <div className="print-no-jobs">No jobs scheduled for the selected people on {printDateStr}.</div>
-    )}
-    {mode==='weekly'&&selDrivers.every(did=>!dates.some(date=>driverDayJobs(did,date).length>0))&&(
-      <div className="print-no-jobs">No jobs scheduled for the selected people this week.</div>
-    )}
   </div>);
 }
 
