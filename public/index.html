@@ -118,6 +118,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
   .print-weekly-table th{background:#e5e5e5 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:800;font-size:12px;text-transform:uppercase}
   .print-weekly-table td{font-size:11px;line-height:1.4}
   .print-no-jobs{text-align:center;padding:30px;font-size:14px;color:#999 !important;font-style:italic}
+  #jobPrintArea{display:block !important;padding:30px}
+  #jobPrintArea *{color:#000 !important}
+  body.printing-job #root,.overlay{display:none !important}
+  #jobPrintArea .jp-header{font-size:24px;font-weight:900;border-bottom:4px solid #000;padding-bottom:10px;margin-bottom:20px}
+  #jobPrintArea .jp-company{font-size:12px;color:#666 !important;margin-top:4px;font-weight:400}
+  #jobPrintArea .jp-row{display:flex;padding:10px 0;border-bottom:1px solid #ccc;font-size:16px}
+  #jobPrintArea .jp-label{font-weight:700;min-width:160px}
+  #jobPrintArea .jp-value{flex:1}
+  #jobPrintArea .jp-notes{margin-top:16px;background:#f0f0f0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:1px solid #ccc;padding:14px;font-size:14px;white-space:pre-wrap;line-height:1.6}
+  #jobPrintArea .jp-notes b{display:block;margin-bottom:6px;font-size:15px}
+  #jobPrintArea .jp-footer{margin-top:30px;padding-top:10px;border-top:2px solid #000;font-size:10px;color:#666 !important}
 }
 /* Screen preview of print sheets */
 .print-sheet{border:2px solid #ccc;background:#fff;padding:24px 20px;margin:12px 0;border-radius:0;box-shadow:0 2px 8px rgba(0,0,0,.12)}
@@ -343,6 +354,17 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mactions">
           <button className="bc" onClick={()=>{setModal(null);setEid(null);}}>Cancel</button>
           {eid&&<button className="bd" onClick={async()=>{await del(eid);setModal(null);setEid(null);}}>Delete</button>}
+          <button id="printJobBtn" className="bp" style={{background:'#475569'}} data-job={JSON.stringify({
+            date:modal.date,
+            driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
+            location:modal.location,
+            truck:(data.trucks.find(t=>t.id===modal.truckId)||{}).name||'',
+            trailer:(data.trailers.find(t=>t.id===modal.trailerId)||{}).name||'',
+            timeWindow:modal.timeWindow||'',
+            equipment:(modal.equipment||[]).join(', '),
+            status:modal.status||'Scheduled',
+            notes:modal.notes||''
+          })}>Print Job</button>
           <button className="bp" onClick={save}>{eid?'Update':'Add Job'}</button>
         </div>
       </div>
@@ -692,6 +714,7 @@ function Print({data,dates,ws,prev,next,now}){
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
+<div id="jobPrintArea" style="display:none"></div>
 <script>
 /* Safari-compatible print button handler - plain JS, no React/Babel */
 document.addEventListener('click', function(e) {
@@ -701,6 +724,42 @@ document.addEventListener('click', function(e) {
       e.preventDefault();
       e.stopPropagation();
       window.print();
+      return;
+    }
+    if(btn.id === 'printJobBtn') {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        var jobData = JSON.parse(btn.getAttribute('data-job'));
+        var area = document.getElementById('jobPrintArea');
+        var dateStr = jobData.date || '';
+        if(dateStr) {
+          var parts = dateStr.split('-');
+          dateStr = parts[1] + '/' + parts[2] + '/' + parts[0];
+        }
+        var html = '<div class="jp-header">Job Details<div class="jp-company">Independence Environmental Services</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Date:</div><div class="jp-value">' + dateStr + '</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Driver:</div><div class="jp-value">' + (jobData.driver || '') + '</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Location / Job:</div><div class="jp-value">' + (jobData.location || '') + '</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Truck:</div><div class="jp-value">' + (jobData.truck || 'None') + '</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Trailer:</div><div class="jp-value">' + (jobData.trailer || 'None') + '</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Time Window:</div><div class="jp-value">' + (jobData.timeWindow || '') + '</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Equipment:</div><div class="jp-value">' + (jobData.equipment || 'None') + '</div></div>';
+        html += '<div class="jp-row"><div class="jp-label">Status:</div><div class="jp-value">' + (jobData.status || '') + '</div></div>';
+        if(jobData.notes) {
+          html += '<div class="jp-notes"><b>Notes / Instructions:</b>' + jobData.notes + '</div>';
+        }
+        html += '<div class="jp-footer">Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</div>';
+        area.innerHTML = html;
+        document.body.classList.add('printing-job');
+        setTimeout(function() {
+          window.print();
+          setTimeout(function() {
+            document.body.classList.remove('printing-job');
+            area.innerHTML = '';
+          }, 500);
+        }, 100);
+      } catch(err) { console.error('Print job error:', err); }
       return;
     }
     btn = btn.parentElement;
