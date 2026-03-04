@@ -314,8 +314,8 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mrow"><label>Time Window</label>
           <input value={modal.timeWindow} onChange={e=>setModal({...modal,timeWindow:e.target.value})} placeholder="e.g. 8:00 AM, Be onsite by 10 AM"/></div>
         <div className="mrow"><label>Equipment Needed</label>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-            {data.equipment.map(eq=>(<label key={eq} style={{fontSize:12,display:'flex',alignItems:'center',gap:3}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:6}}>
+            {data.equipment.map(eq=>(<label key={eq} style={{fontSize:12,display:'flex',alignItems:'center',gap:4,padding:'4px 6px'}}>
               <input type="checkbox" checked={modal.equipment?.includes(eq)||false}
                 onChange={e=>{const eqs=modal.equipment||[];setModal({...modal,equipment:e.target.checked?[...eqs,eq]:eqs.filter(x=>x!==eq)});}}/>
               {eq}</label>))}
@@ -649,8 +649,8 @@ function Print({data,dates,ws,prev,next,now}){
         <label style={{fontWeight:700,fontSize:14}}>Print for: </label>
         <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectAll}>All</button>
         <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectNone}>None</button>
-        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
-          {data.drivers.map(d=>(<label key={d.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:4,padding:'4px 10px',whiteSpace:'nowrap',background:selDrivers.includes(d.id)?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.includes(d.id)?'1px solid #c7d2fe':'1px solid #e2e8f0'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:6,marginTop:8}}>
+          {data.drivers.map(d=>(<label key={d.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:4,padding:'6px 10px',background:selDrivers.includes(d.id)?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.includes(d.id)?'1px solid #c7d2fe':'1px solid #e2e8f0'}}>
             <input type="checkbox" checked={selDrivers.includes(d.id)} onChange={()=>toggleDriver(d.id)}/>
             {d.name}
           </label>))}
