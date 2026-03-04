@@ -5,20 +5,8 @@ const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Use persistent volume on Railway, local directory otherwise
-var DATA_DIR = __dirname;
-if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
-  DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH;
-  console.log('Using Railway volume: ' + DATA_DIR);
-} else if (process.env.RAILWAY_ENVIRONMENT) {
-  DATA_DIR = '/data';
-  console.log('Using Railway data dir: ' + DATA_DIR);
-}
-if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
-
-const DATA_FILE = path.join(DATA_DIR, 'data.json');
-const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const DATA_FILE = path.join(__dirname, 'data.json');
+const BACKUP_DIR = path.join(__dirname, 'backups');
 
 const defaultData = {
   drivers: [
@@ -81,10 +69,15 @@ function createBackup() {
 }
 
 var data = loadData();
-if (!data.locations) { data.locations = defaultData.locations; saveData(data); }
+// Migrate: add locations if missing
+if (!data.locations) {
+  data.locations = defaultData.locations;
+  saveData(data);
+}
 createBackup();
 setInterval(createBackup, 3600000);
 
+// SSE clients for live updates
 var clients = [];
 function broadcast(msg) {
   var payload = 'data: ' + JSON.stringify(msg) + '\n\n';
@@ -94,6 +87,7 @@ function broadcast(msg) {
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// SSE - live connection
 app.get('/api/events', function(req, res) {
   res.writeHead(200, { 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'Connection':'keep-alive' });
   res.write('data: ' + JSON.stringify({ type:'connected', data: data }) + '\n\n');
@@ -137,6 +131,20 @@ app.put('/api/drivers/:id', function(req, res) {
 app.delete('/api/drivers/:id', function(req, res) {
   data.drivers = data.drivers.filter(function(d) { return d.id !== req.params.id; });
   data.jobs = data.jobs.filter(function(j) { return j.driverId !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+app.put('/api/drivers-reorder', function(req, res) {
+  var ids = req.body.order;
+  if (!ids || !Array.isArray(ids)) return res.status(400).json({error:'order array required'});
+  var reordered = [];
+  ids.forEach(function(id) {
+    var d = data.drivers.find(function(x) { return x.id === id; });
+    if (d) reordered.push(d);
+  });
+  data.drivers.forEach(function(d) {
+    if (ids.indexOf(d.id) === -1) reordered.push(d);
+  });
+  data.drivers = reordered;
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
 
