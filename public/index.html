@@ -515,7 +515,7 @@ function Print({data,dates,ws,prev,next,now}){
   const end=new Date(ws);end.setDate(end.getDate()+6);
   const [mode,setMode]=useState('daily');
   const [selDay,setSelDay]=useState(0);
-  const [selDrivers,setSelDrivers]=useState(data.drivers.map(d=>d.id));
+  const [selDrivers,setSelDrivers]=useState([]);
   const [showPreview,setShowPreview]=useState(true);
 
   const toggleDriver=(id)=>{setSelDrivers(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);};
@@ -650,7 +650,7 @@ function Print({data,dates,ws,prev,next,now}){
         <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectAll}>All</button>
         <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectNone}>None</button>
         <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
-          {data.drivers.map(d=>(<label key={d.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:4,padding:'4px 10px',background:selDrivers.includes(d.id)?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.includes(d.id)?'1px solid #c7d2fe':'1px solid #e2e8f0'}}>
+          {data.drivers.map(d=>(<label key={d.id} style={{fontSize:13,display:'flex',alignItems:'center',gap:4,padding:'4px 10px',whiteSpace:'nowrap',background:selDrivers.includes(d.id)?'#eef2ff':'#f8f8f8',borderRadius:6,cursor:'pointer',border:selDrivers.includes(d.id)?'1px solid #c7d2fe':'1px solid #e2e8f0'}}>
             <input type="checkbox" checked={selDrivers.includes(d.id)} onChange={()=>toggleDriver(d.id)}/>
             {d.name}
           </label>))}
