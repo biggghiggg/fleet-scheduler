@@ -343,17 +343,17 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mactions">
           <button className="bc" onClick={()=>{setModal(null);setEid(null);}}>Cancel</button>
           {eid&&<button className="bd" onClick={async()=>{await del(eid);setModal(null);setEid(null);}}>Delete</button>}
-          <button id="printJobBtn" className="bp" style={{background:'#475569'}} data-job={JSON.stringify({
-            date:modal.date,
+          <a href={'/print-job?'+new URLSearchParams({
+            date:modal.date?(modal.date.split('-')[1]+'/'+modal.date.split('-')[2]+'/'+modal.date.split('-')[0]):'',
             driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
-            location:modal.location,
-            truck:(data.trucks.find(t=>t.id===modal.truckId)||{}).name||'',
-            trailer:(data.trailers.find(t=>t.id===modal.trailerId)||{}).name||'',
+            location:modal.location||'',
+            truck:(data.trucks.find(t=>t.id===modal.truckId)||{}).name||'None',
+            trailer:(data.trailers.find(t=>t.id===modal.trailerId)||{}).name||'None',
             timeWindow:modal.timeWindow||'',
-            equipment:(modal.equipment||[]).join(', '),
+            equipment:(modal.equipment||[]).join(', ')||'None',
             status:modal.status||'Scheduled',
             notes:modal.notes||''
-          })}>Print Job</button>
+          }).toString()} target="_blank" style={{display:'inline-block',background:'#475569',color:'#fff',padding:'6px 14px',borderRadius:6,fontSize:13,textDecoration:'none',textAlign:'center',cursor:'pointer'}}>Print Job</a>
           <button className="bp" onClick={save}>{eid?'Update':'Add Job'}</button>
         </div>
       </div>
@@ -716,57 +716,6 @@ document.addEventListener('click', function(e) {
       e.preventDefault();
       e.stopPropagation();
       window.print();
-      return;
-    }
-    if(btn.id === 'printJobBtn') {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        var jobData = JSON.parse(btn.getAttribute('data-job'));
-        var dateStr = jobData.date || '';
-        if(dateStr) {
-          var parts = dateStr.split('-');
-          dateStr = parts[1] + '/' + parts[2] + '/' + parts[0];
-        }
-        var w = window.open('', '_blank', 'width=700,height=900');
-        if(!w) { alert('Please allow pop-ups for this site to print job details.'); return; }
-        w.document.write('<!DOCTYPE html><html><head><title>Job - ' + (jobData.driver||'') + ' - ' + dateStr + '</title>');
-        w.document.write('<style>');
-        w.document.write('*{margin:0;padding:0;box-sizing:border-box}');
-        w.document.write('body{font-family:Arial,Helvetica,sans-serif;padding:40px;color:#000}');
-        w.document.write('.header{text-align:center;margin-bottom:30px;padding-bottom:16px;border-bottom:4px solid #000}');
-        w.document.write('.header h1{font-size:26px;font-weight:900;margin-bottom:4px}');
-        w.document.write('.header .company{font-size:14px;color:#444;font-weight:600;letter-spacing:0.5px}');
-        w.document.write('.row{display:flex;padding:12px 0;border-bottom:1px solid #ddd;font-size:16px}');
-        w.document.write('.row:last-of-type{border-bottom:2px solid #000}');
-        w.document.write('.label{font-weight:700;min-width:170px;color:#333}');
-        w.document.write('.value{flex:1;font-size:16px}');
-        w.document.write('.notes-section{margin-top:20px;border:2px solid #000;padding:16px;background:#f8f8f8}');
-        w.document.write('.notes-section h3{font-size:15px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}');
-        w.document.write('.notes-section p{font-size:14px;line-height:1.7;white-space:pre-wrap}');
-        w.document.write('.signature{margin-top:40px;display:flex;gap:40px}');
-        w.document.write('.sig-line{flex:1;border-bottom:1px solid #000;padding-bottom:4px;font-size:11px;color:#666}');
-        w.document.write('.footer{margin-top:30px;padding-top:10px;border-top:2px solid #000;font-size:10px;color:#888;display:flex;justify-content:space-between}');
-        w.document.write('@media print{body{padding:30px}}');
-        w.document.write('</style></head><body>');
-        w.document.write('<div class="header"><h1>Job Assignment</h1><div class="company">Independence Environmental Services</div></div>');
-        w.document.write('<div class="row"><div class="label">Date:</div><div class="value">' + dateStr + '</div></div>');
-        w.document.write('<div class="row"><div class="label">Driver:</div><div class="value"><strong>' + (jobData.driver||'') + '</strong></div></div>');
-        w.document.write('<div class="row"><div class="label">Location / Job:</div><div class="value"><strong>' + (jobData.location||'') + '</strong></div></div>');
-        w.document.write('<div class="row"><div class="label">Truck:</div><div class="value">' + (jobData.truck||'None') + '</div></div>');
-        w.document.write('<div class="row"><div class="label">Trailer:</div><div class="value">' + (jobData.trailer||'None') + '</div></div>');
-        w.document.write('<div class="row"><div class="label">Time Window:</div><div class="value">' + (jobData.timeWindow||'—') + '</div></div>');
-        w.document.write('<div class="row"><div class="label">Equipment:</div><div class="value">' + (jobData.equipment||'None') + '</div></div>');
-        w.document.write('<div class="row"><div class="label">Status:</div><div class="value">' + (jobData.status||'') + '</div></div>');
-        if(jobData.notes) {
-          w.document.write('<div class="notes-section"><h3>Notes / Special Instructions</h3><p>' + jobData.notes.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p></div>');
-        }
-        w.document.write('<div class="signature"><div class="sig-line">Driver Signature</div><div class="sig-line">Date</div></div>');
-        w.document.write('<div class="footer"><span>Independence Environmental Services</span><span>Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>');
-        w.document.write('</body></html>');
-        w.document.close();
-        setTimeout(function(){ w.print(); }, 300);
-      } catch(err) { console.error('Print job error:', err); }
       return;
     }
     btn = btn.parentElement;
