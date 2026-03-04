@@ -90,11 +90,15 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 .ebtn:hover{background:#dbeafe}
 .ied{border:1px solid var(--primary);border-radius:4px;padding:2px 6px;font-size:13px;width:auto}
 
+/* Print-only content: hidden on screen, visible when printing */
+.print-only{display:none}
+
 /* PRINT STYLES */
 @media print {
   body{background:#fff !important;font-family:Arial,Helvetica,sans-serif !important}
   .app-header,.tabs,.week-nav,.no-print,.toast{display:none !important}
   .main{padding:0 !important}
+  .print-only{display:block !important}
   .print-sheet{page-break-after:always;padding:24px 20px;max-width:100%}
   .print-sheet:last-child{page-break-after:avoid}
   .print-sheet *{color:#000 !important}
@@ -510,7 +514,7 @@ function Routes({data,dates,ws,prev,next,now}){
   </div>);
 }
 
-/* ============ PRINT VIEW (lightweight - only renders on print) ============ */
+/* ============ PRINT VIEW ============ */
 function Print({data,dates,ws,prev,next,now}){
   const end=new Date(ws);end.setDate(end.getDate()+6);
   const [mode,setMode]=useState('daily');
@@ -527,20 +531,13 @@ function Print({data,dates,ws,prev,next,now}){
   const driverDayJobs=(did,date)=>data.jobs.filter(j=>j.driverId===did&&j.date===dk(date));
   const printedAt=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
 
-  const doPrint=()=>{setShowPreview(true);setTimeout(()=>{window.print();},100);};
-
-  const countJobs=useCallback(()=>{
-    if(mode==='daily') return selDrivers.reduce((s,did)=>s+driverDayJobs(did,printDate).length,0);
-    return selDrivers.reduce((s,did)=>s+dates.reduce((s2,date)=>s2+driverDayJobs(did,date).length,0),0);
-  },[mode,selDrivers,data.jobs,selDay]);
-
-  const renderDailySheet=(did)=>{
+  const renderDailySheet=(did,forPrint)=>{
     const driver=data.drivers.find(d=>d.id===did);
     if(!driver) return null;
     const jobs=driverDayJobs(did,printDate);
     if(jobs.length===0) return null;
     return(
-      <div className="print-sheet print-sheet-preview" key={did}>
+      <div className={forPrint?"print-sheet":"print-sheet print-sheet-preview"} key={did}>
         <div className="print-topbar">
           <div>
             <h1>{driver.name}</h1>
@@ -582,14 +579,14 @@ function Print({data,dates,ws,prev,next,now}){
     );
   };
 
-  const renderWeeklySheet=(did)=>{
+  const renderWeeklySheet=(did,forPrint)=>{
     const driver=data.drivers.find(d=>d.id===did);
     if(!driver) return null;
     const hasAnyJobs=dates.some(date=>driverDayJobs(did,date).length>0);
     if(!hasAnyJobs) return null;
     const totalJobs=dates.reduce((s,date)=>s+driverDayJobs(did,date).length,0);
     return(
-      <div className="print-sheet print-sheet-preview" key={did}>
+      <div className={forPrint?"print-sheet":"print-sheet print-sheet-preview"} key={did}>
         <div className="print-topbar">
           <div>
             <h1>{driver.name}</h1>
@@ -641,13 +638,13 @@ function Print({data,dates,ws,prev,next,now}){
     <div className="no-print" style={{background:'var(--bg-white)',borderRadius:10,padding:20,marginBottom:16,boxShadow:'var(--shadow)'}}>
       <div style={{display:'flex',gap:12,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
         <label style={{fontWeight:700,fontSize:14}}>Print Mode:</label>
-        <button className={mode==='daily'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>{setMode('daily');setShowPreview(false);}}>Daily Instruction Sheets</button>
-        <button className={mode==='weekly'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>{setMode('weekly');setShowPreview(false);}}>Weekly Overview</button>
+        <button className={mode==='daily'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('daily')}>Daily Instruction Sheets</button>
+        <button className={mode==='weekly'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('weekly')}>Weekly Overview</button>
       </div>
 
       {mode==='daily'&&<div style={{marginBottom:14}}>
         <label style={{fontWeight:700,fontSize:14,marginRight:8}}>Day:</label>
-        <select value={selDay} onChange={e=>{setSelDay(Number(e.target.value));setShowPreview(false);}} style={{width:'auto',fontSize:14,padding:'6px 10px'}}>
+        <select value={selDay} onChange={e=>setSelDay(Number(e.target.value))} style={{width:'auto',fontSize:14,padding:'6px 10px'}}>
           {dates.map((d,i)=>(<option key={i} value={i}>{DAYS[i]} — {d.getMonth()+1}/{d.getDate()}</option>))}
         </select>
       </div>}
@@ -665,15 +662,21 @@ function Print({data,dates,ws,prev,next,now}){
       </div>
 
       <div style={{display:'flex',gap:12,alignItems:'center'}}>
-        <button className="bp" style={{fontSize:16,padding:'12px 40px',borderRadius:8}} onClick={doPrint}>Print Sheets</button>
+        <button className="bp" style={{fontSize:16,padding:'12px 40px',borderRadius:8}} onClick={()=>window.print()}>Print Sheets</button>
         <button className="bc" style={{fontSize:13,padding:'10px 20px',borderRadius:8}} onClick={()=>setShowPreview(!showPreview)}>{showPreview?'Hide Preview':'Show Preview'}</button>
-        <span style={{fontSize:12,color:'#999'}}>{countJobs()} job{countJobs()!==1?'s':''} &bull; One page per person</span>
+        <span style={{fontSize:12,color:'#999'}}>One page per person</span>
       </div>
     </div>
 
-    {/* Only render sheets when preview is shown or printing */}
-    {showPreview&&mode==='daily'&&selDrivers.map(did=>renderDailySheet(did))}
-    {showPreview&&mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did))}
+    {/* ALWAYS rendered but hidden on screen via .print-only class — visible only when printing */}
+    <div className="print-only">
+      {mode==='daily'&&selDrivers.map(did=>renderDailySheet(did,true))}
+      {mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did,true))}
+    </div>
+
+    {/* Optional on-screen preview */}
+    {showPreview&&mode==='daily'&&selDrivers.map(did=>renderDailySheet(did,false))}
+    {showPreview&&mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did,false))}
 
     {showPreview&&mode==='daily'&&selDrivers.every(did=>driverDayJobs(did,printDate).length===0)&&(
       <div className="print-no-jobs">No jobs scheduled for the selected people on {printDateStr}.</div>
