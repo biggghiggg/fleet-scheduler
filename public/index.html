@@ -958,12 +958,13 @@ function Documents(){
     <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {filtered.map(doc=>(
         <div key={doc.id} style={{background:'var(--bg-white)',borderRadius:8,padding:'12px 16px',boxShadow:'var(--shadow)',display:'flex',alignItems:'center',gap:12}}>
-          <span style={{fontSize:24}}>{getIcon(doc.name)}</span>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:600,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{doc.name}</div>
+          <a href={'/api/documents/'+doc.id+'/view'} target="_blank" style={{fontSize:24,textDecoration:'none',cursor:'pointer'}}>{getIcon(doc.name)}</a>
+          <div style={{flex:1,minWidth:0,cursor:'pointer'}} onClick={()=>window.open('/api/documents/'+doc.id+'/view','_blank')}>
+            <div style={{fontWeight:600,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--primary)'}}>{doc.name}</div>
             <div style={{fontSize:11,color:'var(--text-muted)'}}>{doc.category} &bull; {formatSize(doc.size)} &bull; {formatDate(doc.uploadedAt)}</div>
           </div>
-          <a href={'/api/documents/'+doc.id+'/download'} style={{background:'var(--primary)',color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:12,textDecoration:'none',whiteSpace:'nowrap'}}>Download</a>
+          <a href={'/api/documents/'+doc.id+'/view'} target="_blank" style={{background:'var(--primary)',color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:12,textDecoration:'none',whiteSpace:'nowrap'}}>View</a>
+          <a href={'/api/documents/'+doc.id+'/download'} style={{background:'#475569',color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:12,textDecoration:'none',whiteSpace:'nowrap'}}>Download</a>
           <button style={{background:'#fee2e2',color:'var(--danger)',fontSize:12,padding:'5px 12px'}} onClick={()=>deleteDoc(doc.id,doc.name)}>Delete</button>
         </div>
       ))}
