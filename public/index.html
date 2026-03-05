@@ -254,7 +254,8 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
   const [custSearch,setCustSearch]=useState('');
   const [custDropOpen,setCustDropOpen]=useState(false);
   const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
-  const copyJob=()=>{if(!modal)return;const c={location:modal.location,customerIds:[...(modal.customerIds||[])],truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
+  const getCustEntries=()=>(modal.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
+  const copyJob=()=>{if(!modal)return;const c={location:modal.location,customerIds:getCustEntries().map(x=>({...x})),truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
   const clearClip=()=>{setClip(null);if(show)show('Clipboard cleared.');};
   const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);};
   const save=async()=>{if(eid)await api('PUT','/jobs/'+eid,modal);else await api('POST','/jobs',modal);setModal(null);setEid(null);};
@@ -345,27 +346,28 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             <input value={custSearch} onChange={e=>{setCustSearch(e.target.value);setCustDropOpen(true);}} onFocus={()=>setCustDropOpen(true)} placeholder="Search customers..." style={{width:'100%'}}/>
             {custDropOpen&&(()=>{
               const allCust=(data.customers||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-              const ids=modal.customerIds||[];
+              const entries=getCustEntries();
+              const selectedIds=entries.map(x=>x.id);
               const filtered=custSearch?allCust.filter(c=>(c.name||'').toLowerCase().includes(custSearch.toLowerCase())):allCust;
               return filtered.length>0?<div style={{position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'1px solid #ccc',borderRadius:6,maxHeight:200,overflowY:'auto',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,.15)'}}>
-                {filtered.map(c=><div key={c.id} onClick={()=>{if(!ids.includes(c.id)){setModal({...modal,customerIds:[...ids,c.id]});}setCustSearch('');setCustDropOpen(false);}} style={{padding:'8px 12px',cursor:'pointer',fontSize:13,background:ids.includes(c.id)?'#dbeafe':'#fff',borderBottom:'1px solid #f0f0f0'}} onMouseEnter={e=>e.target.style.background='#eff6ff'} onMouseLeave={e=>e.target.style.background=ids.includes(c.id)?'#dbeafe':'#fff'}>
+                {filtered.map(c=><div key={c.id} onClick={()=>{if(!selectedIds.includes(c.id)){setModal({...modal,customerIds:[...entries,{id:c.id,jobNotes:''}]});}setCustSearch('');setCustDropOpen(false);}} style={{padding:'8px 12px',cursor:'pointer',fontSize:13,background:selectedIds.includes(c.id)?'#dbeafe':'#fff',borderBottom:'1px solid #f0f0f0'}} onMouseEnter={e=>e.target.style.background='#eff6ff'} onMouseLeave={e=>e.target.style.background=selectedIds.includes(c.id)?'#dbeafe':'#fff'}>
                   <strong>{c.name}</strong>{c.city?<span style={{color:'#666',marginLeft:6,fontSize:12}}>{c.city}{c.state?', '+c.state:''}</span>:null}
-                  {ids.includes(c.id)&&<span style={{float:'right',color:'#2563eb',fontSize:11}}>selected</span>}
+                  {selectedIds.includes(c.id)&&<span style={{float:'right',color:'#2563eb',fontSize:11}}>selected</span>}
                 </div>)}
               </div>:null;
             })()}
           </div>
-          {(modal.customerIds||[]).length>0&&<div style={{marginTop:6,display:'flex',flexWrap:'wrap',gap:4}}>
-            {(modal.customerIds||[]).map(cid=>{const c=(data.customers||[]).find(x=>x.id===cid);return c?<span key={cid} style={{display:'inline-flex',alignItems:'center',background:'#dbeafe',border:'1px solid #93c5fd',borderRadius:14,padding:'3px 10px',fontSize:12,fontWeight:600}}>
-              {c.name}<span onClick={()=>setModal({...modal,customerIds:(modal.customerIds||[]).filter(x=>x!==cid)})} style={{marginLeft:6,cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14}}>&times;</span>
-            </span>:null;})}
-          </div>}
-          {(modal.customerIds||[]).length>0&&<div style={{marginTop:6}}>{(modal.customerIds||[]).map(cid=>{const c=(data.customers||[]).find(x=>x.id===cid);return c?<div key={cid} style={{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:8,marginBottom:4,fontSize:12}}>
-            <strong>{c.name}</strong>
+          {getCustEntries().length>0&&<div style={{marginTop:6}}>{getCustEntries().map((entry,idx)=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?<div key={entry.id} style={{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:10,marginBottom:6,fontSize:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <strong style={{fontSize:13}}>{c.name}</strong>
+              <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setModal({...modal,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
+            </div>
             {c.address&&<div><strong>Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
             {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
             {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
             {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
+            <div style={{marginTop:6}}><label style={{fontSize:12,fontWeight:700,color:'#1d4ed8'}}>Job Notes for {c.name}:</label>
+              <textarea value={entry.jobNotes||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,jobNotes:e.target.value}:x);setModal({...modal,customerIds:updated});}} rows={2} placeholder="Special instructions, requirements for this customer..." style={{width:'100%',marginTop:3,fontSize:12,padding:6,borderRadius:4,border:'1px solid #93c5fd'}}/></div>
           </div>:null;})}</div>}
         </div>
         <div className="mrow"><label>Truck</label>
@@ -431,7 +433,8 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
           {eid&&<button className="bd" onClick={async()=>{await del(eid);setModal(null);setEid(null);}}>Delete</button>}
           <button style={{background:'#7c3aed',color:'#fff'}} onClick={copyJob}>Copy Job</button>
           <button onClick={()=>{
-            const custs=(modal.customerIds||[]).map(cid=>(data.customers||[]).find(x=>x.id===cid)).filter(Boolean);
+            const entries=getCustEntries();
+            const custs=entries.map(entry=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?{name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),phone:c.phone||'',contact:c.contact||'',pricing:c.pricing||c.notes||'',jobNotes:entry.jobNotes||''}:null;}).filter(Boolean);
             const jobData={
               date:modal.date?(modal.date.split('-')[1]+'/'+modal.date.split('-')[2]+'/'+modal.date.split('-')[0]):'',
               driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
@@ -443,7 +446,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
               placards:(modal.placards||[]).join(', ')||'None',
               status:modal.status||'Scheduled',
               notes:modal.notes||'',
-              customers:custs.map(c=>({name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),phone:c.phone||'',contact:c.contact||'',pricing:c.pricing||c.notes||''}))
+              customers:custs
             };
             const f=document.createElement('form');f.method='POST';f.action='/print-job';f.target='_blank';
             const inp=document.createElement('input');inp.type='hidden';inp.name='jobData';inp.value=JSON.stringify(jobData);
