@@ -228,12 +228,15 @@ app.post('/print-job', function(req, res) {
     }
     html += '<div class="row"><div class="label">Truck:</div><div class="value">' + (q.truck||'None') + '</div></div>';
     html += '<div class="row"><div class="label">Trailer:</div><div class="value">' + (q.trailer||'None') + '</div></div>';
-    html += '<div class="row"><div class="label">Time Window:</div><div class="value">' + (q.timeWindow||'\u2014') + '</div></div>';
-    html += '<div class="row"><div class="label">Equipment:</div><div class="value">' + (q.equipment||'None') + '</div></div>';
+    var custTime = cust && cust.timeWindow ? cust.timeWindow : (q.timeWindow || '');
+    var custEquip = cust && cust.equipment ? cust.equipment : (q.equipment || 'None');
+    var custPlac = cust && cust.placards ? cust.placards : '';
+    html += '<div class="row"><div class="label">Time Window:</div><div class="value">' + (custTime||'\u2014') + '</div></div>';
+    html += '<div class="row"><div class="label">Equipment:</div><div class="value">' + (custEquip||'None') + '</div></div>';
     html += '<div class="row"><div class="label">Status:</div><div class="value">' + (q.status||'') + '</div></div>';
-    if(q.placards && q.placards !== 'None') {
+    if(custPlac && custPlac !== 'None') {
       html += '<div class="placards-section"><h3>&#9888; Required Placards</h3>';
-      var pList = q.placards.split(', ');
+      var pList = custPlac.split(', ');
       pList.forEach(function(p) { html += '<span class="placard-tag">' + p + '</span>'; });
       html += '</div>';
     }
