@@ -395,6 +395,10 @@ app.delete('/api/customers/:id', function(req, res) {
   data.customers = data.customers.filter(function(c) { return c.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
+app.delete('/api/customers', function(req, res) {
+  data.customers = [];
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
 app.post('/api/customers/import', function(req, res) {
   var rows = req.body.customers;
   if (!rows || !Array.isArray(rows)) return res.status(400).json({error:'customers array required'});
