@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -99,6 +100,64 @@ function broadcast(msg) {
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// DOCUMENTS / FILE UPLOADS
+var UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); }
+var DOCS_FILE = path.join(DATA_DIR, 'documents.json');
+
+function loadDocs() {
+  try {
+    if (fs.existsSync(DOCS_FILE)) return JSON.parse(fs.readFileSync(DOCS_FILE, 'utf8'));
+  } catch(e) { console.error('Error loading docs:', e.message); }
+  return [];
+}
+function saveDocs(docs) { fs.writeFileSync(DOCS_FILE, JSON.stringify(docs, null, 2)); }
+var documents = loadDocs();
+
+var upload = multer({
+  storage: multer.diskStorage({
+    destination: function(req, file, cb) { cb(null, UPLOADS_DIR); },
+    filename: function(req, file, cb) { cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')); }
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
+
+app.get('/api/documents', function(req, res) { res.json(documents); });
+
+app.post('/api/documents', upload.single('file'), function(req, res) {
+  if (!req.file) return res.status(400).json({error:'No file uploaded'});
+  var doc = {
+    id: 'doc' + Date.now(),
+    name: req.file.originalname,
+    filename: req.file.filename,
+    size: req.file.size,
+    type: req.file.mimetype,
+    uploadedAt: new Date().toISOString(),
+    category: req.body.category || 'General'
+  };
+  documents.push(doc);
+  saveDocs(documents);
+  res.json(doc);
+});
+
+app.get('/api/documents/:id/download', function(req, res) {
+  var doc = documents.find(function(d) { return d.id === req.params.id; });
+  if (!doc) return res.status(404).json({error:'Not found'});
+  var filePath = path.join(UPLOADS_DIR, doc.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({error:'File not found'});
+  res.download(filePath, doc.name);
+});
+
+app.delete('/api/documents/:id', function(req, res) {
+  var doc = documents.find(function(d) { return d.id === req.params.id; });
+  if (!doc) return res.status(404).json({error:'Not found'});
+  var filePath = path.join(UPLOADS_DIR, doc.filename);
+  try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch(e) {}
+  documents = documents.filter(function(d) { return d.id !== req.params.id; });
+  saveDocs(documents);
+  res.json({ok:true});
+});
 
 app.get('/api/events', function(req, res) {
   res.writeHead(200, { 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'Connection':'keep-alive' });
