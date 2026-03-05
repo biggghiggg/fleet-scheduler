@@ -251,8 +251,8 @@ const PLACARD_LIST=[
 function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}){
   const end=new Date(ws);end.setDate(end.getDate()+6);
   const [showPlacards,setShowPlacards]=useState(false);
-  const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
-  const copyJob=()=>{if(!modal)return;const c={location:modal.location,truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
+  const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerId:'',truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
+  const copyJob=()=>{if(!modal)return;const c={location:modal.location,customerId:modal.customerId||'',truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
   const clearClip=()=>{setClip(null);if(show)show('Clipboard cleared.');};
   const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job});};
   const save=async()=>{if(eid)await api('PUT','/jobs/'+eid,modal);else await api('POST','/jobs',modal);setModal(null);setEid(null);};
@@ -338,6 +338,18 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
           {(!(data.locations||[]).includes(modal.location))&&(
             <input value={modal.location} onChange={e=>setModal({...modal,location:e.target.value})} placeholder="Type custom location" style={{marginTop:4}}/>
           )}</div>
+        <div className="mrow"><label>Customer</label>
+          <select value={modal.customerId||''} onChange={e=>setModal({...modal,customerId:e.target.value})}>
+            <option value="">-- None --</option>
+            {(data.customers||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {modal.customerId&&(()=>{const c=(data.customers||[]).find(x=>x.id===modal.customerId);return c?<div style={{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:8,marginTop:6,fontSize:12}}>
+            {c.address&&<div><strong>Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
+            {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
+            {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
+          </div>:null;})()}
+        </div>
         <div className="mrow"><label>Truck</label>
           <select value={modal.truckId} onChange={e=>setModal({...modal,truckId:e.target.value})}>
             <option value="">-- None --</option>
@@ -400,7 +412,9 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
           <button className="bc" onClick={()=>{setModal(null);setEid(null);}}>Cancel</button>
           {eid&&<button className="bd" onClick={async()=>{await del(eid);setModal(null);setEid(null);}}>Delete</button>}
           <button style={{background:'#7c3aed',color:'#fff'}} onClick={copyJob}>Copy Job</button>
-          <a href={'/print-job?'+new URLSearchParams({
+          <a href={'/print-job?'+new URLSearchParams((()=>{
+            const cust=modal.customerId?(data.customers||[]).find(x=>x.id===modal.customerId):null;
+            return {
             date:modal.date?(modal.date.split('-')[1]+'/'+modal.date.split('-')[2]+'/'+modal.date.split('-')[0]):'',
             driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
             location:modal.location||'',
@@ -410,8 +424,13 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             equipment:(modal.equipment||[]).join(', ')||'None',
             placards:(modal.placards||[]).join(', ')||'None',
             status:modal.status||'Scheduled',
-            notes:modal.notes||''
-          }).toString()} target="_blank" style={{display:'inline-block',background:'#475569',color:'#fff',padding:'6px 14px',borderRadius:6,fontSize:13,textDecoration:'none',textAlign:'center',cursor:'pointer'}}>Print Job</a>
+            notes:modal.notes||'',
+            custName:cust?cust.name:'',
+            custAddress:cust?[cust.address,cust.city,cust.state,cust.zip].filter(Boolean).join(', '):'',
+            custPhone:cust?cust.phone||'':'',
+            custContact:cust?cust.contact||'':'',
+            custPricing:cust?(cust.pricing||cust.notes||''):''
+          };})()).toString()} target="_blank" style={{display:'inline-block',background:'#475569',color:'#fff',padding:'6px 14px',borderRadius:6,fontSize:13,textDecoration:'none',textAlign:'center',cursor:'pointer'}}>Print Job</a>
           <button className="bp" onClick={save}>{eid?'Update':'Add Job'}</button>
         </div>
       </div>
