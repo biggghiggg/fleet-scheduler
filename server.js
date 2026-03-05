@@ -151,6 +151,24 @@ app.get('/api/documents/:id/download', function(req, res) {
   res.download(filePath, doc.name);
 });
 
+app.get('/api/documents/:id/view', function(req, res) {
+  var doc = documents.find(function(d) { return d.id === req.params.id; });
+  if (!doc) return res.status(404).json({error:'Not found'});
+  var filePath = path.join(UPLOADS_DIR, doc.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({error:'File not found'});
+  var ext = doc.name.split('.').pop().toLowerCase();
+  var mimeTypes = {
+    'pdf':'application/pdf','png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg',
+    'gif':'image/gif','txt':'text/plain','csv':'text/csv','html':'text/html',
+    'doc':'application/msword','docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls':'application/vnd.ms-excel','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  };
+  var mime = mimeTypes[ext] || 'application/octet-stream';
+  res.setHeader('Content-Type', mime);
+  res.setHeader('Content-Disposition', 'inline; filename="' + doc.name + '"');
+  fs.createReadStream(filePath).pipe(res);
+});
+
 app.delete('/api/documents/:id', function(req, res) {
   var doc = documents.find(function(d) { return d.id === req.params.id; });
   if (!doc) return res.status(404).json({error:'Not found'});
