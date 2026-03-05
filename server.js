@@ -197,13 +197,23 @@ app.get('/print-job', function(req, res) {
   html += '.sig-line{flex:1;border-bottom:1px solid #000;padding-bottom:4px;font-size:11px;color:#666}';
   html += '.footer{margin-top:30px;padding-top:10px;border-top:2px solid #000;font-size:10px;color:#888;display:flex;justify-content:space-between}';
   html += '.back-link{display:inline-block;margin-bottom:20px;color:#2563eb;text-decoration:none;font-size:14px}';
-  html += '@media print{.back-link{display:none}body{padding:30px}.placards-section{background:#fffbeb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section .placard-tag{background:#fef3c7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '@media print{.back-link{display:none}body{padding:30px}.placards-section{background:#fffbeb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section .placard-tag{background:#fef3c7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}div[style*="background:#eff6ff"]{background:#eff6ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   html += '</style></head><body>';
   html += '<a href="javascript:history.back()" class="back-link">&larr; Back to Scheduler</a>';
   html += '<div class="header"><h1>Job Assignment</h1><div class="company">Independence Environmental Services</div></div>';
   html += '<div class="row"><div class="label">Date:</div><div class="value">' + (q.date||'') + '</div></div>';
   html += '<div class="row"><div class="label">Driver:</div><div class="value"><strong>' + (q.driver||'') + '</strong></div></div>';
   html += '<div class="row"><div class="label">Location / Job:</div><div class="value"><strong>' + (q.location||'') + '</strong></div></div>';
+  if(q.custName) {
+    html += '<div style="margin:12px 0;border:2px solid #2563eb;border-radius:6px;padding:12px;background:#eff6ff">';
+    html += '<div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Customer Information</div>';
+    html += '<div style="font-size:15px;font-weight:700;margin-bottom:4px">' + q.custName + '</div>';
+    if(q.custAddress) html += '<div style="font-size:14px;margin-bottom:2px">' + q.custAddress + '</div>';
+    if(q.custPhone) html += '<div style="font-size:14px;margin-bottom:2px">Phone: ' + q.custPhone + '</div>';
+    if(q.custContact) html += '<div style="font-size:14px;margin-bottom:2px">Contact: ' + q.custContact + '</div>';
+    if(q.custPricing) html += '<div style="font-size:13px;margin-top:6px;padding-top:6px;border-top:1px solid #93c5fd;white-space:pre-wrap">' + q.custPricing + '</div>';
+    html += '</div>';
+  }
   html += '<div class="row"><div class="label">Truck:</div><div class="value">' + (q.truck||'None') + '</div></div>';
   html += '<div class="row"><div class="label">Trailer:</div><div class="value">' + (q.trailer||'None') + '</div></div>';
   html += '<div class="row"><div class="label">Time Window:</div><div class="value">' + (q.timeWindow||'\u2014') + '</div></div>';
