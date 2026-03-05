@@ -395,6 +395,31 @@ app.delete('/api/customers/:id', function(req, res) {
   data.customers = data.customers.filter(function(c) { return c.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
+app.post('/api/customers/import', function(req, res) {
+  var rows = req.body.customers;
+  if (!rows || !Array.isArray(rows)) return res.status(400).json({error:'customers array required'});
+  var count = 0;
+  rows.forEach(function(r) {
+    if (!r.name || !r.name.trim()) return;
+    var cust = {
+      id: 'cust' + Date.now() + Math.random().toString(36).slice(2),
+      name: (r.name||'').trim(),
+      address: (r.address||'').trim(),
+      city: (r.city||'').trim(),
+      state: (r.state||'').trim(),
+      zip: (r.zip||'').trim(),
+      phone: (r.phone||'').trim(),
+      email: (r.email||'').trim(),
+      contact: (r.contact||'').trim(),
+      pricing: (r.pricing||'').trim(),
+      notes: (r.notes||'').trim()
+    };
+    data.customers.push(cust);
+    count++;
+  });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ok:true, imported:count});
+});
 
 function getLocalIP() {
   var interfaces = os.networkInterfaces();
