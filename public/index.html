@@ -608,6 +608,7 @@ function Customers({data}){
     setShowForm(false);setEditId(null);setForm(empty);
   };
   const del=async(id,name)=>{if(!confirm('Delete "'+name+'"?'))return;await api('DELETE','/customers/'+id);};
+  const deleteAll=async()=>{const count=(data.customers||[]).length;if(!count){alert('No customers to delete.');return;}if(!confirm('Are you sure you want to delete ALL '+count+' customers? This cannot be undone.')){return;}if(!confirm('FINAL WARNING: This will permanently delete all '+count+' customers. Continue?')){return;}await api('DELETE','/customers');setSearch('');};
   const importRef=useRef(null);
   const [importing,setImporting]=useState(false);
   const [importPreview,setImportPreview]=useState(null);
@@ -690,6 +691,7 @@ function Customers({data}){
       <label style={{display:'inline-block',background:'#16a34a',color:'#fff',padding:'8px 16px',borderRadius:6,fontSize:14,cursor:'pointer'}}>
         Import File<input ref={importRef} type="file" accept=".csv,.xlsx,.xls" onChange={parseFile} style={{display:'none'}}/>
       </label>
+      {(data.customers||[]).length>0&&<button onClick={deleteAll} style={{background:'#dc2626',color:'#fff',border:'none',padding:'8px 16px',borderRadius:6,fontSize:14,cursor:'pointer'}}>Delete All Customers</button>}
       {importing&&<span style={{fontSize:12,color:'var(--primary)'}}>Processing...</span>}
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search customers..." style={{flex:1,minWidth:200,fontSize:14,padding:'8px 12px'}}/>
       <span style={{fontSize:13,color:'var(--text-muted)'}}>{filtered.length} customer{filtered.length!==1?'s':''}</span>
