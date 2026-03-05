@@ -235,16 +235,15 @@ function App(){
 const HAZARD_CLASSES=['Class 1 - Explosives','Class 2 - Gases','Class 2.1 - Flammable Gas','Class 2.2 - Non-Flammable Gas','Class 2.3 - Poison Gas','Class 3 - Flammable','Class 4 - Flammable Solid','Class 4.1 - Flammable Solid','Class 4.2 - Spontaneously Combustible','Class 4.3 - Dangerous When Wet','Class 5.1 - Oxidizer','Class 5.2 - Organic Peroxide','Class 6 - Poison/Toxic','Class 6.1 - Poison','Class 6.2 - Infectious Substance','Class 7 - Radioactive','Class 8 - Corrosive','Class 9 - Miscellaneous','DANGEROUS'];
 
 const PLACARD_LIST=[
-  {cat:'Class 3 - Flammable Liquids',items:['1203 - Gasoline/Petrol','1993 - Flammable Liquid, n.o.s.','1263 - Paint','1999 - Tars, Liquid','1170 - Ethanol','1294 - Toluene','1230 - Methanol','2059 - Nitrocellulose Solution','1987 - Alcohols, n.o.s.','1268 - Petroleum Distillates']},
-  {cat:'Class 8 - Corrosive',items:['1830 - Sulfuric Acid','1824 - Sodium Hydroxide Solution','3266 - Corrosive Liquid, Basic, Inorganic, n.o.s.','3264 - Corrosive Liquid, Acidic, Inorganic, n.o.s.','2031 - Nitric Acid','2032 - Nitric Acid, Fuming','1789 - Hydrochloric Acid','2794 - Batteries, Wet, Filled w/ Acid','2795 - Batteries, Wet, Filled w/ Alkali','1805 - Phosphoric Acid']},
-  {cat:'Class 6 - Poison/Toxic',items:['2810 - Toxic Liquid, Organic, n.o.s.','2811 - Toxic Solid, Organic, n.o.s.','1851 - Medicine, Liquid, Toxic','2927 - Toxic Liquid, Corrosive, Organic, n.o.s.','3287 - Toxic Liquid, Inorganic, n.o.s.','1583 - Chloroacetone','1556 - Arsenic Compound','1600 - Dinitrotoluene','3288 - Toxic Solid, Inorganic, n.o.s.']},
-  {cat:'Class 9 - Miscellaneous',items:['3077 - Environmentally Hazardous Substance, Solid','3082 - Environmentally Hazardous Substance, Liquid','3257 - Elevated Temperature Liquid','3334 - Aviation Regulated Liquid','3509 - Packaging, Discarded, Empty, Unclean']},
-  {cat:'Class 4 - Flammable Solids',items:['1325 - Flammable Solid, Organic, n.o.s.','2926 - Flammable Solid, Toxic, Organic, n.o.s.','1383 - Pyrophoric Metal, n.o.s.','2006 - Plastics, Nitrocellulose-Based','3175 - Solids Containing Flammable Liquid']},
-  {cat:'Class 5 - Oxidizer/Organic Peroxide',items:['1479 - Oxidizing Solid, n.o.s.','2014 - Hydrogen Peroxide','1942 - Ammonium Nitrate','3085 - Oxidizing Solid, Corrosive, n.o.s.','3098 - Oxidizing Liquid, Toxic','2015 - Hydrogen Peroxide, Stabilized']},
-  {cat:'Class 2 - Gases',items:['1075 - LPG/Propane','1971 - Methane/Natural Gas','1978 - Propane','1005 - Ammonia, Anhydrous','1017 - Chlorine','1072 - Oxygen, Compressed','2187 - Carbon Dioxide, Refrigerated','1049 - Hydrogen, Compressed']},
-  {cat:'Class 1 - Explosives',items:['0331 - Explosive, Blasting, Type B','0332 - Explosive, Blasting, Type E','0081 - Explosive, Blasting, Type A']},
-  {cat:'Class 7 - Radioactive',items:['2982 - Radioactive Material, n.o.s.','2910 - Radioactive Material, Excepted Package','3321 - Radioactive Material, Low Specific Activity']},
-  {cat:'Other Common',items:['1760 - Corrosive Liquid, n.o.s.','1759 - Corrosive Solid, n.o.s.','3175 - Solids w/ Flammable Liquid','3178 - Flammable Solid, Inorganic, n.o.s.']}
+  {cat:'Class 3 - Flammable',items:['1203','1993','1263','1999','1170','1294','1230','2059','1987','1268']},
+  {cat:'Class 8 - Corrosive',items:['1830','1824','3266','3264','2031','2032','1789','2794','2795','1805','1760','1759']},
+  {cat:'Class 6 - Poison/Toxic',items:['2810','2811','1851','2927','3287','1583','1556','1600','3288']},
+  {cat:'Class 9 - Miscellaneous',items:['3077','3082','3257','3334','3509']},
+  {cat:'Class 4 - Flammable Solid',items:['1325','2926','1383','2006','3175','3178']},
+  {cat:'Class 5 - Oxidizer',items:['1479','2014','1942','3085','3098','2015']},
+  {cat:'Class 2 - Gases',items:['1075','1971','1978','1005','1017','1072','2187','1049']},
+  {cat:'Class 1 - Explosives',items:['0331','0332','0081']},
+  {cat:'Class 7 - Radioactive',items:['2982','2910','3321']}
 ];
 
 function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}){
