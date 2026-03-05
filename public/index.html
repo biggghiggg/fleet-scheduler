@@ -232,6 +232,8 @@ function App(){
   );
 }
 
+const HAZARD_CLASSES=['Class 1 - Explosives','Class 2 - Gases','Class 2.1 - Flammable Gas','Class 2.2 - Non-Flammable Gas','Class 2.3 - Poison Gas','Class 3 - Flammable','Class 4 - Flammable Solid','Class 4.1 - Flammable Solid','Class 4.2 - Spontaneously Combustible','Class 4.3 - Dangerous When Wet','Class 5.1 - Oxidizer','Class 5.2 - Organic Peroxide','Class 6 - Poison/Toxic','Class 6.1 - Poison','Class 6.2 - Infectious Substance','Class 7 - Radioactive','Class 8 - Corrosive','Class 9 - Miscellaneous','DANGEROUS'];
+
 const PLACARD_LIST=[
   {cat:'Class 3 - Flammable Liquids',items:['1203 - Gasoline/Petrol','1993 - Flammable Liquid, n.o.s.','1263 - Paint','1999 - Tars, Liquid','1170 - Ethanol','1294 - Toluene','1230 - Methanol','2059 - Nitrocellulose Solution','1987 - Alcohols, n.o.s.','1268 - Petroleum Distillates']},
   {cat:'Class 8 - Corrosive',items:['1830 - Sulfuric Acid','1824 - Sodium Hydroxide Solution','3266 - Corrosive Liquid, Basic, Inorganic, n.o.s.','3264 - Corrosive Liquid, Acidic, Inorganic, n.o.s.','2031 - Nitric Acid','2032 - Nitric Acid, Fuming','1789 - Hydrochloric Acid','2794 - Batteries, Wet, Filled w/ Acid','2795 - Batteries, Wet, Filled w/ Alkali','1805 - Phosphoric Acid']},
@@ -366,6 +368,16 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
               <h3 style={{fontSize:16,fontWeight:700}}>Select Placards</h3>
               <button className="bc" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setShowPlacards(false)}>Done</button>
             </div>
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#b45309',marginBottom:4,borderBottom:'2px solid #d97706',paddingBottom:3}}>Hazard Class Placards (no UN number)</div>
+              <div>{HAZARD_CLASSES.map(hc=>(<div key={hc} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
+                <label style={{fontSize:12,cursor:'pointer',fontWeight:(modal.placards||[]).includes(hc)?600:400}}>
+                  <input type="checkbox" checked={(modal.placards||[]).includes(hc)} style={{marginRight:3,width:'auto'}}
+                    onChange={e=>{const pls=modal.placards||[];setModal({...modal,placards:e.target.checked?[...pls,hc]:pls.filter(x=>x!==hc)});}}/>
+                  {hc}
+                </label></div>))}</div>
+            </div>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--text-muted)',marginBottom:8,marginTop:8}}>&#9660; 4-Digit UN Number Placards</div>
             {PLACARD_LIST.map(grp=>(<div key={grp.cat} style={{marginBottom:14}}>
               <div style={{fontSize:13,fontWeight:700,color:'var(--primary)',marginBottom:4,borderBottom:'1px solid var(--border)',paddingBottom:3}}>{grp.cat}</div>
               <div>{grp.items.map(p=>(<div key={p} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
