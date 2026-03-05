@@ -250,7 +250,7 @@ const PLACARD_LIST=[
 
 function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}){
   const end=new Date(ws);end.setDate(end.getDate()+6);
-  const [showPlacards,setShowPlacards]=useState(false);
+  const [showPlacards,setShowPlacards]=useState(null); /* null or customer id */
   const [custSearch,setCustSearch]=useState('');
   const [custDropOpen,setCustDropOpen]=useState(false);
   const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
@@ -357,7 +357,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
               </div>:null;
             })()}
           </div>
-          {getCustEntries().length>0&&<div style={{marginTop:6}}>{getCustEntries().map((entry,idx)=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?<div key={entry.id} style={{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:10,marginBottom:6,fontSize:12}}>
+          {getCustEntries().length>0&&<div style={{marginTop:6}}>{getCustEntries().map((entry,idx)=>{const c=(data.customers||[]).find(x=>x.id===entry.id);const ep=entry.placards||[];const eeq=entry.equipment||[];return c?<div key={entry.id} style={{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:10,marginBottom:6,fontSize:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
               <strong style={{fontSize:13}}>{c.name}</strong>
               <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setModal({...modal,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
@@ -366,6 +366,18 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
             {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
             {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
+            <div style={{marginTop:6}}><label style={{fontSize:11,fontWeight:700,color:'#333'}}>Time Window:</label>
+              <input value={entry.timeWindow||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,timeWindow:e.target.value}:x);setModal({...modal,customerIds:updated});}} placeholder="e.g. 8:00 AM, Be onsite by 10 AM" style={{width:'100%',marginTop:2,fontSize:12,padding:4,borderRadius:4,border:'1px solid #ccc'}}/></div>
+            <div style={{marginTop:4}}><label style={{fontSize:11,fontWeight:700,color:'#333'}}>Equipment:</label>
+              <div style={{marginTop:2}}>{data.equipment.filter(eq=>eq!=='Placards').map(eq=>(<span key={eq} style={{display:'inline-block',marginRight:10,marginBottom:3}}>
+                <label style={{fontSize:11,cursor:'pointer'}}>
+                <input type="checkbox" checked={eeq.includes(eq)} style={{marginRight:3,width:'auto'}}
+                  onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,equipment:e.target.checked?[...eeq,eq]:eeq.filter(z=>z!==eq)}:x);setModal({...modal,customerIds:updated});}}/>
+                {eq}</label></span>))}</div></div>
+            <div style={{marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <button onClick={()=>setShowPlacards(entry.id)} style={{background:'#d97706',color:'#fff',border:'none',padding:'3px 10px',borderRadius:4,fontSize:11,cursor:'pointer',fontWeight:600}}>Placards ({ep.length})</button>
+              {ep.length>0&&ep.map(p=><span key={p} style={{display:'inline-block',background:'#fef3c7',border:'1px solid #d97706',borderRadius:4,padding:'1px 6px',fontSize:10,fontWeight:600}}>{p}</span>)}
+            </div>
             <div style={{marginTop:6}}><label style={{fontSize:12,fontWeight:700,color:'#1d4ed8'}}>Job Notes for {c.name}:</label>
               <textarea value={entry.jobNotes||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,jobNotes:e.target.value}:x);setModal({...modal,customerIds:updated});}} rows={2} placeholder="Special instructions, requirements for this customer..." style={{width:'100%',marginTop:3,fontSize:12,padding:6,borderRadius:4,border:'1px solid #93c5fd'}}/></div>
           </div>:null;})}</div>}
@@ -380,33 +392,20 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             <option value="">-- None --</option>
             {data.trailers.map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
           </select></div>
-        <div className="mrow"><label>Time Window</label>
-          <input value={modal.timeWindow} onChange={e=>setModal({...modal,timeWindow:e.target.value})} placeholder="e.g. 8:00 AM, Be onsite by 10 AM"/></div>
-        <div className="mrow"><label>Equipment Needed</label>
-          <div style={{marginTop:4}}>
-            {data.equipment.map(eq=>(<div key={eq} style={{display:'inline-block',marginRight:14,marginBottom:6}}>
-              <label style={{fontSize:13,cursor:'pointer'}}>
-              <input type="checkbox" checked={modal.equipment?.includes(eq)||false} style={{marginRight:4,width:'auto'}}
-                onChange={e=>{const eqs=modal.equipment||[];
-                  if(eq==='Placards'&&e.target.checked){setModal({...modal,equipment:[...eqs,'Placards']});setShowPlacards(true);}
-                  else{setModal({...modal,equipment:e.target.checked?[...eqs,eq]:eqs.filter(x=>x!==eq)});if(eq==='Placards'&&!e.target.checked){setModal(m=>({...m,placards:[]}));}}
-                }}/>
-              {eq}</label>
-              {eq==='Placards'&&modal.equipment?.includes('Placards')&&<span onClick={()=>setShowPlacards(true)} style={{marginLeft:4,fontSize:11,color:'var(--primary)',cursor:'pointer',textDecoration:'underline'}}>({(modal.placards||[]).length} selected)</span>}
-            </div>))}
-          </div></div>
-        {showPlacards&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowPlacards(false)}>
+        {showPlacards&&(()=>{const pcid=showPlacards;const pEntry=getCustEntries().find(x=>x.id===pcid);const pCust=(data.customers||[]).find(x=>x.id===pcid);const curPl=pEntry?pEntry.placards||[]:[];
+          const togglePl=(p)=>{const updated=getCustEntries().map(x=>x.id===pcid?{...x,placards:curPl.includes(p)?curPl.filter(z=>z!==p):[...curPl,p]}:x);setModal({...modal,customerIds:updated});};
+          return <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowPlacards(null)}>
           <div style={{background:'#fff',borderRadius:12,padding:20,width:600,maxWidth:'95vw',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 8px 30px rgba(0,0,0,.3)'}} onClick={e=>e.stopPropagation()}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <h3 style={{fontSize:16,fontWeight:700}}>Select Placards</h3>
-              <button className="bc" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setShowPlacards(false)}>Done</button>
+              <h3 style={{fontSize:16,fontWeight:700}}>Placards for {pCust?pCust.name:''}</h3>
+              <button className="bc" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setShowPlacards(null)}>Done</button>
             </div>
             <div style={{marginBottom:14}}>
               <div style={{fontSize:13,fontWeight:700,color:'#b45309',marginBottom:4,borderBottom:'2px solid #d97706',paddingBottom:3}}>Hazard Class Placards (no UN number)</div>
               <div>{HAZARD_CLASSES.map(hc=>(<div key={hc} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
-                <label style={{fontSize:12,cursor:'pointer',fontWeight:(modal.placards||[]).includes(hc)?600:400}}>
-                  <input type="checkbox" checked={(modal.placards||[]).includes(hc)} style={{marginRight:3,width:'auto'}}
-                    onChange={e=>{const pls=modal.placards||[];setModal({...modal,placards:e.target.checked?[...pls,hc]:pls.filter(x=>x!==hc)});}}/>
+                <label style={{fontSize:12,cursor:'pointer',fontWeight:curPl.includes(hc)?600:400}}>
+                  <input type="checkbox" checked={curPl.includes(hc)} style={{marginRight:3,width:'auto'}}
+                    onChange={()=>togglePl(hc)}/>
                   {hc}
                 </label></div>))}</div>
             </div>
@@ -414,14 +413,14 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             {PLACARD_LIST.map(grp=>(<div key={grp.cat} style={{marginBottom:14}}>
               <div style={{fontSize:13,fontWeight:700,color:'var(--primary)',marginBottom:4,borderBottom:'1px solid var(--border)',paddingBottom:3}}>{grp.cat}</div>
               <div>{grp.items.map(p=>(<div key={p} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
-                <label style={{fontSize:12,cursor:'pointer',fontWeight:(modal.placards||[]).includes(p)?600:400}}>
-                  <input type="checkbox" checked={(modal.placards||[]).includes(p)} style={{marginRight:3,width:'auto'}}
-                    onChange={e=>{const pls=modal.placards||[];setModal({...modal,placards:e.target.checked?[...pls,p]:pls.filter(x=>x!==p)});}}/>
+                <label style={{fontSize:12,cursor:'pointer',fontWeight:curPl.includes(p)?600:400}}>
+                  <input type="checkbox" checked={curPl.includes(p)} style={{marginRight:3,width:'auto'}}
+                    onChange={()=>togglePl(p)}/>
                   {p}
                 </label></div>))}</div>
             </div>))}
           </div>
-        </div>}
+        </div>;})()}
         <div className="mrow"><label>Status</label>
           <select value={modal.status||'Scheduled'} onChange={e=>setModal({...modal,status:e.target.value})}>
             <option>Scheduled</option><option>Tentative</option><option>Confirmed</option><option>Off</option><option>OOO</option>
@@ -434,16 +433,13 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
           <button style={{background:'#7c3aed',color:'#fff'}} onClick={copyJob}>Copy Job</button>
           <button onClick={()=>{
             const entries=getCustEntries();
-            const custs=entries.map(entry=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?{name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),phone:c.phone||'',contact:c.contact||'',pricing:c.pricing||c.notes||'',jobNotes:entry.jobNotes||''}:null;}).filter(Boolean);
+            const custs=entries.map(entry=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?{name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),phone:c.phone||'',contact:c.contact||'',pricing:c.pricing||c.notes||'',jobNotes:entry.jobNotes||'',timeWindow:entry.timeWindow||'',equipment:(entry.equipment||[]).join(', ')||'None',placards:(entry.placards||[]).join(', ')||'None'}:null;}).filter(Boolean);
             const jobData={
               date:modal.date?(modal.date.split('-')[1]+'/'+modal.date.split('-')[2]+'/'+modal.date.split('-')[0]):'',
               driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
               location:modal.location||'',
               truck:(data.trucks.find(t=>t.id===modal.truckId)||{}).name||'None',
               trailer:(data.trailers.find(t=>t.id===modal.trailerId)||{}).name||'None',
-              timeWindow:modal.timeWindow||'',
-              equipment:(modal.equipment||[]).join(', ')||'None',
-              placards:(modal.placards||[]).join(', ')||'None',
               status:modal.status||'Scheduled',
               notes:modal.notes||'',
               customers:custs
