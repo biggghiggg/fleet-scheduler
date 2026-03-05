@@ -298,7 +298,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
               const sc=job.status?(job.status.toLowerCase().replace(/\s/g,'')):'';
               const loc=(job.location||'').trim().toLowerCase();
               const pinkLocs=['ews','la tsdf','prr','use'];
-              const locColor=loc==='coast'?'#fee2e2':loc==='vac'?'#fed7aa':loc==='roll off'?'#e9d5ff':pinkLocs.includes(loc)?'#fce7f3':(job.location&&!(data.locations||[]).some(l=>l===job.location))?'#dcfce7':null;
+              const locColor=loc==='coast'?'#fca5a5':loc==='vac'?'#fed7aa':loc==='roll off'?'#e9d5ff':pinkLocs.includes(loc)?'#fce7f3':(job.location&&!(data.locations||[]).some(l=>l===job.location))?'#dcfce7':null;
               return(<div key={job.id} className={'chip '+sc} style={locColor?{background:locColor}:{}} onClick={e=>openEdit(job,e)}>
                 {job.location&&<div className="loc">{job.location}</div>}
                 {truck&&<div className="trk">{truck.name}</div>}
