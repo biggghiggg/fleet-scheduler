@@ -235,15 +235,15 @@ function App(){
 const HAZARD_CLASSES=['Class 1 - Explosives','Class 2 - Gases','Class 2.1 - Flammable Gas','Class 2.2 - Non-Flammable Gas','Class 2.3 - Poison Gas','Class 3 - Flammable','Class 4 - Flammable Solid','Class 4.1 - Flammable Solid','Class 4.2 - Spontaneously Combustible','Class 4.3 - Dangerous When Wet','Class 5.1 - Oxidizer','Class 5.2 - Organic Peroxide','Class 6 - Poison/Toxic','Class 6.1 - Poison','Class 6.2 - Infectious Substance','Class 7 - Radioactive','Class 8 - Corrosive','Class 9 - Miscellaneous','DANGEROUS'];
 
 const PLACARD_LIST=[
-  {cat:'Class 3 - Flammable',items:['1203','1993','1263','1999','1170','1294','1230','2059','1987','1268']},
-  {cat:'Class 8 - Corrosive',items:['1830','1824','3266','3264','2031','2032','1789','2794','2795','1805','1760','1759']},
-  {cat:'Class 6 - Poison/Toxic',items:['2810','2811','1851','2927','3287','1583','1556','1600','3288']},
-  {cat:'Class 9 - Miscellaneous',items:['3077','3082','3257','3334','3509']},
-  {cat:'Class 4 - Flammable Solid',items:['1325','2926','1383','2006','3175','3178']},
-  {cat:'Class 5 - Oxidizer',items:['1479','2014','1942','3085','3098','2015']},
-  {cat:'Class 2 - Gases',items:['1075','1971','1978','1005','1017','1072','2187','1049']},
-  {cat:'Class 1 - Explosives',items:['0331','0332','0081']},
-  {cat:'Class 7 - Radioactive',items:['2982','2910','3321']}
+  {cat:'Class 3 - Flammable',items:['1203 Class 3 Flammable','1993 Class 3 Flammable','1263 Class 3 Flammable','1999 Class 3 Flammable','1170 Class 3 Flammable','1294 Class 3 Flammable','1230 Class 3 Flammable','2059 Class 3 Flammable','1987 Class 3 Flammable','1268 Class 3 Flammable']},
+  {cat:'Class 8 - Corrosive',items:['1830 Class 8 Corrosive','1824 Class 8 Corrosive','3266 Class 8 Corrosive','3264 Class 8 Corrosive','2031 Class 8 Corrosive','2032 Class 8 Corrosive','1789 Class 8 Corrosive','2794 Class 8 Corrosive','2795 Class 8 Corrosive','1805 Class 8 Corrosive','1760 Class 8 Corrosive','1759 Class 8 Corrosive']},
+  {cat:'Class 6 - Poison/Toxic',items:['2810 Class 6 Poison','2811 Class 6 Poison','1851 Class 6 Poison','2927 Class 6 Poison','3287 Class 6 Poison','1583 Class 6 Poison','1556 Class 6 Poison','1600 Class 6 Poison','3288 Class 6 Poison']},
+  {cat:'Class 9 - Miscellaneous',items:['3077 Class 9 Misc','3082 Class 9 Misc','3257 Class 9 Misc','3334 Class 9 Misc','3509 Class 9 Misc']},
+  {cat:'Class 4 - Flammable Solid',items:['1325 Class 4 Flammable Solid','2926 Class 4 Flammable Solid','1383 Class 4 Flammable Solid','2006 Class 4 Flammable Solid','3175 Class 4 Flammable Solid','3178 Class 4 Flammable Solid']},
+  {cat:'Class 5 - Oxidizer',items:['1479 Class 5 Oxidizer','2014 Class 5 Oxidizer','1942 Class 5 Oxidizer','3085 Class 5 Oxidizer','3098 Class 5 Oxidizer','2015 Class 5 Oxidizer']},
+  {cat:'Class 2 - Gases',items:['1075 Class 2 Gas','1971 Class 2 Gas','1978 Class 2 Gas','1005 Class 2 Gas','1017 Class 2 Gas','1072 Class 2 Gas','2187 Class 2 Gas','1049 Class 2 Gas']},
+  {cat:'Class 1 - Explosives',items:['0331 Class 1 Explosive','0332 Class 1 Explosive','0081 Class 1 Explosive']},
+  {cat:'Class 7 - Radioactive',items:['2982 Class 7 Radioactive','2910 Class 7 Radioactive','3321 Class 7 Radioactive']}
 ];
 
 function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}){
