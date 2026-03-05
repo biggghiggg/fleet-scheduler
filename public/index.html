@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e}
@@ -607,6 +608,74 @@ function Customers({data}){
     setShowForm(false);setEditId(null);setForm(empty);
   };
   const del=async(id,name)=>{if(!confirm('Delete "'+name+'"?'))return;await api('DELETE','/customers/'+id);};
+  const importRef=useRef(null);
+  const [importing,setImporting]=useState(false);
+  const [importPreview,setImportPreview]=useState(null);
+
+  const matchCol=(headers,options)=>{
+    for(let i=0;i<headers.length;i++){
+      const h=headers[i].toLowerCase().replace(/[^a-z0-9]/g,'');
+      for(const opt of options){if(h.includes(opt))return i;}
+    }
+    return -1;
+  };
+
+  const parseFile=async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    setImporting(true);
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){alert('File appears empty or has no data rows.');setImporting(false);return;}
+      const headers=rows[0].map(h=>String(h));
+      const nameIdx=matchCol(headers,['customer','company','name','customername','companyname','displayname']);
+      const addrIdx=matchCol(headers,['street','address','billingstreet','shippingstreet','address1']);
+      const cityIdx=matchCol(headers,['city','billingcity','shippingcity']);
+      const stateIdx=matchCol(headers,['state','province','billingstate','shippingstate']);
+      const zipIdx=matchCol(headers,['zip','postal','billingzip','shippingzip','zipcode','postalcode']);
+      const phoneIdx=matchCol(headers,['phone','telephone','mainphone','workphone','primaryphone']);
+      const emailIdx=matchCol(headers,['email','emailaddress','mainemail']);
+      const contactIdx=matchCol(headers,['contact','contactname','firstname','primarycontact']);
+      const notesIdx=matchCol(headers,['notes','memo','comment','description']);
+
+      if(nameIdx===-1){alert('Could not find a Customer/Company Name column. Make sure your first row has column headers like "Customer" or "Company Name".');setImporting(false);return;}
+
+      const parsed=[];
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];const name=String(r[nameIdx]||'').trim();
+        if(!name)continue;
+        parsed.push({
+          name:name,
+          address:addrIdx>=0?String(r[addrIdx]||'').trim():'',
+          city:cityIdx>=0?String(r[cityIdx]||'').trim():'',
+          state:stateIdx>=0?String(r[stateIdx]||'').trim():'',
+          zip:zipIdx>=0?String(r[zipIdx]||'').trim():'',
+          phone:phoneIdx>=0?String(r[phoneIdx]||'').trim():'',
+          email:emailIdx>=0?String(r[emailIdx]||'').trim():'',
+          contact:contactIdx>=0?String(r[contactIdx]||'').trim():'',
+          notes:notesIdx>=0?String(r[notesIdx]||'').trim():'',
+          pricing:''
+        });
+      }
+      setImportPreview(parsed);
+    }catch(err){alert('Error reading file: '+err.message);}
+    setImporting(false);
+    if(importRef.current)importRef.current.value='';
+  };
+
+  const doImport=async()=>{
+    if(!importPreview||!importPreview.length)return;
+    setImporting(true);
+    try{
+      const r=await fetch('/api/customers/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customers:importPreview})});
+      const result=await r.json();
+      alert('Imported '+result.imported+' customers!');
+      setImportPreview(null);
+    }catch(err){alert('Import error: '+err.message);}
+    setImporting(false);
+  };
 
   const customers=data.customers||[];
   const filtered=search?customers.filter(c=>{
@@ -618,9 +687,44 @@ function Customers({data}){
   return(<div>
     <div style={{display:'flex',gap:12,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
       <button className="bp" onClick={openAdd} style={{fontSize:14,padding:'8px 20px'}}>+ Add Customer</button>
+      <label style={{display:'inline-block',background:'#16a34a',color:'#fff',padding:'8px 16px',borderRadius:6,fontSize:14,cursor:'pointer'}}>
+        Import File<input ref={importRef} type="file" accept=".csv,.xlsx,.xls" onChange={parseFile} style={{display:'none'}}/>
+      </label>
+      {importing&&<span style={{fontSize:12,color:'var(--primary)'}}>Processing...</span>}
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search customers..." style={{flex:1,minWidth:200,fontSize:14,padding:'8px 12px'}}/>
       <span style={{fontSize:13,color:'var(--text-muted)'}}>{filtered.length} customer{filtered.length!==1?'s':''}</span>
     </div>
+
+    {importPreview&&<div style={{background:'#fffbeb',border:'2px solid #d97706',borderRadius:10,padding:16,marginBottom:16}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div><strong style={{fontSize:15}}>Preview: {importPreview.length} customers found</strong><div style={{fontSize:12,color:'#92400e'}}>Review below, then click Import to add them all.</div></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="bc" onClick={()=>setImportPreview(null)}>Cancel</button>
+          <button className="bp" onClick={doImport} style={{background:'#16a34a'}}>Import {importPreview.length} Customers</button>
+        </div>
+      </div>
+      <div style={{maxHeight:300,overflowY:'auto',fontSize:12}}>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr style={{background:'#fef3c7'}}>
+            <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Name</th>
+            <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Address</th>
+            <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>City</th>
+            <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Phone</th>
+            <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Email</th>
+          </tr></thead>
+          <tbody>{importPreview.slice(0,50).map((c,i)=>(
+            <tr key={i} style={{borderBottom:'1px solid #e5e7eb'}}>
+              <td style={{padding:'3px 8px',fontWeight:600}}>{c.name}</td>
+              <td style={{padding:'3px 8px'}}>{c.address}</td>
+              <td style={{padding:'3px 8px'}}>{c.city}{c.state?', '+c.state:''}</td>
+              <td style={{padding:'3px 8px'}}>{c.phone}</td>
+              <td style={{padding:'3px 8px'}}>{c.email}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+        {importPreview.length>50&&<div style={{padding:8,textAlign:'center',color:'#92400e'}}>...and {importPreview.length-50} more</div>}
+      </div>
+    </div>}
 
     {filtered.length===0&&<div style={{textAlign:'center',padding:40,color:'#999',fontSize:14}}>{search?'No customers match your search.':'No customers yet. Click "+ Add Customer" to get started.'}</div>}
 
