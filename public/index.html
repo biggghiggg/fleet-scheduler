@@ -166,6 +166,7 @@ function App(){
   const [ws,setWs]=useState(()=>weekStart(new Date()));
   const [modal,setModal]=useState(null);
   const [eid,setEid]=useState(null);
+  const [clip,setClip]=useState(null);
   const [conn,setConn]=useState(false);
   const [toast,setToast]=useState(null);
   const tt=useRef(null);
@@ -220,7 +221,7 @@ function App(){
         ))}
       </div>
       <div className="main">
-        {tab==='schedule'&&<Schedule {...{data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid}}/>}
+        {tab==='schedule'&&<Schedule {...{data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}}/>}
         {tab==='roster'&&<Roster data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
         {tab==='routes'&&<Routes data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
@@ -231,9 +232,11 @@ function App(){
   );
 }
 
-function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid}){
+function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}){
   const end=new Date(ws);end.setDate(end.getDate()+6);
-  const openAdd=(did,date)=>{setEid(null);setModal({driverId:did,date:dk(date),location:'',truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});};
+  const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
+  const copyJob=()=>{if(!modal)return;const c={location:modal.location,truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
+  const clearClip=()=>{setClip(null);if(show)show('Clipboard cleared.');};
   const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job});};
   const save=async()=>{if(eid)await api('PUT','/jobs/'+eid,modal);else await api('POST','/jobs',modal);setModal(null);setEid(null);};
   const del=async(id,e)=>{if(e)e.stopPropagation();await api('DELETE','/jobs/'+id);};
@@ -252,6 +255,10 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
       <button onClick={next}>Next &#9654;</button>
     </div>
+    {clip&&<div style={{background:'#7c3aed',color:'#fff',padding:'8px 16px',borderRadius:8,marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13}}>
+      <span><strong>Job copied:</strong> {clip.location||'(no location)'} &mdash; Click any cell to paste</span>
+      <button onClick={clearClip} style={{background:'#fff',color:'#7c3aed',fontSize:12,padding:'4px 12px'}}>Clear</button>
+    </div>}
     <div className="grid"><table><thead><tr><th>Person</th>
       {dates.map((d,i)=>(<th key={i} style={dk(d)===today?{background:'#fffbeb'}:{}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{d.getMonth()+1}/{d.getDate()}</span></th>))}
     </tr></thead><tbody>
@@ -343,6 +350,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mactions">
           <button className="bc" onClick={()=>{setModal(null);setEid(null);}}>Cancel</button>
           {eid&&<button className="bd" onClick={async()=>{await del(eid);setModal(null);setEid(null);}}>Delete</button>}
+          <button style={{background:'#7c3aed',color:'#fff'}} onClick={copyJob}>Copy Job</button>
           <a href={'/print-job?'+new URLSearchParams({
             date:modal.date?(modal.date.split('-')[1]+'/'+modal.date.split('-')[2]+'/'+modal.date.split('-')[0]):'',
             driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
