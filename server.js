@@ -224,6 +224,48 @@ app.get('/print-job', function(req, res) {
   res.send(html);
 });
 
+// PRINT CUSTOMER PAGE
+app.get('/print-customer', function(req, res) {
+  var q = req.query;
+  var addr = [q.address, q.city, q.state, q.zip].filter(Boolean).join(', ');
+  var html = '<!DOCTYPE html><html><head><title>Customer - ' + (q.name||'') + '</title>';
+  html += '<style>';
+  html += '*{margin:0;padding:0;box-sizing:border-box}';
+  html += 'body{font-family:Arial,Helvetica,sans-serif;padding:40px;color:#000;max-width:800px;margin:0 auto}';
+  html += '.header{text-align:center;margin-bottom:30px;padding-bottom:16px;border-bottom:4px solid #000}';
+  html += '.header h1{font-size:26px;font-weight:900;margin-bottom:4px}';
+  html += '.header .company{font-size:14px;color:#444;font-weight:600;letter-spacing:0.5px}';
+  html += '.cust-name{font-size:22px;font-weight:800;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #333}';
+  html += '.row{display:flex;padding:10px 0;border-bottom:1px solid #ddd;font-size:15px}';
+  html += '.label{font-weight:700;min-width:150px;color:#333}';
+  html += '.value{flex:1;font-size:15px}';
+  html += '.section{margin-top:20px;border:2px solid #000;padding:16px}';
+  html += '.section h3{font-size:14px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}';
+  html += '.section p{font-size:14px;line-height:1.7;white-space:pre-wrap}';
+  html += '.pricing{background:#f0fdf4;border-color:#16a34a}';
+  html += '.notes{background:#f8f8f8;border-color:#000}';
+  html += '.footer{margin-top:30px;padding-top:10px;border-top:2px solid #000;font-size:10px;color:#888;display:flex;justify-content:space-between}';
+  html += '.back-link{display:inline-block;margin-bottom:20px;color:#2563eb;text-decoration:none;font-size:14px}';
+  html += '@media print{.back-link{display:none}body{padding:30px}.pricing{background:#f0fdf4 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '</style></head><body>';
+  html += '<a href="javascript:history.back()" class="back-link">&larr; Back to Scheduler</a>';
+  html += '<div class="header"><h1>Customer Information</h1><div class="company">Independence Environmental Services</div></div>';
+  html += '<div class="cust-name">' + (q.name||'') + '</div>';
+  if(q.contact) html += '<div class="row"><div class="label">Contact:</div><div class="value">' + q.contact + '</div></div>';
+  if(addr) html += '<div class="row"><div class="label">Address:</div><div class="value">' + addr + '</div></div>';
+  if(q.phone) html += '<div class="row"><div class="label">Phone:</div><div class="value">' + q.phone + '</div></div>';
+  if(q.email) html += '<div class="row"><div class="label">Email:</div><div class="value">' + q.email + '</div></div>';
+  if(q.pricing) {
+    html += '<div class="section pricing"><h3>Pricing Information</h3><p>' + q.pricing + '</p></div>';
+  }
+  if(q.notes) {
+    html += '<div class="section notes"><h3>Notes / Special Instructions</h3><p>' + q.notes + '</p></div>';
+  }
+  html += '<div class="footer"><span>Independence Environmental Services</span><span>Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
+  html += '</body></html>';
+  res.send(html);
+});
+
 // JOBS
 app.post('/api/jobs', function(req, res) {
   var job = Object.assign({}, req.body, { id: 'j' + Date.now() + Math.random().toString(36).slice(2) });
