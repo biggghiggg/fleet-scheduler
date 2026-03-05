@@ -275,6 +275,14 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
       <button onClick={next}>Next &#9654;</button>
     </div>
+    <div style={{display:'flex',gap:10,marginBottom:8,flexWrap:'wrap',alignItems:'center',fontSize:11}}>
+      <span style={{fontWeight:700,color:'#666'}}>Legend:</span>
+      <span style={{background:'#fca5a5',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Coast</span>
+      <span style={{background:'#fed7aa',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Vac</span>
+      <span style={{background:'#e9d5ff',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Roll Off</span>
+      <span style={{background:'#fce7f3',padding:'2px 8px',borderRadius:4,fontWeight:600}}>EWS / LA TSDF / PRR / USE</span>
+      <span style={{background:'#dcfce7',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Custom</span>
+    </div>
     {clip&&<div style={{background:'#7c3aed',color:'#fff',padding:'8px 16px',borderRadius:8,marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13}}>
       <span><strong>Job copied:</strong> {clip.location||'(no location)'} &mdash; Click any cell to paste</span>
       <button onClick={clearClip} style={{background:'#fff',color:'#7c3aed',fontSize:12,padding:'4px 12px'}}>Clear</button>
