@@ -216,7 +216,7 @@ function App(){
         <span className={'conn-status '+(conn?'ok':'bad')}>{conn?'Live':'Reconnecting...'}</span>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['docs','Documents']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
@@ -225,6 +225,7 @@ function App(){
         {tab==='roster'&&<Roster data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
         {tab==='routes'&&<Routes data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
+        {tab==='customers'&&<Customers data={data}/>}
         {tab==='docs'&&<Documents/>}
       </div>
       {toast&&<div className="toast">{toast}</div>}
@@ -589,7 +590,100 @@ function Routes({data,dates,ws,prev,next,now}){
   </div>);
 }
 
-/* ============ PRINT VIEW ============ */
+/* ============ CUSTOMERS ============ */
+function Customers({data}){
+  const [showForm,setShowForm]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [search,setSearch]=useState('');
+  const empty={name:'',address:'',city:'',state:'',zip:'',phone:'',email:'',contact:'',pricing:'',notes:''};
+  const [form,setForm]=useState(empty);
+
+  const openAdd=()=>{setEditId(null);setForm(empty);setShowForm(true);};
+  const openEdit=(c)=>{setEditId(c.id);setForm({name:c.name||'',address:c.address||'',city:c.city||'',state:c.state||'',zip:c.zip||'',phone:c.phone||'',email:c.email||'',contact:c.contact||'',pricing:c.pricing||'',notes:c.notes||''});setShowForm(true);};
+  const save=async()=>{
+    if(!form.name.trim()){alert('Customer name is required');return;}
+    if(editId){await api('PUT','/customers/'+editId,form);}
+    else{await api('POST','/customers',form);}
+    setShowForm(false);setEditId(null);setForm(empty);
+  };
+  const del=async(id,name)=>{if(!confirm('Delete "'+name+'"?'))return;await api('DELETE','/customers/'+id);};
+
+  const customers=data.customers||[];
+  const filtered=search?customers.filter(c=>{
+    const s=search.toLowerCase();
+    return (c.name||'').toLowerCase().includes(s)||(c.city||'').toLowerCase().includes(s)||(c.contact||'').toLowerCase().includes(s)||(c.address||'').toLowerCase().includes(s);
+  }):customers;
+
+  return(<div>
+    <div style={{display:'flex',gap:12,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
+      <button className="bp" onClick={openAdd} style={{fontSize:14,padding:'8px 20px'}}>+ Add Customer</button>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search customers..." style={{flex:1,minWidth:200,fontSize:14,padding:'8px 12px'}}/>
+      <span style={{fontSize:13,color:'var(--text-muted)'}}>{filtered.length} customer{filtered.length!==1?'s':''}</span>
+    </div>
+
+    {filtered.length===0&&<div style={{textAlign:'center',padding:40,color:'#999',fontSize:14}}>{search?'No customers match your search.':'No customers yet. Click "+ Add Customer" to get started.'}</div>}
+
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      {filtered.map(c=>(
+        <div key={c.id} style={{background:'var(--bg-white)',borderRadius:10,padding:16,boxShadow:'var(--shadow)',cursor:'pointer'}} onClick={()=>openEdit(c)}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+            <div>
+              <div style={{fontWeight:700,fontSize:16}}>{c.name}</div>
+              {c.contact&&<div style={{fontSize:13,color:'var(--text-muted)',marginTop:2}}>Contact: {c.contact}</div>}
+            </div>
+            <div style={{display:'flex',gap:6}}>
+              <button className="bp" style={{fontSize:11,padding:'3px 10px'}} onClick={e=>{e.stopPropagation();openEdit(c);}}>Edit</button>
+              <button style={{background:'#fee2e2',color:'var(--danger)',fontSize:11,padding:'3px 10px'}} onClick={e=>{e.stopPropagation();del(c.id,c.name);}}>Delete</button>
+            </div>
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:16,marginTop:8,fontSize:13}}>
+            {(c.address||c.city)&&<div style={{color:'#555'}}>{[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ')}</div>}
+            {c.phone&&<div style={{color:'#555'}}>Phone: {c.phone}</div>}
+            {c.email&&<div style={{color:'#555'}}>Email: {c.email}</div>}
+          </div>
+          {c.pricing&&<div style={{marginTop:8,padding:'8px 12px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,fontSize:13}}><strong>Pricing:</strong> {c.pricing}</div>}
+          {c.notes&&<div style={{marginTop:6,fontSize:12,color:'#666'}}>{c.notes}</div>}
+        </div>
+      ))}
+    </div>
+
+    {showForm&&(<div className="overlay" onClick={()=>setShowForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{width:550}}>
+        <h2>{editId?'Edit Customer':'Add Customer'}</h2>
+        <div className="mrow"><label>Company / Customer Name *</label>
+          <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. Brenntag Fresno"/></div>
+        <div className="mrow"><label>Contact Person</label>
+          <input value={form.contact} onChange={e=>setForm({...form,contact:e.target.value})} placeholder="e.g. John Smith"/></div>
+        <div className="mrow"><label>Address</label>
+          <input value={form.address} onChange={e=>setForm({...form,address:e.target.value})} placeholder="Street address"/></div>
+        <div style={{display:'flex',gap:8}}>
+          <div className="mrow" style={{flex:2}}><label>City</label>
+            <input value={form.city} onChange={e=>setForm({...form,city:e.target.value})} placeholder="City"/></div>
+          <div className="mrow" style={{flex:1}}><label>State</label>
+            <input value={form.state} onChange={e=>setForm({...form,state:e.target.value})} placeholder="CA"/></div>
+          <div className="mrow" style={{flex:1}}><label>Zip</label>
+            <input value={form.zip} onChange={e=>setForm({...form,zip:e.target.value})} placeholder="93706"/></div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <div className="mrow" style={{flex:1}}><label>Phone</label>
+            <input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="(559) 555-1234"/></div>
+          <div className="mrow" style={{flex:1}}><label>Email</label>
+            <input value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="email@company.com"/></div>
+        </div>
+        <div className="mrow"><label>Pricing Info</label>
+          <textarea value={form.pricing} onChange={e=>setForm({...form,pricing:e.target.value})} rows={3} placeholder="e.g. Standard rate $85/hr, Overtime $120/hr, Minimum 4 hrs. Hazmat surcharge $50 per load. Net 30 terms."/></div>
+        <div className="mrow"><label>Notes</label>
+          <textarea value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} rows={2} placeholder="Gate code, special instructions, dock hours, etc."/></div>
+        <div className="mactions">
+          <button className="bc" onClick={()=>setShowForm(false)}>Cancel</button>
+          <button className="bp" onClick={save}>{editId?'Update':'Add Customer'}</button>
+        </div>
+      </div>
+    </div>)}
+  </div>);
+}
+
+/* ============ DOCUMENTS ============ */
 function Documents(){
   const [docs,setDocs]=useState([]);
   const [uploading,setUploading]=useState(false);
