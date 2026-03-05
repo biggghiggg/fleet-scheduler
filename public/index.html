@@ -216,7 +216,7 @@ function App(){
         <span className={'conn-status '+(conn?'ok':'bad')}>{conn?'Live':'Reconnecting...'}</span>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['print','Print']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['docs','Documents']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
@@ -225,7 +225,7 @@ function App(){
         {tab==='roster'&&<Roster data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
         {tab==='routes'&&<Routes data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
-        {tab==='print'&&<Print data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
+        {tab==='docs'&&<Documents/>}
       </div>
       {toast&&<div className="toast">{toast}</div>}
     </div>
@@ -590,168 +590,90 @@ function Routes({data,dates,ws,prev,next,now}){
 }
 
 /* ============ PRINT VIEW ============ */
-function Print({data,dates,ws,prev,next,now}){
-  const end=new Date(ws);end.setDate(end.getDate()+6);
-  const [mode,setMode]=useState('daily');
-  const [selDay,setSelDay]=useState(0);
-  const [selDrivers,setSelDrivers]=useState([]);
-  const [showPreview,setShowPreview]=useState(true);
+function Documents(){
+  const [docs,setDocs]=useState([]);
+  const [uploading,setUploading]=useState(false);
+  const [category,setCategory]=useState('General');
+  const fileRef=useRef(null);
+  const categories=['General','Safety','Permits','Training','Manifests','Inspections','Insurance','Contracts','Other'];
 
-  const toggleDriver=(id)=>{setSelDrivers(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);};
-  const selectAll=()=>setSelDrivers(data.drivers.map(d=>d.id));
-  const selectNone=()=>setSelDrivers([]);
+  const loadDocs=async()=>{
+    try{const r=await fetch('/api/documents');const d=await r.json();setDocs(d);}catch(e){console.error('Load docs error:',e);}
+  };
+  useEffect(()=>{loadDocs();},[]);
 
-  const printDate=dates[selDay];
-  const printDateStr=printDate?fmtLong(printDate):'';
-  const driverDayJobs=(did,date)=>data.jobs.filter(j=>j.driverId===did&&j.date===dk(date));
-  const printedAt=new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-
-  const renderDailySheet=(did)=>{
-    const driver=data.drivers.find(d=>d.id===did);
-    if(!driver) return null;
-    const jobs=driverDayJobs(did,printDate);
-    if(jobs.length===0) return null;
-    return(
-      <div className="print-sheet" key={did}>
-        <div className="print-topbar">
-          <div>
-            <h1>{driver.name}</h1>
-            <div style={{fontSize:14,fontWeight:600,color:'#333',marginTop:2}}>{driver.role}</div>
-          </div>
-          <div className="print-meta">
-            <strong>{printDateStr}</strong><br/>
-            {jobs.length} job{jobs.length!==1?'s':''} scheduled
-          </div>
-        </div>
-        {jobs.map((job,idx)=>{
-          const truck=data.trucks.find(t=>t.id===job.truckId);
-          const trailer=data.trailers.find(t=>t.id===job.trailerId);
-          return(
-            <div className="print-job-card" key={job.id}>
-              <div className="print-job-num">
-                <span>JOB {idx+1} of {jobs.length}</span>
-                {job.timeWindow&&<span>{job.timeWindow}</span>}
-              </div>
-              <div className="print-job-body">
-                <div className="print-job-loc">{job.location||'No location assigned'}</div>
-                <div className="print-job-grid">
-                  {truck&&<div className="print-job-field"><b>Truck:</b> {truck.name} ({truck.type})</div>}
-                  {trailer&&<div className="print-job-field"><b>Trailer:</b> {trailer.name} ({trailer.type})</div>}
-                  {job.timeWindow&&<div className="print-job-field"><b>Time:</b> {job.timeWindow}</div>}
-                  {job.status&&job.status!=='Scheduled'&&<div className="print-job-field"><b>Status:</b> {job.status}</div>}
-                  {job.equipment&&job.equipment.length>0&&<div className="print-job-field" style={{gridColumn:'1/-1'}}><b>Equipment:</b> {job.equipment.join(', ')}</div>}
-                </div>
-                {job.notes&&<div className="print-job-notes"><b>Instructions / Notes:</b>{job.notes}</div>}
-              </div>
-            </div>
-          );
-        })}
-        <div className="print-footer">
-          <span>Fleet Scheduler &mdash; Printed {printedAt}</span>
-          <span>{driver.name} &bull; {printDateStr} &bull; {jobs.length} job{jobs.length!==1?'s':''}</span>
-        </div>
-      </div>
-    );
+  const uploadFile=async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    setUploading(true);
+    try{
+      const fd=new FormData();fd.append('file',file);fd.append('category',category);
+      const r=await fetch('/api/documents',{method:'POST',body:fd});
+      if(r.ok){await loadDocs();}else{alert('Upload failed');}
+    }catch(err){alert('Upload error: '+err.message);}
+    setUploading(false);
+    if(fileRef.current)fileRef.current.value='';
   };
 
-  const renderWeeklySheet=(did)=>{
-    const driver=data.drivers.find(d=>d.id===did);
-    if(!driver) return null;
-    const hasAnyJobs=dates.some(date=>driverDayJobs(did,date).length>0);
-    if(!hasAnyJobs) return null;
-    const totalJobs=dates.reduce((s,date)=>s+driverDayJobs(did,date).length,0);
-    return(
-      <div className="print-sheet" key={did}>
-        <div className="print-topbar">
-          <div>
-            <h1>{driver.name}</h1>
-            <div style={{fontSize:14,fontWeight:600,color:'#333',marginTop:2}}>{driver.role} &mdash; Weekly Overview</div>
-          </div>
-          <div className="print-meta">
-            <strong>{fmt(ws)} &mdash; {fmt(end)}</strong><br/>
-            {totalJobs} job{totalJobs!==1?'s':''} this week
-          </div>
-        </div>
-        <table className="print-weekly-table">
-          <thead><tr><th style={{width:100}}>Day</th><th>Location</th><th>Truck</th><th>Trailer</th><th>Time</th><th>Equipment</th><th>Notes</th></tr></thead>
-          <tbody>
-            {dates.map((date,i)=>{
-              const jobs=driverDayJobs(did,date);
-              if(jobs.length===0) return(<tr key={i}><td style={{fontWeight:800}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{date.getMonth()+1}/{date.getDate()}</span></td><td colSpan={6} style={{color:'#999',fontStyle:'italic'}}>No jobs scheduled</td></tr>);
-              return jobs.map((job,j)=>{
-                const truck=data.trucks.find(t=>t.id===job.truckId);
-                const trailer=data.trailers.find(t=>t.id===job.trailerId);
-                return(<tr key={job.id}>
-                  {j===0&&<td rowSpan={jobs.length} style={{fontWeight:800}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{date.getMonth()+1}/{date.getDate()}</span></td>}
-                  <td style={{fontWeight:700}}>{job.location||'—'}</td>
-                  <td>{truck?truck.name:'—'}</td>
-                  <td>{trailer?trailer.name:'—'}</td>
-                  <td>{job.timeWindow||'—'}</td>
-                  <td style={{fontSize:11}}>{job.equipment&&job.equipment.length?job.equipment.join(', '):'—'}</td>
-                  <td style={{fontSize:11,maxWidth:150}}>{job.notes||'—'}</td>
-                </tr>);
-              });
-            })}
-          </tbody>
-        </table>
-        <div className="print-footer">
-          <span>Fleet Scheduler &mdash; Printed {printedAt}</span>
-          <span>{driver.name} &bull; Week of {fmt(ws)} &bull; {totalJobs} job{totalJobs!==1?'s':''}</span>
-        </div>
-      </div>
-    );
+  const deleteDoc=async(id,name)=>{
+    if(!confirm('Delete "'+name+'"?'))return;
+    await fetch('/api/documents/'+id,{method:'DELETE'});
+    loadDocs();
   };
+
+  const formatSize=(bytes)=>{
+    if(bytes<1024)return bytes+' B';
+    if(bytes<1048576)return(bytes/1024).toFixed(1)+' KB';
+    return(bytes/1048576).toFixed(1)+' MB';
+  };
+
+  const formatDate=(iso)=>{
+    const d=new Date(iso);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  };
+
+  const getIcon=(name)=>{
+    const ext=name.split('.').pop().toLowerCase();
+    if(ext==='pdf')return'\uD83D\uDCC4';
+    if(['doc','docx'].includes(ext))return'\uD83D\uDCC3';
+    if(['xls','xlsx'].includes(ext))return'\uD83D\uDCCA';
+    if(['jpg','jpeg','png','gif'].includes(ext))return'\uD83D\uDDBC';
+    return'\uD83D\uDCC1';
+  };
+
+  const [filterCat,setFilterCat]=useState('All');
+  const filtered=filterCat==='All'?docs:docs.filter(d=>d.category===filterCat);
 
   return(<div>
-    <div className="week-nav no-print">
-      <button onClick={prev}>&#9664; Prev</button>
-      <button onClick={now} style={{background:'#16a34a'}}>Today</button>
-      <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
-      <button onClick={next}>Next &#9654;</button>
-    </div>
-
-    <div className="no-print" style={{background:'var(--bg-white)',borderRadius:10,padding:20,marginBottom:16,boxShadow:'var(--shadow)'}}>
-      <div style={{display:'flex',gap:12,marginBottom:14,alignItems:'center',flexWrap:'wrap'}}>
-        <label style={{fontWeight:700,fontSize:14}}>Print Mode:</label>
-        <button className={mode==='daily'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('daily')}>Daily Instruction Sheets</button>
-        <button className={mode==='weekly'?'bp':'bc'} style={{padding:'8px 20px'}} onClick={()=>setMode('weekly')}>Weekly Overview</button>
-      </div>
-
-      {mode==='daily'&&<div style={{marginBottom:14}}>
-        <label style={{fontWeight:700,fontSize:14,marginRight:8}}>Day:</label>
-        <select value={selDay} onChange={e=>setSelDay(Number(e.target.value))} style={{width:'auto',fontSize:14,padding:'6px 10px'}}>
-          {dates.map((d,i)=>(<option key={i} value={i}>{DAYS[i]} — {d.getMonth()+1}/{d.getDate()}</option>))}
+    <div style={{background:'var(--bg-white)',borderRadius:10,padding:20,marginBottom:16,boxShadow:'var(--shadow)'}}>
+      <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',marginBottom:16}}>
+        <label style={{fontWeight:700,fontSize:14}}>Upload Document:</label>
+        <select value={category} onChange={e=>setCategory(e.target.value)} style={{width:'auto',fontSize:13,padding:'6px 10px'}}>
+          {categories.map(c=>(<option key={c}>{c}</option>))}
         </select>
-      </div>}
-
-      <div style={{marginBottom:14}}>
-        <label style={{fontWeight:700,fontSize:14}}>Print for: </label>
-        <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectAll}>All</button>
-        <button className="ebtn" style={{fontSize:12,padding:'4px 10px'}} onClick={selectNone}>None</button>
-        <div style={{marginTop:8}}>
-          {data.drivers.map(d=>(<div key={d.id} style={{display:'inline-block',marginRight:12,marginBottom:6}}>
-            <label style={{fontSize:14,cursor:'pointer',fontWeight:selDrivers.includes(d.id)?600:400}}>
-            <input type="checkbox" checked={selDrivers.includes(d.id)} onChange={()=>toggleDriver(d.id)} style={{marginRight:4,width:'auto'}}/>
-            {d.name}
-          </label></div>))}
-        </div>
+        <input ref={fileRef} type="file" onChange={uploadFile} style={{fontSize:13}} accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif"/>
+        {uploading&&<span style={{fontSize:12,color:'var(--primary)'}}>Uploading...</span>}
       </div>
-
-      <button id="printBtn" className="bp" style={{fontSize:16,padding:'12px 40px',borderRadius:8}}>Print Sheets</button>
-      <button className="bc" style={{fontSize:13,padding:'10px 20px',borderRadius:8,marginLeft:8}} onClick={()=>setShowPreview(!showPreview)}>{showPreview?'Hide Preview':'Show Preview'}</button>
-      <span style={{marginLeft:12,fontSize:12,color:'#999'}}>One page per person</span>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+        <button className={filterCat==='All'?'bp':'bc'} style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setFilterCat('All')}>All ({docs.length})</button>
+        {categories.map(c=>{const cnt=docs.filter(d=>d.category===c).length;return cnt>0?(<button key={c} className={filterCat===c?'bp':'bc'} style={{fontSize:11,padding:'4px 10px'}} onClick={()=>setFilterCat(c)}>{c} ({cnt})</button>):null;})}
+      </div>
     </div>
 
-    {/* Print sheets - toggle with preview button */}
-    {showPreview&&mode==='daily'&&selDrivers.map(did=>renderDailySheet(did))}
-    {showPreview&&mode==='weekly'&&selDrivers.map(did=>renderWeeklySheet(did))}
+    {filtered.length===0&&<div style={{textAlign:'center',padding:40,color:'#999',fontSize:14}}>No documents{filterCat!=='All'?' in '+filterCat:''}. Upload files using the form above.</div>}
 
-    {mode==='daily'&&selDrivers.every(did=>driverDayJobs(did,printDate).length===0)&&(
-      <div className="print-no-jobs">No jobs scheduled for the selected people on {printDateStr}.</div>
-    )}
-    {mode==='weekly'&&selDrivers.every(did=>!dates.some(date=>driverDayJobs(did,date).length>0))&&(
-      <div className="print-no-jobs">No jobs scheduled for the selected people this week.</div>
-    )}
+    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+      {filtered.map(doc=>(
+        <div key={doc.id} style={{background:'var(--bg-white)',borderRadius:8,padding:'12px 16px',boxShadow:'var(--shadow)',display:'flex',alignItems:'center',gap:12}}>
+          <span style={{fontSize:24}}>{getIcon(doc.name)}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,fontSize:14,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{doc.name}</div>
+            <div style={{fontSize:11,color:'var(--text-muted)'}}>{doc.category} &bull; {formatSize(doc.size)} &bull; {formatDate(doc.uploadedAt)}</div>
+          </div>
+          <a href={'/api/documents/'+doc.id+'/download'} style={{background:'var(--primary)',color:'#fff',padding:'5px 12px',borderRadius:6,fontSize:12,textDecoration:'none',whiteSpace:'nowrap'}}>Download</a>
+          <button style={{background:'#fee2e2',color:'var(--danger)',fontSize:12,padding:'5px 12px'}} onClick={()=>deleteDoc(doc.id,doc.name)}>Delete</button>
+        </div>
+      ))}
+    </div>
   </div>);
 }
 
