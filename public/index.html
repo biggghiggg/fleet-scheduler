@@ -558,15 +558,14 @@ function Fleet({data}){
 
 function Routes({data,dates,ws,prev,next,now}){
   const end=new Date(ws);end.setDate(end.getDate()+6);
-  const routesForDay=(date)=>{
-    const k=dk(date);const dj=data.jobs.filter(j=>j.date===k&&j.location);
-    const m={};dj.forEach(j=>{const d=data.drivers.find(x=>x.id===j.driverId);if(!d)return;if(!m[d.name])m[d.name]=[];m[d.name].push({loc:j.location,truck:data.trucks.find(t=>t.id===j.truckId)?.name});});
-    return m;
+  const today=dk(new Date());
+  const driverJobs=(driverId,date)=>{
+    const k=dk(date);
+    return data.jobs.filter(j=>j.driverId===driverId&&j.date===k&&j.location).map(j=>({
+      loc:j.location,
+      truck:data.trucks.find(t=>t.id===j.truckId)?.name
+    }));
   };
-  const allLocs=useMemo(()=>{
-    const l={};dates.forEach(date=>{const k=dk(date);data.jobs.filter(j=>j.date===k&&j.location).forEach(j=>{const n=j.location.trim();if(!l[n])l[n]=0;l[n]++;});});
-    return Object.entries(l).sort((a,b)=>b[1]-a[1]);
-  },[data.jobs,dates]);
   return(<div>
     <div className="week-nav">
       <button onClick={prev}>&#9664; Prev</button>
@@ -574,22 +573,18 @@ function Routes({data,dates,ws,prev,next,now}){
       <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
       <button onClick={next}>Next &#9654;</button>
     </div>
-    {allLocs.length>0&&(<div style={{background:'var(--bg-white)',borderRadius:10,padding:16,marginBottom:16,boxShadow:'var(--shadow)'}}>
-      <div style={{fontWeight:600,marginBottom:8}}>This Week's Locations ({allLocs.length} unique)</div>
-      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>{allLocs.map(([loc,c])=>(<span key={loc} className="rtag">{loc} <span style={{opacity:.6}}>x{c}</span></span>))}</div>
-    </div>)}
-    <div className="rtable"><table><thead><tr><th style={{width:100}}>Day</th><th>Driver Routes</th></tr></thead><tbody>
-      {dates.map((date,i)=>{
-        const r=routesForDay(date);
-        return(<tr key={i}><td style={{fontWeight:600}}>{DAYS[i]}<br/><span style={{fontSize:11,color:'var(--text-muted)'}}>{date.getMonth()+1}/{date.getDate()}</span></td>
-          <td>{data.drivers.map(driver=>{
-            const items=r[driver.name]||[];
-            return(<div key={driver.id} style={{marginBottom:4,display:'flex',alignItems:'center',gap:6}}>
-              <strong style={{fontSize:12,minWidth:70}}>{driver.name}:</strong>
-              {items.length>0&&items.map((item,j)=>(<span key={j} className="rtag">{item.loc}{item.truck?' ('+item.truck+')':''}</span>))}
-            </div>);
-          })}</td></tr>);
-      })}
+    <div className="grid"><table><thead><tr><th>Person</th>
+      {dates.map((d,i)=>(<th key={i} style={dk(d)===today?{background:'#fffbeb'}:{}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{d.getMonth()+1}/{d.getDate()}</span></th>))}
+    </tr></thead><tbody>
+      {data.drivers.map(driver=>(<tr key={driver.id}>
+        <td><div>{driver.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:400}}>{driver.role}</div></div></td>
+        {dates.map((date,i)=>{
+          const jobs=driverJobs(driver.id,date);const ist=dk(date)===today;
+          return(<td key={i}><div className={'cell'+(ist?' today':'')} style={{minHeight:40}}>
+            {jobs.map((item,j)=>(<div key={j} className="rtag" style={{marginBottom:3,display:'block'}}>{item.loc}{item.truck?' ('+item.truck+')':''}</div>))}
+          </div></td>);
+        })}
+      </tr>))}
     </tbody></table></div>
   </div>);
 }
