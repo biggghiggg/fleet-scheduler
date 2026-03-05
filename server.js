@@ -207,7 +207,7 @@ app.post('/print-job', function(req, res) {
   html += '.sig-line{flex:1;border-bottom:1px solid #000;padding-bottom:4px;font-size:10px;color:#666}';
   html += '.footer{margin-top:14px;padding-top:6px;border-top:2px solid #000;font-size:9px;color:#888;display:flex;justify-content:space-between}';
   html += '.back-link{display:inline-block;margin-bottom:10px;color:#2563eb;text-decoration:none;font-size:13px}';
-  html += '@media print{.back-link{display:none}body{padding:15px 20px}.cust-box{background:#eff6ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section{background:#fffbeb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section .placard-tag{background:#fef3c7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '@media print{.back-link{display:none}body{padding:15px 20px}.cust-box{background:#eff6ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section{background:#fffbeb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section .placard-tag{background:#fef3c7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}div[style*="background:#f5f3ff"]{background:#f5f3ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   html += '</style></head><body>';
   html += '<a href="javascript:history.back()" class="back-link">&larr; Back to RouteBoard</a>';
 
@@ -239,6 +239,12 @@ app.post('/print-job', function(req, res) {
     }
     if(q.notes) {
       html += '<div class="notes-section"><h3>Notes / Special Instructions</h3><p>' + q.notes + '</p></div>';
+    }
+    if(cust && cust.jobNotes) {
+      html += '<div style="margin-top:8px;border:2px solid #7c3aed;border-radius:6px;padding:8px 10px;background:#f5f3ff">';
+      html += '<div style="font-size:11px;font-weight:700;color:#6d28d9;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Customer-Specific Notes</div>';
+      html += '<p style="font-size:12px;line-height:1.4;white-space:pre-wrap;margin:0">' + cust.jobNotes + '</p>';
+      html += '</div>';
     }
     html += '<div class="signature"><div class="sig-line">Driver Signature</div><div class="sig-line">Date</div></div>';
     html += '<div class="footer"><span>Independence Environmental Services</span><span>Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
