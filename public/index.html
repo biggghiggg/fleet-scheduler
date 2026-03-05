@@ -702,7 +702,7 @@ function Customers({data}){
           email:emailIdx>=0?String(r[emailIdx]||'').trim():'',
           contact:contactIdx>=0?String(r[contactIdx]||'').trim():'',
           notes:notesIdx>=0?String(r[notesIdx]||'').trim():'',
-          pricing:''
+          pricing:notesIdx>=0?String(r[notesIdx]||'').trim():''
         });
       }
       setImportPreview(parsed);
@@ -757,7 +757,7 @@ function Customers({data}){
             <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Address</th>
             <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>City</th>
             <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Phone</th>
-            <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Email</th>
+            <th style={{padding:'4px 8px',textAlign:'left',borderBottom:'1px solid #d97706'}}>Notes/Pricing</th>
           </tr></thead>
           <tbody>{importPreview.slice(0,50).map((c,i)=>(
             <tr key={i} style={{borderBottom:'1px solid #e5e7eb'}}>
@@ -765,7 +765,7 @@ function Customers({data}){
               <td style={{padding:'3px 8px'}}>{c.address}</td>
               <td style={{padding:'3px 8px'}}>{c.city}{c.state?', '+c.state:''}</td>
               <td style={{padding:'3px 8px'}}>{c.phone}</td>
-              <td style={{padding:'3px 8px'}}>{c.email}</td>
+              <td style={{padding:'3px 8px',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</td>
             </tr>
           ))}</tbody>
         </table>
