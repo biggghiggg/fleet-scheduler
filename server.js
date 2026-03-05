@@ -126,14 +126,17 @@ app.get('/print-job', function(req, res) {
   html += '.row{display:flex;padding:12px 0;border-bottom:1px solid #ddd;font-size:16px}';
   html += '.label{font-weight:700;min-width:170px;color:#333}';
   html += '.value{flex:1;font-size:16px}';
-  html += '.notes-section{margin-top:20px;border:2px solid #000;padding:16px;background:#f8f8f8}';
+  html += '.placards-section{margin-top:16px;border:2px solid #d97706;padding:14px;background:#fffbeb}';
+  html += '.placards-section h3{font-size:14px;font-weight:700;margin-bottom:8px;color:#92400e;text-transform:uppercase;letter-spacing:0.5px}';
+  html += '.placards-section .placard-tag{display:inline-block;background:#fef3c7;border:1px solid #d97706;border-radius:4px;padding:3px 8px;margin:2px 4px 2px 0;font-size:13px;font-weight:600}';
+  html += '.notes-section{margin-top:16px;border:2px solid #000;padding:16px;background:#f8f8f8}';
   html += '.notes-section h3{font-size:15px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}';
   html += '.notes-section p{font-size:14px;line-height:1.7;white-space:pre-wrap}';
   html += '.signature{margin-top:40px;display:flex;gap:40px}';
   html += '.sig-line{flex:1;border-bottom:1px solid #000;padding-bottom:4px;font-size:11px;color:#666}';
   html += '.footer{margin-top:30px;padding-top:10px;border-top:2px solid #000;font-size:10px;color:#888;display:flex;justify-content:space-between}';
   html += '.back-link{display:inline-block;margin-bottom:20px;color:#2563eb;text-decoration:none;font-size:14px}';
-  html += '@media print{.back-link{display:none}body{padding:30px}}';
+  html += '@media print{.back-link{display:none}body{padding:30px}.placards-section{background:#fffbeb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section .placard-tag{background:#fef3c7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   html += '</style></head><body>';
   html += '<a href="javascript:history.back()" class="back-link">&larr; Back to Scheduler</a>';
   html += '<div class="header"><h1>Job Assignment</h1><div class="company">Independence Environmental Services</div></div>';
@@ -142,9 +145,15 @@ app.get('/print-job', function(req, res) {
   html += '<div class="row"><div class="label">Location / Job:</div><div class="value"><strong>' + (q.location||'') + '</strong></div></div>';
   html += '<div class="row"><div class="label">Truck:</div><div class="value">' + (q.truck||'None') + '</div></div>';
   html += '<div class="row"><div class="label">Trailer:</div><div class="value">' + (q.trailer||'None') + '</div></div>';
-  html += '<div class="row"><div class="label">Time Window:</div><div class="value">' + (q.timeWindow||'—') + '</div></div>';
+  html += '<div class="row"><div class="label">Time Window:</div><div class="value">' + (q.timeWindow||'\u2014') + '</div></div>';
   html += '<div class="row"><div class="label">Equipment:</div><div class="value">' + (q.equipment||'None') + '</div></div>';
   html += '<div class="row"><div class="label">Status:</div><div class="value">' + (q.status||'') + '</div></div>';
+  if(q.placards && q.placards !== 'None') {
+    html += '<div class="placards-section"><h3>&#9888; Required Placards</h3>';
+    var pList = q.placards.split(', ');
+    pList.forEach(function(p) { html += '<span class="placard-tag">' + p + '</span>'; });
+    html += '</div>';
+  }
   if(q.notes) {
     html += '<div class="notes-section"><h3>Notes / Special Instructions</h3><p>' + q.notes + '</p></div>';
   }
