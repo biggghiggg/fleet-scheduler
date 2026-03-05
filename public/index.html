@@ -628,32 +628,77 @@ function Customers({data}){
       const buf=await file.arrayBuffer();
       const wb=XLSX.read(buf,{type:'array'});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      if(rows.length<2){alert('File appears empty or has no data rows.');setImporting(false);return;}
-      const headers=rows[0].map(h=>String(h));
-      const nameIdx=matchCol(headers,['customer','company','name','customername','companyname','displayname']);
-      const addrIdx=matchCol(headers,['street','address','billingstreet','shippingstreet','address1']);
+      const allRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(allRows.length<2){alert('File appears empty or has no data rows.');setImporting(false);return;}
+
+      /* Find real header row - QuickBooks puts title rows before actual headers */
+      let headerRow=0;
+      for(let i=0;i<Math.min(allRows.length,10);i++){
+        const row=allRows[i];
+        const vals=row.filter(v=>v&&String(v).trim());
+        if(vals.length>=2){
+          const joined=row.map(v=>String(v||'').toLowerCase()).join(' ');
+          if(joined.includes('customer')||joined.includes('phone')||joined.includes('address')){headerRow=i;break;}
+        }
+      }
+      const headers=allRows[headerRow].map(h=>String(h||''));
+      const rows=allRows.slice(headerRow+1);
+
+      const nameIdx=matchCol(headers,['customerfullname','customername','customer','company','name','companyname','displayname','fullname']);
+      const addrIdx=matchCol(headers,['billaddress','billingaddress','billingstreet','billstreet','street','address','shippingstreet','address1','shipaddress']);
       const cityIdx=matchCol(headers,['city','billingcity','shippingcity']);
       const stateIdx=matchCol(headers,['state','province','billingstate','shippingstate']);
       const zipIdx=matchCol(headers,['zip','postal','billingzip','shippingzip','zipcode','postalcode']);
-      const phoneIdx=matchCol(headers,['phone','telephone','mainphone','workphone','primaryphone']);
+      const phoneIdx=matchCol(headers,['phone','phonenumbers','telephone','mainphone','workphone','primaryphone']);
       const emailIdx=matchCol(headers,['email','emailaddress','mainemail']);
       const contactIdx=matchCol(headers,['contact','contactname','firstname','primarycontact']);
-      const notesIdx=matchCol(headers,['notes','memo','comment','description']);
+      const notesIdx=matchCol(headers,['note','notes','memo','comment','description']);
 
-      if(nameIdx===-1){alert('Could not find a Customer/Company Name column. Make sure your first row has column headers like "Customer" or "Company Name".');setImporting(false);return;}
+      if(nameIdx===-1){alert('Could not find a Customer Name column. Headers found: '+headers.join(', '));setImporting(false);return;}
+
+      /* Parse combined address like "123 Main St Fresno CA 93702" into parts */
+      const parseAddr=(str)=>{
+        if(!str)return{address:'',city:'',state:'',zip:''};
+        str=str.trim();
+        const zipM=str.match(/\s(\d{5}(?:-\d{4})?)$/);
+        const zip=zipM?zipM[1]:'';
+        if(zipM)str=str.slice(0,zipM.index).trim();
+        const stM=str.match(/\s([A-Z]{2}|California|Texas|Nevada|Arizona|Oregon|Washington|Colorado|Utah)$/i);
+        let state='';
+        if(stM){
+          state=stM[1];
+          const ab={california:'CA',texas:'TX',nevada:'NV',arizona:'AZ',oregon:'OR',washington:'WA',colorado:'CO',utah:'UT'};
+          if(stM[1].length>2&&ab[stM[1].toLowerCase()])state=ab[stM[1].toLowerCase()];
+          else state=stM[1].toUpperCase();
+          str=str.slice(0,stM.index).trim();
+        }
+        /* Split remaining into address + city */
+        let address=str,city='';
+        const knownCities=['fresno','clovis','visalia','madera','hanford','tulare','bakersfield','sacramento','stockton','modesto','merced','los angeles','san francisco','san jose','san diego','san mateo','union city','las vegas','los banos','selma','reedley','dinuba','sanger','kingsburg','parlier','fowler','kerman','coalinga','lemoore','porterville','delano','wasco','shafter','arvin','tehachapi','ridgecrest','manteca','tracy','turlock','atwater','chowchilla','exeter','lindsay','woodlake','orange cove','mendota','firebaugh','gustine','newman','patterson','riverbank','oakdale','escalon','ripon','lathrop','livingston','dos palos','south dos palos','huron','avenal','corcoran','west fresno','north fresno','east fresno','southeast fresno','southwest fresno','tower district'];
+        const lower=str.toLowerCase();
+        let found='';
+        for(const c of knownCities){if(lower.endsWith(' '+c)||lower===c){found=c;break;}}
+        if(found){city=str.slice(str.length-found.length);address=str.slice(0,str.length-found.length).trim();}
+        return{address,city,state,zip};
+      };
+
+      const cleanPhone=(p)=>{if(!p)return '';return String(p).replace(/^Phone:\s*/i,'').replace(/^Phone\s*/i,'').trim();};
 
       const parsed=[];
-      for(let i=1;i<rows.length;i++){
+      for(let i=0;i<rows.length;i++){
         const r=rows[i];const name=String(r[nameIdx]||'').trim();
         if(!name)continue;
+        const rawAddr=addrIdx>=0?String(r[addrIdx]||'').trim():'';
+        const hasSepateCols=cityIdx>=0;
+        const addrParts=hasSepateCols?null:parseAddr(rawAddr);
+
         parsed.push({
-          name:name,
-          address:addrIdx>=0?String(r[addrIdx]||'').trim():'',
-          city:cityIdx>=0?String(r[cityIdx]||'').trim():'',
-          state:stateIdx>=0?String(r[stateIdx]||'').trim():'',
-          zip:zipIdx>=0?String(r[zipIdx]||'').trim():'',
-          phone:phoneIdx>=0?String(r[phoneIdx]||'').trim():'',
+          name,
+          address:hasSepateCols?rawAddr:(addrParts?addrParts.address:''),
+          city:hasSepateCols?(cityIdx>=0?String(r[cityIdx]||'').trim():''):(addrParts?addrParts.city:''),
+          state:hasSepateCols?(stateIdx>=0?String(r[stateIdx]||'').trim():''):(addrParts?addrParts.state:''),
+          zip:hasSepateCols?(zipIdx>=0?String(r[zipIdx]||'').trim():''):(addrParts?addrParts.zip:''),
+          phone:cleanPhone(phoneIdx>=0?r[phoneIdx]:''),
           email:emailIdx>=0?String(r[emailIdx]||'').trim():'',
           contact:contactIdx>=0?String(r[contactIdx]||'').trim():'',
           notes:notesIdx>=0?String(r[notesIdx]||'').trim():'',
