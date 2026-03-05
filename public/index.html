@@ -301,7 +301,8 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
                 <span className="x" onClick={e=>{e.stopPropagation();del(job.id);}}>&#10005;</span>
               </div>);
             })}
-            {jobs.length===0&&<div style={{color:'#ccc',fontSize:11,textAlign:'center',marginTop:16}}>+</div>}
+            {jobs.length===0&&<div style={{color:'#ccc',fontSize:11,textAlign:'center',marginTop:16}}>+ Add Job</div>}
+            {jobs.length>0&&<div style={{color:'var(--primary)',fontSize:10,textAlign:'center',marginTop:4,cursor:'pointer',fontWeight:600}} onClick={e=>{e.stopPropagation();openAdd(driver.id,date);}}>+ Add Another</div>}
           </div></td>);
         })}
       </tr>))}
