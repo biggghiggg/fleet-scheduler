@@ -53,6 +53,7 @@ const defaultData = {
     {id:'tr3',name:'Trailer 3',type:'Tanker'},
   ],
   jobs: [],
+  customers: [],
   equipment: ['Liftgate','Drum Dolly','Placards','PPE','Bins','Totes'],
   locations: ['EWS','Brenntag Fresno','Brenntag Richmond','Coast','GQ','Avenal','Lost Hills','Madera','Thatcher','Bolthouse','Leprinos','Eagle Quick Lube','Faraday','PAC','PRR','Local Route','Parc/Atlas/High Bar','F&T Farms']
 };
@@ -83,6 +84,7 @@ function createBackup() {
 
 var data = loadData();
 if (!data.locations) { data.locations = defaultData.locations; saveData(data); }
+if (!data.customers) { data.customers = []; saveData(data); }
 console.log('DATA_DIR = ' + DATA_DIR);
 console.log('DATA_FILE = ' + DATA_FILE);
 console.log('RAILWAY_VOLUME_MOUNT_PATH = ' + (process.env.RAILWAY_VOLUME_MOUNT_PATH || 'NOT SET'));
@@ -332,6 +334,23 @@ app.put('/api/locations', function(req, res) {
 });
 app.delete('/api/locations/:name', function(req, res) {
   data.locations = data.locations.filter(function(l) { return l !== req.params.name; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// CUSTOMERS
+app.get('/api/customers', function(req, res) { res.json(data.customers || []); });
+app.post('/api/customers', function(req, res) {
+  var cust = Object.assign({}, req.body, { id: 'cust' + Date.now() });
+  data.customers.push(cust); saveData(data); broadcast({type:'full-sync',data:data}); res.json(cust);
+});
+app.put('/api/customers/:id', function(req, res) {
+  var idx = data.customers.findIndex(function(c) { return c.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.customers[idx], req.body);
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json(data.customers[idx]);
+});
+app.delete('/api/customers/:id', function(req, res) {
+  data.customers = data.customers.filter(function(c) { return c.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
 
