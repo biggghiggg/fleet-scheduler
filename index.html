@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manifest Platform - Independence Environmental Services</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e}
+    .top-nav{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;padding:0 24px;display:flex;align-items:center;height:60px;box-shadow:0 2px 8px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100}
+    .top-nav h1{font-size:18px;font-weight:600;margin-right:32px}
+    .top-nav h1 span{color:#e94560}
+    .nav-tabs{display:flex;gap:4px;flex-wrap:wrap}
+    .nav-tab{background:transparent;border:none;color:rgba(255,255,255,0.6);padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.2s}
+    .nav-tab:hover{color:#fff;background:rgba(255,255,255,0.1)}
+    .nav-tab.active{color:#fff;background:rgba(255,255,255,0.15);border-bottom:2px solid #e94560}
+    .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:12px}
+    .status-dot.connected{background:#4ade80;box-shadow:0 0 6px #4ade80}
+    .status-dot.disconnected{background:#f87171}
+    .main-content{max-width:1200px;margin:0 auto;padding:24px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);padding:24px;margin-bottom:20px}
+    .btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
+    .btn-primary{background:#e94560;color:#fff}.btn-primary:hover{background:#d63851}
+    .btn-secondary{background:#e8e8e8;color:#333}.btn-secondary:hover{background:#ddd}
+    .btn-success{background:#22c55e;color:#fff}.btn-success:hover{background:#16a34a}
+    .btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+    .btn-sm{padding:5px 10px;font-size:12px}
+    .btn-print{background:#3b82f6;color:#fff}.btn-print:hover{background:#2563eb}
+    .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-group label{font-size:12px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px}
+    .form-group input,.form-group select,.form-group textarea{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;transition:border-color 0.15s}
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#e94560;box-shadow:0 0 0 3px rgba(233,69,96,0.1)}
+    .form-group.full-width{grid-column:1/-1}
+    .data-table{width:100%;border-collapse:collapse}
+    .data-table th{text-align:left;padding:10px 12px;font-size:12px;font-weight:600;color:#666;text-transform:uppercase;border-bottom:2px solid #eee}
+    .data-table td{padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:14px}
+    .data-table tr:hover td{background:#f9f9fb}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center}
+    .modal{background:#fff;border-radius:16px;padding:28px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+    .modal h3{font-size:20px;margin-bottom:20px;color:#1a1a2e}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+    .waste-table{width:100%;border-collapse:collapse;margin:12px 0}
+    .waste-table th{font-size:11px;padding:6px 4px;background:#f5f5f5;text-transform:uppercase;font-weight:600;color:#666}
+    .waste-table td{padding:4px}
+    .waste-table input{width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px}
+    .waste-table input:focus{outline:none;border-color:#e94560}
+    .search-bar{padding:8px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;width:300px}
+    .search-bar:focus{outline:none;border-color:#e94560}
+    .badge{padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600}
+    .badge-draft{background:#fef3c7;color:#92400e}
+    .badge-printed{background:#d1fae5;color:#065f46}
+    .badge-signed{background:#dbeafe;color:#1e40af}
+    .section-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+    .profile-select{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    .profile-select select{flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:6px}
+    .upload-area{border:2px dashed #ddd;border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s}
+    .upload-area:hover{border-color:#e94560;background:#fef2f4}
+    .upload-area p{color:#888;margin-top:8px}
+    .print-preview{background:#1a1a2e;color:#4ade80;font-family:'Courier New',monospace;padding:16px;border-radius:8px;font-size:11px;line-height:1.4;overflow-x:auto;white-space:pre;max-height:500px;overflow-y:auto}
+    @media(max-width:768px){.form-grid{grid-template-columns:1fr}.search-bar{width:100%}.top-nav h1{font-size:14px;margin-right:12px}.nav-tab{padding:6px 10px;font-size:12px}}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    var useState=React.useState,useEffect=React.useEffect,useCallback=React.useCallback,useRef=React.useRef;
+    var api={
+      get:function(url){return fetch(url).then(function(r){return r.json()})},
+      post:function(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()})},
+      put:function(url,body){return fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json()})},
+      del:function(url){return fetch(url,{method:'DELETE'}).then(function(r){return r.json()})}
+    };
+    var CONTAINER_TYPES=[{code:'DM',label:'Metal Drums'},{code:'DP',label:'Plastic Drums'},{code:'DW',label:'Wooden Drums'},{code:'CF',label:'Fiber Drums'},{code:'TT',label:'Dump Truck/Trailer'},{code:'TC',label:'Tank Car'},{code:'TP',label:'Portable Tanks'},{code:'CY',label:'Cylinders'},{code:'CM',label:'Metal Boxes'},{code:'BA',label:'Burlap Bags'}];
+    var UNIT_TYPES=[{code:'G',label:'Gallons'},{code:'L',label:'Liters'},{code:'P',label:'Pounds'},{code:'K',label:'Kilograms'},{code:'T',label:'Tons'},{code:'N',label:'Cubic Yards'}];
+
+    // CERCLA Reportable Quantities (in pounds) per 40 CFR 302.4
+    var RQ_TABLE={
+      D001:100,D002:100,D003:10,D004:1,D005:1000,D006:10,D007:10,D008:10,D009:1,D010:100,D011:1000,
+      D012:1,D013:5000,D014:5000,D015:5000,D016:100,D017:100,D018:100,D019:5000,D020:10,D021:10,
+      D022:100,D023:100,D024:100,D025:100,D026:1000,D027:10,D028:100,D029:1,D030:100,D031:100,
+      D032:10,D033:100,D034:100,D035:100,D036:10,D037:10,D038:100,D039:10,D040:100,D041:100,D042:10,D043:100,
+      F001:100,F002:100,F003:100,F004:100,F005:100,F006:100,F007:100,F008:100,F009:100,F010:100,
+      F011:100,F012:100,F019:100,F020:1,F021:1,F022:1,F023:1,F024:1,F025:1,F026:1,F027:1,F028:1,F032:1,F034:1,F035:1,F037:1,F038:1,F039:100
+    };
+    // Convert quantity to pounds based on unit code
+    function qtyToPounds(qty, unit) {
+      var n = parseFloat(qty);
+      if (isNaN(n) || n <= 0) return 0;
+      if (unit === 'P') return n;
+      if (unit === 'K') return n * 2.20462;
+      if (unit === 'T') return n * 2000;
+      if (unit === 'G') return n * 8.34;
+      if (unit === 'L') return n * 2.20462;
+      if (unit === 'N') return n * 1400;
+      return n;
+    }
+    // Check if RQ applies: returns lowest RQ threshold if quantity exceeds it
+    function checkRQ(wasteCodes, qty, unit) {
+      if (!wasteCodes || !qty || !unit) return false;
+      var codes = wasteCodes.split(/[\s,]+/).filter(function(c){return c.length>0});
+      var lbs = qtyToPounds(qty, unit);
+      if (lbs <= 0) return false;
+      for (var i = 0; i < codes.length; i++) {
+        var code = codes[i].toUpperCase();
+        if (RQ_TABLE[code] && lbs >= RQ_TABLE[code]) return true;
+      }
+      return false;
+    }
+
+    function App(){
+      var ts=useState('manifests');var tab=ts[0];var setTab=ts[1];
+      var ds=useState({generators:[],transporters:[],facilities:[],wasteStreams:[],manifests:[]});var data=ds[0];var setData=ds[1];
+      var cs=useState(false);var connected=cs[0];var setConnected=cs[1];
+      var ls=useState(true);var loading=ls[0];var setLoading=ls[1];
+      var gs=useState(null);var preselectedGen=gs[0];var setPreselectedGen=gs[1];
+      var loadAllData=useCallback(function(){return api.get('/api/data').then(function(d){setData(d);setLoading(false)}).catch(function(e){console.error(e);setLoading(false)})},[]);
+      useEffect(function(){loadAllData();var es=new EventSource('/api/events');es.onmessage=function(e){var ev=JSON.parse(e.data);if(ev.type==='connected')setConnected(true);if(ev.type==='data-updated')loadAllData()};es.onerror=function(){setConnected(false)};return function(){es.close()}},[loadAllData]);
+      if(loading) return React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',fontSize:18,color:'#888'}},'Loading...');
+      return React.createElement('div',null,
+        React.createElement('nav',{className:'top-nav'},
+          React.createElement('h1',null,React.createElement('span',null,'IES'),' Manifest Platform'),
+          React.createElement('div',{className:'nav-tabs'},
+            React.createElement('button',{className:'nav-tab'+(tab==='manifests'?' active':''),onClick:function(){setTab('manifests')}},'Manifests'),
+            React.createElement('button',{className:'nav-tab'+(tab==='generators'?' active':''),onClick:function(){setTab('generators')}},'Generators'),
+            React.createElement('button',{className:'nav-tab'+(tab==='transporters'?' active':''),onClick:function(){setTab('transporters')}},'Transporters'),
+            React.createElement('button',{className:'nav-tab'+(tab==='facilities'?' active':''),onClick:function(){setTab('facilities')}},'Facilities'),
+            React.createElement('button',{className:'nav-tab'+(tab==='waste'?' active':''),onClick:function(){setTab('waste')}},'Waste Streams'),
+            React.createElement('button',{className:'nav-tab'+(tab==='profiles'?' active':''),onClick:function(){setTab('profiles')}},'Profiles'),
+            React.createElement('button',{className:'nav-tab'+(tab==='import'?' active':''),onClick:function(){setTab('import')}},'Import'),
+            React.createElement('button',{className:'nav-tab'+(tab==='alignment'?' active':''),onClick:function(){setTab('alignment')},style:{color:tab==='alignment'?'#fff':'rgba(255,255,255,0.4)'}},'Alignment')
+          ),
+          React.createElement('span',{className:'status-dot '+(connected?'connected':'disconnected'),title:connected?'Connected':'Disconnected'})
+        ),
+        React.createElement('div',{className:'main-content'},
+          tab==='manifests'?React.createElement(ManifestsTab,{data:data,reload:loadAllData,preselectedGen:preselectedGen,clearPreselected:function(){setPreselectedGen(null)}}):null,
+          tab==='generators'?React.createElement(ProfileTab,{data:data,type:'generators',label:{singular:'Generator',plural:'Generators'},reload:loadAllData,onNewManifest:function(gen){setPreselectedGen(gen);setTab('manifests')}}):null,
+          tab==='transporters'?React.createElement(ProfileTab,{data:data,type:'transporters',label:{singular:'Transporter',plural:'Transporters'},reload:loadAllData}):null,
+          tab==='facilities'?React.createElement(ProfileTab,{data:data,type:'facilities',label:{singular:'Facility',plural:'Facilities'},reload:loadAllData}):null,
+          tab==='waste'?React.createElement(WasteStreamsTab,{data:data,reload:loadAllData}):null,
+          tab==='profiles'?React.createElement(ProfilesTab,{data:data,reload:loadAllData}):null,
+          tab==='import'?React.createElement(ImportTab,{reload:loadAllData}):null,
+          tab==='alignment'?React.createElement(AlignmentEditor,null):null
+        )
+      );
+    }
+
+    function ManifestsTab(props){
+      var data=props.data;var reload=props.reload;var preselectedGen=props.preselectedGen;var clearPreselected=props.clearPreselected;
+      var s1=useState(false);var showModal=s1[0];var setShowModal=s1[1];
+      var s2=useState(null);var editing=s2[0];var setEditing=s2[1];
+      var s3=useState('');var search=s3[0];var setSearch=s3[1];
+      var s4=useState(null);var previewing=s4[0];var setPreviewing=s4[1];
+      useEffect(function(){if(preselectedGen){setEditing({_preselectedGen:preselectedGen});setShowModal(true)}},[preselectedGen]);
+      function handleSave(f){var p=editing?api.put('/api/manifests/'+editing.id,f):api.post('/api/manifests',f);p.then(function(){reload();setShowModal(false);setEditing(null)})}
+      function handleDelete(id){if(confirm('Delete this manifest?')){api.del('/api/manifests/'+id).then(reload)}}
+      function handlePrint(id){window.open('/api/print/manifest/'+id,'_blank')}
+      function handlePreview(m){var previewData=Object.assign({},m);var wl=[];for(var i=1;i<=4;i++){wl.push({hm:m['waste'+i+'HM']||'',description:m['waste'+i+'Description']||'',containerNum:m['waste'+i+'ContainerNum']||'',containerType:m['waste'+i+'ContainerType']||'',qty:m['waste'+i+'Qty']||'',unit:m['waste'+i+'Unit']||'',wasteCodes:m['waste'+i+'WasteCodes']||''})}previewData.wasteLines=wl;setPreviewing(previewData)}
+      var items=(data.manifests||[]).filter(function(m){var s=search.toLowerCase();return !s||(m.manifestNum||'').toLowerCase().indexOf(s)>=0||(m.generatorName||'').toLowerCase().indexOf(s)>=0});
+      return React.createElement('div',null,
+        React.createElement('div',{className:'section-header'},
+          React.createElement('h2',{style:{fontSize:22,fontWeight:700}},'Hazardous Waste Manifests'),
+          React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+            React.createElement('input',{className:'search-bar',placeholder:'Search manifests...',value:search,onChange:function(e){setSearch(e.target.value)}}),
+            React.createElement('button',{className:'btn btn-primary',onClick:function(){setEditing(null);setShowModal(true)}},'+ New Manifest')
+          )
+        ),
+        React.createElement('div',{className:'card'},
+          React.createElement('table',{className:'data-table'},
+            React.createElement('thead',null,
+              React.createElement('tr',null,
+                React.createElement('th',null,'Manifest #'),
+                React.createElement('th',null,'Generator'),
+                React.createElement('th',null,'Transporter 1'),
+                React.createElement('th',null,'Facility'),
+                React.createElement('th',null,'Status'),
+                React.createElement('th',null,'Actions')
+              )
+            ),
+            React.createElement('tbody',null,
+              items.length===0?React.createElement('tr',null,React.createElement('td',{colSpan:'6',style:{textAlign:'center',color:'#999',padding:24}},'No manifests yet.')):null,
+              items.map(function(m){return React.createElement('tr',{key:m.id},
+                React.createElement('td',{style:{fontWeight:600}},m.manifestNum||'-'),
+                React.createElement('td',null,m.generatorName||'-'),
+                React.createElement('td',null,m.transporter1Name||'-'),
+                React.createElement('td',null,m.facilityName||'-'),
+                React.createElement('td',null,React.createElement('span',{className:'badge badge-'+(m.status||'draft')},m.status||'draft')),
+                React.createElement('td',{style:{display:'flex',gap:4}},
+                  React.createElement('button',{className:'btn btn-sm btn-secondary',onClick:function(){setEditing(m);setShowModal(true)}},'Edit'),
+                  React.createElement('button',{className:'btn btn-sm btn-success',onClick:function(){handlePreview(m)}},'Preview'),
+                  React.createElement('button',{className:'btn btn-sm btn-print',onClick:function(){handlePrint(m.id)}},'Print'),
+                  React.createElement('button',{className:'btn btn-sm btn-danger',onClick:function(){handleDelete(m.id)}},'X')
+                )
+              )})
+            )
+          )
+        ),
+        showModal?React.createElement(ManifestFormModal,{manifest:editing,data:data,reload:function(){reload();setShowModal(false);setEditing(null);clearPreselected()},onClose:function(){setShowModal(false);setEditing(null);clearPreselected()},onPreview:function(formData){setPreviewing(formData)}}):null,
+        previewing?React.createElement(ManifestPreview,{formData:previewing,onClose:function(){setPreviewing(null)}}):null
+      );
+    }
+
+    function ManifestFormModal(props) {
+      var manifest = props.manifest;
+      var data = props.data;
+      var onClose = props.onClose;
+      var reload = props.reload;
+      var onPreview = props.onPreview;
+      var preGen = manifest && manifest._preselectedGen ? manifest._preselectedGen : null;
+      var isEdit = !!manifest && !preGen;
+      var emptyWaste = { hm: '', description: '', containerNum: '', containerType: '', qty: '', unit: '', wasteCodes: '' };
+
+      var formState = useState(function() {
+        if (preGen) {
+          return {
+            manifestTrackingNum: '', emergencyPhone: '800-255-3924',
+            generatorEpaId: preGen.epaId || '', generatorName: preGen.name || '',
+            generatorAddress: preGen.siteAddress || '',
+            generatorCityStZip: [preGen.city, preGen.state, preGen.zip].filter(Boolean).join(', '),
+            generatorPhone: preGen.phone || '',
+            genSiteAddress: '', genSiteCityStZip: '',
+            transporter1Name: '', transporter1EpaId: '',
+            transporter2Name: '', transporter2EpaId: '',
+            facilityName: '', facilityAddress: '', facilityCityStZip: '', facilityPhone: '', facilityEpaId: '',
+            wasteLines: [Object.assign({},emptyWaste), Object.assign({},emptyWaste), Object.assign({},emptyWaste), Object.assign({},emptyWaste)],
+            specialHandling: '', specialHandling2: '', specialHandling3: 'ER Contract # MIS9933011',
+            generatorPrintName: '', generatorDate: new Date().toLocaleDateString('en-US'),
+            pageNum: '1', pageTotal: '1',
+            status: 'draft'
+          };
+        }
+        if (manifest) return Object.assign({}, manifest);
+        return {
+          manifestTrackingNum: '', emergencyPhone: '800-255-3924',
+          generatorEpaId: '', generatorName: '', generatorAddress: '', generatorCityStZip: '', generatorPhone: '',
+          genSiteAddress: '', genSiteCityStZip: '',
+          transporter1Name: '', transporter1EpaId: '',
+          transporter2Name: '', transporter2EpaId: '',
+          facilityName: '', facilityAddress: '', facilityCityStZip: '', facilityPhone: '', facilityEpaId: '',
+          wasteLines: [Object.assign({},emptyWaste), Object.assign({},emptyWaste), Object.assign({},emptyWaste), Object.assign({},emptyWaste)],
+          specialHandling: '', specialHandling2: '', specialHandling3: 'ER Contract # MIS9933011',
+          generatorPrintName: '', generatorDate: new Date().toLocaleDateString('en-US'),
+          pageNum: '1', pageTotal: '1',
+          status: 'draft'
+        };
+      });
+      var form = formState[0];
+      var setForm = formState[1];
+
+      function set(field, val) { setForm(function(f) { var n = Object.assign({}, f); n[field] = val; return n; }); }
+
+      function setWaste(idx, field, val) {
+        setForm(function(f) {
+          var lines = (f.wasteLines || []).slice();
+          while (lines.length <= idx) lines.push(Object.assign({}, emptyWaste));
+          lines[idx] = Object.assign({}, lines[idx]);
+          lines[idx][field] = val;
+          return Object.assign({}, f, { wasteLines: lines });
+        });
+      }
+
+      function loadGenerator(id) {
+        var gen = data.generators.find(function(g) { return g.id === id; });
+        if (!gen) return;
+        setForm(function(f) {
+          return Object.assign({}, f, {
+            generatorName: gen.name || '',
+            generatorEpaId: gen.epaId || '',
+            generatorAddress: gen.siteAddress || '',
+            generatorCityStZip: [gen.city, gen.state, gen.zip].filter(Boolean).join(', '),
+            generatorPhone: gen.phone || '',
+            emergencyPhone: f.emergencyPhone || ''
+          });
+        });
+      }
+
+      function loadTransporter(id, num) {
+        var t = data.transporters.find(function(x) { return x.id === id; });
+        if (!t) return;
+        setForm(function(f) {
+          var n = Object.assign({}, f);
+          n['transporter' + num + 'Name'] = t.name || '';
+          n['transporter' + num + 'EpaId'] = t.epaId || '';
+          return n;
+        });
+      }
+
+      function loadFacility(id) {
+        var fac = data.facilities.find(function(x) { return x.id === id; });
+        if (!fac) return;
+        setForm(function(f) {
+          return Object.assign({}, f, {
+            facilityName: fac.name || '',
+            facilityAddress: fac.siteAddress || '',
+            facilityCityStZip: [fac.city, fac.state, fac.zip].filter(Boolean).join(', '),
+            facilityPhone: fac.phone || '',
+            facilityEpaId: fac.epaId || ''
+          });
+        });
+      }
+
+      function loadWasteStream(id, lineIdx) {
+        var w = data.wasteStreams.find(function(x) { return x.id === id; });
+        if (!w) return;
+        setForm(function(f) {
+          var lines = (f.wasteLines || []).slice();
+          while (lines.length <= lineIdx) lines.push(Object.assign({}, emptyWaste));
+          var rawFed = (w.wasteCodes || '').replace(/\bnone\b/gi, '').trim();
+          var fedCodes = rawFed.replace(/([A-Za-z]\d{3})/g, ' $1').replace(/\s+/g, ' ').trim();
+          var stateCodes = (w.stateWasteCodes || '').replace(/\bnone\b/gi, '').replace(/[A-Za-z]+-?/g, '').replace(/\s+/g, ' ').trim();
+          var allCodes = [fedCodes, stateCodes].filter(Boolean).join(' ').trim();
+          var hasRcra = fedCodes.length > 0;
+          var descParts = [];
+          var idNum = (w.unNum || '').trim();
+          var validId = idNum.match(/^(UN|NA)\s*\d{4,5}$/i) || idNum.match(/^\d{4,5}$/);
+          if (validId) descParts.push(idNum.match(/^(UN|NA)/i) ? idNum : 'UN' + idNum);
+          var dotDesc = (w.dotDescription || '').replace(/\b(UN|NA)\s*\d{4,5}\b/gi, '').replace(/,\s*,/g, ',').replace(/^[\s,]+|[\s,]+$/g, '').trim();
+          var hzClass = (w.hazardClass || '').trim();
+          var pg = (w.packingGroup || '').trim();
+          // Strip hazard class and PG from dotDesc if already embedded (e.g. Samex format "WASTE PAINT..., 3, II")
+          if (hzClass && hzClass.match(/^\d(\.\d)?$/)) {
+            dotDesc = dotDesc.replace(new RegExp(',\\s*' + hzClass.replace('.', '\\.') + '\\s*(?=,|$)'), '').replace(/^[\s,]+|[\s,]+$/g, '').trim();
+          }
+          if (pg && pg.match(/^(I{1,3})$/i)) {
+            dotDesc = dotDesc.replace(new RegExp(',\\s*' + pg + '\\s*$', 'i'), '').replace(/^[\s,]+|[\s,]+$/g, '').trim();
+          }
+          if (dotDesc) descParts.push(dotDesc);
+          if (hzClass && hzClass.match(/^\d(\.\d)?$/)) descParts.push(hzClass);
+          if (pg && pg.match(/^(I{1,3}|PG\s*(I{1,3})|1|2|3)$/i)) descParts.push(pg.match(/^(I{1,3})$/)?'PG '+pg:pg);
+          var desc = descParts.join(', ');
+          var hasUNNA = validId || desc.match(/\b(UN|NA)\d{4,5}\b/i);
+          if (hasUNNA && desc.indexOf('RQ') !== 0) desc = 'RQ, ' + desc;
+          lines[lineIdx] = {
+            hm: hasRcra ? (w.hm || '') : '', description: desc, containerNum: '',
+            containerType: w.containerType || '', qty: '', unit: w.unit || '', wasteCodes: allCodes
+          };
+          return Object.assign({}, f, { wasteLines: lines });
+        });
+      }
+
+      function handleSave() {
+        var payload = Object.assign({}, form);
+        var lines = payload.wasteLines || [];
+        for (var i = 0; i < 4; i++) {
+          var n = i + 1;
+          var line = lines[i] || emptyWaste;
+          var lineIsRQ = checkRQ(line.wasteCodes, line.qty, line.unit);
+          var hasUNNA = (line.description || '').match(/\b(UN|NA)\d{4,5}\b/i);
+          payload['waste' + n + 'HM'] = lineIsRQ ? 'RQ' : (line.hm || '');
+          var saveDesc = line.description || '';
+          if (hasUNNA && saveDesc.indexOf('RQ') !== 0) saveDesc = 'RQ, ' + saveDesc;
+          payload['waste' + n + 'Description'] = saveDesc;
+          payload['waste' + n + 'ContainerNum'] = line.containerNum || '';
+          payload['waste' + n + 'ContainerType'] = line.containerType || '';
+          payload['waste' + n + 'Qty'] = line.qty || '';
+          payload['waste' + n + 'Unit'] = line.unit || '';
+          payload['waste' + n + 'WasteCodes'] = line.wasteCodes || '';
+        }
+        var promise;
+        if (isEdit && manifest && manifest.id) {
+          promise = api.put('/api/manifests/' + manifest.id, payload);
+        } else {
+          promise = api.post('/api/manifests', payload);
+        }
+        promise.then(function() { reload(); onClose(); });
+      }
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" style={{maxWidth:850}} onClick={function(e){e.stopPropagation()}}>
+            <h3>{isEdit ? 'Edit' : 'New'} Manifest (EPA 8700-22)</h3>
+
+            <div className="form-grid" style={{marginBottom:20}}>
+              <div className="form-group">
+                <label>Manifest Tracking # (Box 4)</label>
+                <input value={form.manifestTrackingNum || ''} onChange={function(e){set('manifestTrackingNum',e.target.value)}} placeholder="Pre-printed on form" />
+              </div>
+              <div className="form-group">
+                <label>Page ___ of ___</label>
+                <div style={{display:'flex',gap:8}}>
+                  <input value={form.pageNum || '1'} onChange={function(e){set('pageNum',e.target.value)}} style={{width:50}} />
+                  <span style={{alignSelf:'center'}}>of</span>
+                  <input value={form.pageTotal || '1'} onChange={function(e){set('pageTotal',e.target.value)}} style={{width:50}} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Emergency Response Phone (Box 3)</label>
+                <input value={form.emergencyPhone || ''} onChange={function(e){set('emergencyPhone',e.target.value)}} />
+              </div>
+            </div>
+
+            <div className="card" style={{background:'#f9fafb',padding:16,marginBottom:16}}>
+              <h4 style={{marginBottom:8}}>Box 5 - Generator</h4>
+              <div className="profile-select">
+                <select onChange={function(e){loadGenerator(e.target.value)}} defaultValue="">
+                  <option value="">-- Load from saved generator --</option>
+                  {data.generators.map(function(g) { return <option key={g.id} value={g.id}>{g.name} {g.epaId ? '(' + g.epaId + ')' : ''}</option>; })}
+                </select>
+              </div>
+              <div className="form-grid">
+                <div className="form-group"><label>EPA ID (Box 1)</label><input value={form.generatorEpaId || ''} onChange={function(e){set('generatorEpaId',e.target.value)}} /></div>
+                <div className="form-group"><label>Generator Name</label><input value={form.generatorName || ''} onChange={function(e){set('generatorName',e.target.value)}} /></div>
+                <div className="form-group"><label>Mailing Address</label><input value={form.generatorAddress || ''} onChange={function(e){set('generatorAddress',e.target.value)}} /></div>
+                <div className="form-group"><label>City, State, Zip</label><input value={form.generatorCityStZip || ''} onChange={function(e){set('generatorCityStZip',e.target.value)}} /></div>
+                <div className="form-group"><label>Phone</label><input value={form.generatorPhone || ''} onChange={function(e){set('generatorPhone',e.target.value)}} /></div>
+                <div className="form-group"><label>Site Address (if different)</label><input value={form.genSiteAddress || ''} onChange={function(e){set('genSiteAddress',e.target.value)}} /></div>
+                <div className="form-group"><label>Site City, State, Zip</label><input value={form.genSiteCityStZip || ''} onChange={function(e){set('genSiteCityStZip',e.target.value)}} /></div>
+              </div>
+            </div>
+
+            <div className="card" style={{background:'#f9fafb',padding:16,marginBottom:16}}>
+              <h4 style={{marginBottom:8}}>Box 6 - Transporter 1</h4>
+              <div className="profile-select">
+                <select onChange={function(e){loadTransporter(e.target.value, 1)}} defaultValue="">
+                  <option value="">-- Load from saved transporter --</option>
+                  {data.transporters.map(function(t) { return <option key={t.id} value={t.id}>{t.name}</option>; })}
+                </select>
+              </div>
+              <div className="form-grid">
+                <div className="form-group"><label>Company Name</label><input value={form.transporter1Name || ''} onChange={function(e){set('transporter1Name',e.target.value)}} /></div>
+                <div className="form-group"><label>EPA ID</label><input value={form.transporter1EpaId || ''} onChange={function(e){set('transporter1EpaId',e.target.value)}} /></div>
+              </div>
+              <h4 style={{marginBottom:8,marginTop:16}}>Box 7 - Transporter 2</h4>
+              <div className="profile-select">
+                <select onChange={function(e){loadTransporter(e.target.value, 2)}} defaultValue="">
+                  <option value="">-- Load from saved transporter --</option>
+                  {data.transporters.map(function(t) { return <option key={t.id} value={t.id}>{t.name}</option>; })}
+                </select>
+              </div>
+              <div className="form-grid">
+                <div className="form-group"><label>Company Name</label><input value={form.transporter2Name || ''} onChange={function(e){set('transporter2Name',e.target.value)}} /></div>
+                <div className="form-group"><label>EPA ID</label><input value={form.transporter2EpaId || ''} onChange={function(e){set('transporter2EpaId',e.target.value)}} /></div>
+              </div>
+            </div>
+
+            <div className="card" style={{background:'#f9fafb',padding:16,marginBottom:16}}>
+              <h4 style={{marginBottom:8}}>Box 8 - Designated Facility (TSDF)</h4>
+              <div className="profile-select">
+                <select onChange={function(e){loadFacility(e.target.value)}} defaultValue="">
+                  <option value="">-- Load from saved facility --</option>
+                  {data.facilities.map(function(f) { return <option key={f.id} value={f.id}>{f.name}</option>; })}
+                </select>
+              </div>
+              <div className="form-grid">
+                <div className="form-group"><label>Facility Name</label><input value={form.facilityName || ''} onChange={function(e){set('facilityName',e.target.value)}} /></div>
+                <div className="form-group"><label>EPA ID</label><input value={form.facilityEpaId || ''} onChange={function(e){set('facilityEpaId',e.target.value)}} /></div>
+                <div className="form-group"><label>Address</label><input value={form.facilityAddress || ''} onChange={function(e){set('facilityAddress',e.target.value)}} /></div>
+                <div className="form-group"><label>City, State, Zip</label><input value={form.facilityCityStZip || ''} onChange={function(e){set('facilityCityStZip',e.target.value)}} /></div>
+                <div className="form-group"><label>Phone</label><input value={form.facilityPhone || ''} onChange={function(e){set('facilityPhone',e.target.value)}} /></div>
+              </div>
+            </div>
+
+            <div className="card" style={{background:'#f9fafb',padding:16,marginBottom:16}}>
+              <h4 style={{marginBottom:8}}>Box 9 - Waste Description (up to 4 lines)</h4>
+              <table className="waste-table">
+                <thead>
+                  <tr>
+                    <th style={{width:20}}>#</th>
+                    <th style={{width:30}}>HM</th>
+                    <th>US DOT Description</th>
+                    <th style={{width:50}}>Containers</th>
+                    <th style={{width:80}}>Type</th>
+                    <th style={{width:60}}>Qty</th>
+                    <th style={{width:70}}>Unit</th>
+                    <th style={{width:120}}>Waste Codes</th>
+                    <th style={{width:100}}>Template</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0,1,2,3].map(function(i) {
+                    var line = (form.wasteLines || [])[i] || emptyWaste;
+                    var isRQ = checkRQ(line.wasteCodes, line.qty, line.unit);
+                    return (
+                      <tr key={i} style={isRQ?{background:'#fffbeb'}:{}}>
+                        <td style={{fontWeight:600,color:'#888'}}>{i+1}</td>
+                        <td style={isRQ?{position:'relative'}:{}}>
+                          <input value={isRQ?'RQ':(line.hm||'')} onChange={function(e){setWaste(i,'hm',e.target.value)}} maxLength={2} style={isRQ?{background:'#fef3c7',fontWeight:700,color:'#92400e'}:{}} readOnly={isRQ} />
+                        </td>
+                        <td><input value={line.description} onChange={function(e){setWaste(i,'description',e.target.value)}} /></td>
+                        <td><input value={line.containerNum} onChange={function(e){setWaste(i,'containerNum',e.target.value)}} /></td>
+                        <td>
+                          <select value={line.containerType} onChange={function(e){setWaste(i,'containerType',e.target.value)}}>
+                            <option value="">--</option>
+                            {CONTAINER_TYPES.map(function(ct) { return <option key={ct.code} value={ct.code}>{ct.code}</option>; })}
+                          </select>
+                        </td>
+                        <td><input value={line.qty} onChange={function(e){setWaste(i,'qty',e.target.value)}} /></td>
+                        <td>
+                          <select value={line.unit} onChange={function(e){setWaste(i,'unit',e.target.value)}}>
+                            <option value="">--</option>
+                            {UNIT_TYPES.map(function(u) { return <option key={u.code} value={u.code}>{u.code}</option>; })}
+                          </select>
+                        </td>
+                        <td><input value={line.wasteCodes} onChange={function(e){setWaste(i,'wasteCodes',e.target.value)}} placeholder="D001 D002" /></td>
+                        <td>
+                          <select onChange={function(e){loadWasteStream(e.target.value,i)}} defaultValue="" style={{fontSize:11,padding:'4px 2px'}}>
+                            <option value="">Load...</option>
+                            {(function() {
+                              var genPIds = preGen ? (preGen.profileIds || []) : [];
+                              var linked = genPIds.length > 0 ? data.wasteStreams.filter(function(w) { return genPIds.indexOf(w.id) >= 0; }) : [];
+                              var others = genPIds.length > 0 ? data.wasteStreams.filter(function(w) { return genPIds.indexOf(w.id) < 0; }) : data.wasteStreams;
+                              var opts = [];
+                              if (linked.length > 0) {
+                                opts.push(<optgroup key="linked" label={"--- " + (preGen.name || 'Generator') + " Profiles ---"}>{linked.map(function(w) { return <option key={w.id} value={w.id}>{w.name}</option>; })}</optgroup>);
+                                opts.push(<optgroup key="other" label="--- All Profiles ---">{others.map(function(w) { return <option key={w.id} value={w.id}>{w.name}</option>; })}</optgroup>);
+                              } else {
+                                for (var wi = 0; wi < data.wasteStreams.length; wi++) { var w = data.wasteStreams[wi]; opts.push(<option key={w.id} value={w.id}>{w.name}</option>); }
+                              }
+                              return opts;
+                            })()}
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div style={{marginTop:8,fontSize:11,color:'#666'}}>
+                {[0,1,2,3].map(function(i) {
+                  var line = (form.wasteLines || [])[i] || emptyWaste;
+                  if (!line.wasteCodes && !line.qty) return null;
+                  var codes = (line.wasteCodes||'').split(/[\s,]+/).filter(function(c){return c.length>0});
+                  var matchedCodes = codes.filter(function(c){return RQ_TABLE[c.toUpperCase()]});
+                  if (matchedCodes.length === 0 && codes.length > 0) return <div key={i} style={{color:'#999'}}>Line {i+1}: No RQ-listed codes found in "{line.wasteCodes}"</div>;
+                  if (matchedCodes.length > 0 && line.qty && line.unit) {
+                    var lbs = qtyToPounds(line.qty, line.unit);
+                    var lowestRQ = 99999;
+                    var triggerCode = '';
+                    for (var mi=0;mi<matchedCodes.length;mi++){var rq=RQ_TABLE[matchedCodes[mi].toUpperCase()];if(rq<lowestRQ){lowestRQ=rq;triggerCode=matchedCodes[mi].toUpperCase()}}
+                    var isRQ = lbs >= lowestRQ;
+                    return <div key={i} style={{color:isRQ?'#92400e':'#666',fontWeight:isRQ?600:400}}>{isRQ?'Line '+(i+1)+': RQ TRIGGERED - '+triggerCode+' threshold is '+lowestRQ+' lbs, shipment is '+Math.round(lbs)+' lbs':'Line '+(i+1)+': '+triggerCode+' RQ is '+lowestRQ+' lbs, shipment is '+Math.round(lbs)+' lbs (under threshold)'}</div>;
+                  }
+                  return null;
+                })}
+              </div>
+            </div>
+
+            <div className="form-grid" style={{marginBottom:16}}>
+              <div className="form-group full-width">
+                <label>Special Handling Instructions (Box 14)</label>
+                <input value={form.specialHandling || ''} onChange={function(e){set('specialHandling',e.target.value)}} />
+              </div>
+              <div className="form-group full-width">
+                <label>Special Handling Line 2</label>
+                <input value={form.specialHandling2 || ''} onChange={function(e){set('specialHandling2',e.target.value)}} />
+              </div>
+              <div className="form-group full-width">
+                <label>Special Handling Line 3</label>
+                <input value={form.specialHandling3 || ''} onChange={function(e){set('specialHandling3',e.target.value)}} />
+              </div>
+              <div className="form-group">
+                <label>Generator Print Name (Box 15)</label>
+                <input value={form.generatorPrintName || ''} onChange={function(e){set('generatorPrintName',e.target.value)}} />
+              </div>
+              <div className="form-group">
+                <label>Date</label>
+                <input value={form.generatorDate || ''} onChange={function(e){set('generatorDate',e.target.value)}} />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={form.status || 'draft'} onChange={function(e){set('status',e.target.value)}}>
+                  <option value="draft">Draft</option>
+                  <option value="printed">Printed</option>
+                  <option value="signed">Signed</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+              <button className="btn btn-success" onClick={function(){if(onPreview)onPreview(form)}}>Preview</button>
+              {isEdit && manifest && manifest.id ? <button className="btn btn-print" onClick={function(){window.open('/api/print/manifest/'+manifest.id,'_blank')}}>Print</button> : null}
+              <button className="btn btn-primary" onClick={handleSave}>{isEdit ? 'Update' : 'Create'} Manifest</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ManifestPreview(props) {
+      var d = props.formData;
+      var onClose = props.onClose;
+      var lines = d.wasteLines || [];
+      var bx = {border:'1px solid #333',padding:'4px 6px',fontSize:11,minHeight:18};
+      var lbl = {fontSize:8,fontWeight:700,color:'#555',textTransform:'uppercase',marginBottom:1};
+      var boxNum = {fontSize:9,fontWeight:800,color:'#006600',marginRight:4};
+      var section = {borderBottom:'2px solid #333',padding:'4px 0'};
+      var cellStyle = function(w){return {width:w,border:'1px solid #333',padding:'2px 4px',fontSize:10,verticalAlign:'top'}};
+
+      function Box(num, label) { return React.createElement('span',null,React.createElement('span',{style:boxNum},num+'.'),React.createElement('span',{style:{fontSize:8,color:'#555'}},label)); }
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div style={{background:'#fff',width:850,maxHeight:'92vh',overflowY:'auto',padding:0,borderRadius:4,boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}} onClick={function(e){e.stopPropagation()}}>
+            <div style={{background:'#006600',color:'#fff',padding:'8px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontWeight:700,fontSize:14}}>UNIFORM HAZARDOUS WASTE MANIFEST - EPA Form 8700-22 (Preview)</span>
+              <div style={{display:'flex',gap:8}}>
+                {d.id ? <button className="btn btn-sm" style={{background:'#fff',color:'#333'}} onClick={function(){window.open('/api/print/manifest/'+d.id,'_blank')}}>Send to Printer</button> : null}
+                <button className="btn btn-sm" style={{background:'#fff',color:'#333'}} onClick={function(){var pw=window.open('','_blank');pw.document.write('<html><head><title>Manifest Preview</title></head><body>');pw.document.write(document.querySelector('.modal-overlay:last-child > div').innerHTML);pw.document.write('</body></html>');pw.document.close();pw.print()}}>Print Preview</button>
+                <button className="btn btn-sm" style={{background:'rgba(255,255,255,0.3)',color:'#fff'}} onClick={onClose}>Close</button>
+              </div>
+            </div>
+
+            <div style={{padding:'12px 16px',fontFamily:'Arial,sans-serif'}}>
+              {/* Row 1: Generator EPA ID, Page, Manifest Tracking #, Emergency Phone */}
+              <div style={{display:'grid',gridTemplateColumns:'200px 100px 1fr 200px',gap:0,marginBottom:0}}>
+                <div style={bx}>
+                  <div style={lbl}>{Box('1','Generator ID No.')}</div>
+                  <div style={{fontSize:13,fontWeight:600,fontFamily:'monospace'}}>{d.generatorEpaId || ''}</div>
+                </div>
+                <div style={bx}>
+                  <div style={lbl}>{Box('2','Page 1 of')}</div>
+                  <div style={{fontSize:13}}>{(d.pageNum||'1') + ' of ' + (d.pageTotal||'1')}</div>
+                </div>
+                <div style={bx}>
+                  <div style={lbl}>{Box('4','Manifest Tracking Number')}</div>
+                  <div style={{fontSize:15,fontWeight:700,fontFamily:'monospace',color:'#c00',letterSpacing:1}}>{d.manifestTrackingNum || ''}</div>
+                </div>
+                <div style={bx}>
+                  <div style={lbl}>{Box('3','Emergency Response Phone')}</div>
+                  <div style={{fontSize:13,fontWeight:600}}>{d.emergencyPhone || ''}</div>
+                </div>
+              </div>
+
+              {/* Box 5: Generator */}
+              <div style={Object.assign({},bx,{background:'#f0fff0',marginTop:-1})}>
+                <div style={lbl}>{Box('5',"Generator's Name and Mailing Address")}</div>
+                <div style={{fontSize:13,fontWeight:600}}>{d.generatorName || ''}</div>
+                <div style={{fontSize:11}}>{d.generatorAddress || ''}</div>
+                <div style={{fontSize:11}}>{d.generatorCityStZip || ''}</div>
+                <div style={{display:'flex',gap:24,marginTop:2}}>
+                  <span style={{fontSize:10,color:'#555'}}>Phone: <strong>{d.generatorPhone || ''}</strong></span>
+                  {d.genSiteAddress ? <span style={{fontSize:10,color:'#555'}}>Site Address: <strong>{d.genSiteAddress}</strong> {d.genSiteCityStZip||''}</span> : null}
+                </div>
+              </div>
+
+              {/* Box 6: Transporter 1 */}
+              <div style={Object.assign({},bx,{display:'grid',gridTemplateColumns:'1fr 200px',gap:0,padding:0,marginTop:-1})}>
+                <div style={{padding:'4px 6px'}}>
+                  <div style={lbl}>{Box('6','Transporter 1 Company Name')}</div>
+                  <div style={{fontSize:13,fontWeight:600}}>{d.transporter1Name || ''}</div>
+                </div>
+                <div style={{borderLeft:'1px solid #333',padding:'4px 6px'}}>
+                  <div style={lbl}>US EPA ID Number</div>
+                  <div style={{fontSize:12,fontFamily:'monospace'}}>{d.transporter1EpaId || ''}</div>
+                </div>
+              </div>
+
+              {/* Box 7: Transporter 2 */}
+              <div style={Object.assign({},bx,{display:'grid',gridTemplateColumns:'1fr 200px',gap:0,padding:0,marginTop:-1})}>
+                <div style={{padding:'4px 6px'}}>
+                  <div style={lbl}>{Box('7','Transporter 2 Company Name')}</div>
+                  <div style={{fontSize:13,fontWeight:600}}>{d.transporter2Name || ''}</div>
+                </div>
+                <div style={{borderLeft:'1px solid #333',padding:'4px 6px'}}>
+                  <div style={lbl}>US EPA ID Number</div>
+                  <div style={{fontSize:12,fontFamily:'monospace'}}>{d.transporter2EpaId || ''}</div>
+                </div>
+              </div>
+
+              {/* Box 8: Facility */}
+              <div style={Object.assign({},bx,{background:'#fff8f0',marginTop:-1})}>
+                <div style={lbl}>{Box('8',"Designated Facility Name and Site Address")}</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 200px'}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600}}>{d.facilityName || ''}</div>
+                    <div style={{fontSize:11}}>{d.facilityAddress || ''}</div>
+                    <div style={{fontSize:11}}>{d.facilityCityStZip || ''}</div>
+                    <span style={{fontSize:10,color:'#555'}}>Phone: <strong>{d.facilityPhone || ''}</strong></span>
+                  </div>
+                  <div style={{borderLeft:'1px solid #ccc',paddingLeft:8}}>
+                    <div style={lbl}>Facility EPA ID</div>
+                    <div style={{fontSize:12,fontFamily:'monospace',fontWeight:600}}>{d.facilityEpaId || ''}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 9: Waste Description Table */}
+              <div style={Object.assign({},bx,{marginTop:-1,padding:0})}>
+                <div style={{padding:'4px 6px'}}>
+                  <div style={lbl}>{Box('9','US DOT Description (Including Proper Shipping Name, Hazard Class, ID Number, and Packing Group)')}</div>
+                </div>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead>
+                    <tr style={{background:'#f5f5f5'}}>
+                      <th style={cellStyle('3%')}>#</th>
+                      <th style={cellStyle('3%')}>HM</th>
+                      <th style={cellStyle('34%')}>DOT Description</th>
+                      <th style={cellStyle('8%')}><span style={{fontSize:8}}>10. Containers</span></th>
+                      <th style={cellStyle('8%')}><span style={{fontSize:8}}>11. Type</span></th>
+                      <th style={cellStyle('10%')}><span style={{fontSize:8}}>12. Qty</span></th>
+                      <th style={cellStyle('8%')}><span style={{fontSize:8}}>Unit</span></th>
+                      <th style={cellStyle('26%')}><span style={{fontSize:8}}>13. Waste Codes</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[0,1,2,3].map(function(i) {
+                      var line = lines[i] || {};
+                      var hasData = line.description || line.containerNum || line.qty || line.wasteCodes;
+                      return (
+                        <tr key={i} style={{background: hasData ? '#fffff0' : '#fff'}}>
+                          <td style={Object.assign({},cellStyle('3%'),{textAlign:'center',fontWeight:700,color:'#888'})}>{i+1}</td>
+                          <td style={Object.assign({},cellStyle('3%'),{textAlign:'center',fontWeight:600})}>{line.hm || ''}</td>
+                          <td style={cellStyle('34%')}><span style={{fontSize:11,fontWeight: hasData?600:400}}>{line.description || ''}</span></td>
+                          <td style={Object.assign({},cellStyle('8%'),{textAlign:'center'})}>{line.containerNum || ''}</td>
+                          <td style={Object.assign({},cellStyle('8%'),{textAlign:'center'})}>{line.containerType || ''}</td>
+                          <td style={Object.assign({},cellStyle('10%'),{textAlign:'center'})}>{line.qty || ''}</td>
+                          <td style={Object.assign({},cellStyle('8%'),{textAlign:'center'})}>{line.unit || ''}</td>
+                          <td style={cellStyle('26%')}>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:1}}>
+                              {(function(){var codes=(line.wasteCodes||'').split(/[\s,]+/).filter(function(c){return c.length>0});var boxes=[];for(var b=0;b<6;b++){boxes.push(<div key={b} style={{border:'1px solid #999',padding:'1px 3px',fontSize:9,fontFamily:'monospace',fontWeight:600,textAlign:'center',minHeight:14,background:codes[b]?'#fffff0':'#fff'}}>{codes[b]||''}</div>)}return boxes})()}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Box 14: Special Handling */}
+              <div style={Object.assign({},bx,{marginTop:-1,background:'#fff8f8'})}>
+                <div style={lbl}>{Box('14','Special Handling Instructions and Additional Information')}</div>
+                <div style={{fontSize:12,fontWeight:500}}>{d.specialHandling || ''}</div>
+                {d.specialHandling2 ? <div style={{fontSize:12}}>{d.specialHandling2}</div> : null}
+                {d.specialHandling3 ? <div style={{fontSize:12,fontStyle:'italic'}}>{d.specialHandling3}</div> : null}
+              </div>
+
+              {/* Box 15: Generator Certification */}
+              <div style={Object.assign({},bx,{marginTop:-1,background:'#f8f8ff'})}>
+                <div style={lbl}>{Box('15',"Generator's/Offeror's Certification")}</div>
+                <div style={{fontSize:9,color:'#666',marginBottom:4}}>I hereby declare that the contents of this consignment are fully and accurately described above by the proper shipping name, and are classified, packaged, marked and labeled/placarded, and are in all respects in proper condition for transport according to applicable international and national governmental regulations.</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 200px',gap:16}}>
+                  <div>
+                    <div style={{fontSize:9,color:'#888'}}>Printed/Typed Name</div>
+                    <div style={{fontSize:13,fontWeight:600,borderBottom:'1px solid #999',minHeight:18,paddingBottom:2}}>{d.generatorPrintName || ''}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:9,color:'#888'}}>Date</div>
+                    <div style={{fontSize:13,fontWeight:600,borderBottom:'1px solid #999',minHeight:18,paddingBottom:2}}>{d.generatorDate || ''}</div>
+                  </div>
+                </div>
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:9,color:'#888'}}>Signature</div>
+                  <div style={{borderBottom:'1px solid #999',minHeight:24}}></div>
+                </div>
+              </div>
+
+              {/* Status badge */}
+              <div style={{marginTop:12,textAlign:'right'}}>
+                <span className={'badge badge-'+(d.status||'draft')} style={{fontSize:14,padding:'6px 16px'}}>Status: {d.status || 'draft'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ProfileTab(props){
+      var data=props.data;var type=props.type;var label=props.label;var reload=props.reload;var onNewManifest=props.onNewManifest;
+      var s1=useState(false);var showModal=s1[0];var setShowModal=s1[1];
+      var s2=useState(null);var editing=s2[0];var setEditing=s2[1];
+      var s3=useState('');var search=s3[0];var setSearch=s3[1];
+      var s4=useState(null);var expandedId=s4[0];var setExpandedId=s4[1];
+      var s5=useState(null);var viewItem=s5[0];var setViewItem=s5[1];
+      var items=(data[type]||[]).filter(function(item){var s=search.toLowerCase();return !s||(item.name||'').toLowerCase().indexOf(s)>=0||(item.epaId||'').toLowerCase().indexOf(s)>=0});
+      function handleSave(formData){var p=editing?api.put('/api/'+type+'/'+editing.id,formData):api.post('/api/'+type,formData);p.then(function(){reload();setShowModal(false);setEditing(null)})}
+      function handleDelete(id){if(confirm('Delete this '+label.singular.toLowerCase()+'?')){api.del('/api/'+type+'/'+id).then(reload)}}
+      function handleClearAll(){if(confirm('DELETE ALL GENERATORS? This cannot be undone!')){if(confirm('Are you really sure? This will remove all '+data.generators.length+' generators.')){api.del('/api/generators').then(reload)}}}
+      function addProfileToGenerator(gen,profileId){var updatedIds=(gen.profileIds||[]).slice();if(updatedIds.indexOf(profileId)<0){updatedIds.push(profileId)}api.put('/api/generators/'+gen.id,Object.assign({},gen,{profileIds:updatedIds})).then(reload)}
+      function removeProfileFromGenerator(gen,profileId){var updatedIds=(gen.profileIds||[]).slice().filter(function(id){return id!==profileId});api.put('/api/generators/'+gen.id,Object.assign({},gen,{profileIds:updatedIds})).then(reload)}
+      return React.createElement('div',null,
+        React.createElement('div',{className:'section-header'},
+          React.createElement('h2',{style:{fontSize:22,fontWeight:700}},label.plural),
+          React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+            React.createElement('input',{className:'search-bar',placeholder:'Search '+label.plural.toLowerCase()+'...',value:search,onChange:function(e){setSearch(e.target.value)}}),
+            React.createElement('button',{className:'btn btn-primary',onClick:function(){setEditing(null);setShowModal(true)}},'+New '+label.singular),
+            type==='generators'?React.createElement('button',{className:'btn btn-danger',onClick:handleClearAll},'Clear All Generators'):null
+          )
+        ),
+        React.createElement('div',{className:'card'},
+          React.createElement('table',{className:'data-table'},
+            React.createElement('thead',null,
+              React.createElement('tr',null,
+                React.createElement('th',null,'Name'),
+                React.createElement('th',null,'EPA ID'),
+                React.createElement('th',null,'Mailing Address'),
+                React.createElement('th',null,'Site Address'),
+                React.createElement('th',null,'Phone'),
+                React.createElement('th',null,'Actions')
+              )
+            ),
+            React.createElement('tbody',null,
+              items.length===0?React.createElement('tr',null,React.createElement('td',{colSpan:'6',style:{textAlign:'center',color:'#999',padding:24}},'No '+label.plural.toLowerCase()+' yet.')):null,
+              (function(){
+                var rows=[];
+                for(var ii=0;ii<items.length;ii++){
+                  (function(item){
+                    var isExpanded=expandedId===item.id;
+                    var pIds=item.profileIds||[];
+                    var ws=data.wasteStreams||[];
+                    var linkedWastes=type==='generators'?ws.filter(function(w){return pIds.indexOf(w.id)>=0}):[];
+                    var availableWastes=type==='generators'?ws.filter(function(w){return pIds.indexOf(w.id)<0}):[];
+                    rows.push(React.createElement('tr',{key:item.id},
+                      React.createElement('td',{style:{fontWeight:600,cursor:type==='generators'?'pointer':'default',color:type==='generators'?'#e94560':'inherit'},onClick:type==='generators'?function(){setExpandedId(isExpanded?null:item.id)}:undefined},(type==='generators'?(isExpanded?'v ':'> '):'')+item.name),
+                      React.createElement('td',null,item.epaId||'-'),
+                      React.createElement('td',null,[item.mailAddress,item.mailCity,item.mailState].filter(Boolean).join(', ')||[item.siteAddress,item.city,item.state].filter(Boolean).join(', ')||'-'),
+                      React.createElement('td',null,[item.siteAddress,item.city,item.state].filter(Boolean).join(', ')||'-'),
+                      React.createElement('td',null,item.phone||'-'),
+                      React.createElement('td',{style:{display:'flex',gap:4}},
+                        React.createElement('button',{className:'btn btn-sm btn-secondary',onClick:function(){setEditing(item);setShowModal(true)}},'Edit'),
+                        React.createElement('button',{className:'btn btn-sm btn-danger',onClick:function(){handleDelete(item.id)}},'X')
+                      )
+                    ));
+                    if(isExpanded&&type==='generators'){
+                      rows.push(React.createElement('tr',{key:item.id+'-exp'},
+                        React.createElement('td',{colSpan:6},
+                          React.createElement('div',{style:{padding:12,background:'#f9fafb',borderRadius:4}},
+                            React.createElement('h5',{style:{marginBottom:8,color:'#555'}},'Linked Waste Profiles'),
+                            React.createElement('div',{style:{marginBottom:12}},
+                              linkedWastes.length>0?linkedWastes.map(function(w){return React.createElement('div',{key:w.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:6,background:'#fff',marginBottom:4,borderRadius:4}},
+                                React.createElement('div',null,
+                                  React.createElement('strong',null,w.name),
+                                  w.wasteCodes?React.createElement('span',{style:{color:'#666',fontSize:12,marginLeft:8}},w.wasteCodes):null
+                                ),
+                                React.createElement('button',{className:'btn btn-sm btn-danger',onClick:function(){removeProfileFromGenerator(item,w.id)}},'Remove')
+                              )}):React.createElement('p',{style:{color:'#999',fontSize:13}},'No profiles linked yet')
+                            ),
+                            React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+                              React.createElement('select',{value:'',onChange:function(e){if(e.target.value){addProfileToGenerator(item,e.target.value);e.target.value=''}},style:{padding:'6px 8px'}},
+                                React.createElement('option',{value:''},'-- Add Profile --'),
+                                availableWastes.map(function(w){return React.createElement('option',{key:w.id,value:w.id},w.name)})
+                              ),
+                              React.createElement('button',{className:'btn btn-sm btn-primary',onClick:function(){onNewManifest(item)}},'New Manifest')
+                            )
+                          )
+                        )
+                      ));
+                    }
+                  })(items[ii]);
+                }
+                return rows;
+              })()
+            )
+          )
+        ),
+        showModal?React.createElement(ProfileFormModal,{type:type,item:editing,label:label,onSave:handleSave,onClose:function(){setShowModal(false);setEditing(null)}}):null,
+        viewItem&&type==='generators'?React.createElement('div',{className:'modal-overlay',onClick:function(){setViewItem(null)}},
+          React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation()},style:{maxWidth:600}},
+            React.createElement('h3',{style:{marginBottom:16}},viewItem.name),
+            React.createElement('div',{style:{display:'grid',gridTemplateColumns:'140px 1fr',gap:'8px 16px',fontSize:14}},
+              React.createElement('strong',null,'EPA ID:'),
+              React.createElement('span',null,viewItem.epaId||'-'),
+              React.createElement('strong',null,'Phone:'),
+              React.createElement('span',null,viewItem.phone||'-'),
+              React.createElement('strong',null,'Contact:'),
+              React.createElement('span',null,viewItem.contactName||'-'),
+              React.createElement('strong',null,'Emergency Phone:'),
+              React.createElement('span',null,viewItem.emergencyPhone||'-'),
+              React.createElement('strong',{style:{gridColumn:'1/-1',marginTop:12,borderBottom:'1px solid #eee',paddingBottom:4}},'Mailing Address'),
+              React.createElement('strong',null,'Street:'),
+              React.createElement('span',null,viewItem.mailAddress||'-'),
+              React.createElement('strong',null,'City/State/Zip:'),
+              React.createElement('span',null,[viewItem.mailCity,viewItem.mailState,viewItem.mailZip].filter(Boolean).join(', ')||'-'),
+              React.createElement('strong',{style:{gridColumn:'1/-1',marginTop:12,borderBottom:'1px solid #eee',paddingBottom:4}},'Site Address'),
+              React.createElement('strong',null,'Street:'),
+              React.createElement('span',null,viewItem.siteAddress||'-'),
+              React.createElement('strong',null,'City/State/Zip:'),
+              React.createElement('span',null,[viewItem.city,viewItem.state,viewItem.zip].filter(Boolean).join(', ')||'-'),
+              React.createElement('strong',{style:{gridColumn:'1/-1',marginTop:12,borderBottom:'1px solid #eee',paddingBottom:4}},'Linked Profiles ('+((viewItem.profileIds||[]).length)+')'),
+              (function(){
+                var profileElements=[];
+                if((viewItem.profileIds||[]).length>0){
+                  var linkedProfs=(data.wasteStreams||[]).filter(function(w){return(viewItem.profileIds||[]).indexOf(w.id)>=0});
+                  for(var pi=0;pi<linkedProfs.length;pi++){
+                    var w=linkedProfs[pi];
+                    profileElements.push(React.createElement('span',{key:w.id+'-l',style:{color:'#666'}},w.profileId?'#'+w.profileId:''));
+                    profileElements.push(React.createElement('span',{key:w.id+'-n'},w.name));
+                  }
+                }else{
+                  profileElements.push(React.createElement('span',{key:'empty',style:{gridColumn:'1/-1',color:'#999'}},'No profiles linked'));
+                }
+                return profileElements;
+              })()
+            ),
+            React.createElement('div',{className:'modal-actions'},
+              React.createElement('button',{className:'btn btn-secondary',onClick:function(){setViewItem(null)}},'Close'),
+              React.createElement('button',{className:'btn btn-primary',onClick:function(){setEditing(viewItem);setShowModal(true);setViewItem(null)}},'Edit Generator')
+            )
+          )
+        ):null
+      );
+    }
+
+    function ProfileFormModal(props){
+      var item=props.item;var type=props.type;var label=props.label;var onSave=props.onSave;var onClose=props.onClose;
+      var f1=useState(item||{name:'',epaId:'',siteAddress:'',city:'',state:'',zip:'',mailAddress:'',mailCity:'',mailState:'',mailZip:'',phone:'',contactName:'',emergencyPhone:''});
+      var form=f1[0];var setForm=f1[1];
+      function set(k,v){setForm(function(f){var n=Object.assign({},f);n[k]=v;return n})}
+      return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation()}},
+          React.createElement('h3',null,(item?'Edit':'New')+' '+label.singular),
+          React.createElement('div',{className:'form-grid'},
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Name'),
+              React.createElement('input',{value:form.name||'',onChange:function(e){set('name',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'EPA ID'),
+              React.createElement('input',{value:form.epaId||'',onChange:function(e){set('epaId',e.target.value)},placeholder:'e.g. CAD000000000'})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Phone'),
+              React.createElement('input',{value:form.phone||'',onChange:function(e){set('phone',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Contact Name'),
+              React.createElement('input',{value:form.contactName||'',onChange:function(e){set('contactName',e.target.value)}})
+            ),
+            type==='generators'?React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Emergency Phone'),
+              React.createElement('input',{value:form.emergencyPhone||'',onChange:function(e){set('emergencyPhone',e.target.value)}})
+            ):null
+          ),
+          type!=='facilities'?React.createElement('h5',{style:{marginTop:16,marginBottom:8,color:'#555'}},'Mailing Address'):null,
+          type!=='facilities'?React.createElement('div',{className:'form-grid'},
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Street'),
+              React.createElement('input',{value:form.mailAddress||'',onChange:function(e){set('mailAddress',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'City'),
+              React.createElement('input',{value:form.mailCity||'',onChange:function(e){set('mailCity',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'State'),
+              React.createElement('input',{value:form.mailState||'',onChange:function(e){set('mailState',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Zip'),
+              React.createElement('input',{value:form.mailZip||'',onChange:function(e){set('mailZip',e.target.value)}})
+            )
+          ):null,
+          React.createElement('h5',{style:{marginTop:16,marginBottom:8,color:'#555'}},'Site Address'),
+          React.createElement('div',{className:'form-grid'},
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Street'),
+              React.createElement('input',{value:form.siteAddress||'',onChange:function(e){set('siteAddress',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'City'),
+              React.createElement('input',{value:form.city||'',onChange:function(e){set('city',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'State'),
+              React.createElement('input',{value:form.state||'',onChange:function(e){set('state',e.target.value)}})
+            ),
+            React.createElement('div',{className:'form-group'},
+              React.createElement('label',null,'Zip'),
+              React.createElement('input',{value:form.zip||'',onChange:function(e){set('zip',e.target.value)}})
+            )
+          ),
+          React.createElement('div',{className:'modal-actions'},
+            React.createElement('button',{className:'btn btn-secondary',onClick:onClose},'Cancel'),
+            React.createElement('button',{className:'btn btn-primary',onClick:function(){onSave(form)}},'Save '+label.singular)
+          )
+        )
+      );
+    }
+
+    function WasteStreamsTab(props){
+      var data=props.data;var reload=props.reload;
+      var s1=useState(false);var showModal=s1[0];var setShowModal=s1[1];
+      var s2=useState(null);var editing=s2[0];var setEditing=s2[1];
+      var s5=useState(null);var profileResult=s5[0];var setProfileResult=s5[1];
+      var s6=useState(false);var profileUploading=s6[0];var setProfileUploading=s6[1];
+      var s7=useState('');var wsSearch=s7[0];var setWsSearch=s7[1];
+      var s8=useState(null);var bulkProgress=s8[0];var setBulkProgress=s8[1];
+      var profileRef=useRef();
+      var bulkRef=useRef();
+      function handleSave(formData){var p=editing?api.put('/api/waste-streams/'+editing.id,formData):api.post('/api/waste-streams',formData);p.then(function(){reload();setShowModal(false);setEditing(null)})}
+      function handleDelete(id){if(confirm('Delete this waste stream?')){api.del('/api/waste-streams/'+id).then(reload)}}
+      function handleProfileUpload(e){var file=e.target.files[0];if(!file)return;setProfileUploading(true);setProfileResult(null);var formData=new FormData();formData.append('file',file);fetch('/api/import/waste-profile',{method:'POST',body:formData}).then(function(r){return r.json()}).then(function(d){setProfileResult(d);setProfileUploading(false);if(d.success)reload();if(profileRef.current)profileRef.current.value=''}).catch(function(err){setProfileResult({error:'Upload failed: '+err.message});setProfileUploading(false);if(profileRef.current)profileRef.current.value=''})}
+
+      function handleBulkUpload(e) {
+        var files = e.target.files;
+        if (!files || files.length === 0) return;
+        // Filter to only PDFs
+        var pdfs = [];
+        for (var fi = 0; fi < files.length; fi++) {
+          if (files[fi].name.toLowerCase().indexOf('.pdf') !== -1) pdfs.push(files[fi]);
+        }
+        if (pdfs.length === 0) { if (bulkRef.current) bulkRef.current.value = ''; return; }
+        var progress = { total: pdfs.length, current: 0, imported: 0, skipped: 0, failed: 0, errors: [], done: false };
+        setBulkProgress(Object.assign({}, progress));
+
+        function processNext(idx) {
+          if (idx >= pdfs.length) {
+            progress.done = true;
+            setBulkProgress(Object.assign({}, progress));
+            reload();
+            if (bulkRef.current) bulkRef.current.value = '';
+            return;
+          }
+          progress.current = idx + 1;
+          progress.currentFile = pdfs[idx].name;
+          setBulkProgress(Object.assign({}, progress));
+          var formData = new FormData();
+          formData.append('file', pdfs[idx]);
+          fetch('/api/import/waste-profile', { method: 'POST', body: formData })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (d.success) {
+                progress.imported++;
+              } else if (d.error && d.error.indexOf('already exists') !== -1) {
+                progress.skipped++;
+              } else {
+                progress.failed++;
+                progress.errors.push(pdfs[idx].name + ': ' + (d.error || 'Unknown error'));
+              }
+              setBulkProgress(Object.assign({}, progress));
+              processNext(idx + 1);
+            })
+            .catch(function(err) {
+              progress.failed++;
+              progress.errors.push(pdfs[idx].name + ': ' + err.message);
+              setBulkProgress(Object.assign({}, progress));
+              processNext(idx + 1);
+            });
+        }
+        processNext(0);
+      }
+
+      // Sort alphabetically by name, then filter by search
+      var allStreams = (data.wasteStreams || []).slice().sort(function(a, b) {
+        return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
+      });
+      var filtered = allStreams;
+      if (wsSearch) {
+        var term = wsSearch.toLowerCase();
+        filtered = allStreams.filter(function(w) {
+          return (w.name || '').toLowerCase().indexOf(term) !== -1 ||
+            (w.profileId || '').toLowerCase().indexOf(term) !== -1 ||
+            (w.dotDescription || '').toLowerCase().indexOf(term) !== -1 ||
+            (w.wasteCodes || '').toLowerCase().indexOf(term) !== -1 ||
+            (w.stateWasteCodes || '').toLowerCase().indexOf(term) !== -1 ||
+            (w.unNum || '').toLowerCase().indexOf(term) !== -1 ||
+            (w.source || '').toLowerCase().indexOf(term) !== -1;
+        });
+      }
+
+      return React.createElement('div',null,
+        React.createElement('div',{className:'section-header'},
+          React.createElement('h2',{style:{fontSize:22,fontWeight:700}},'Waste Stream Templates'),
+          React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+            React.createElement('span',{style:{fontSize:13,color:'#888'}},allStreams.length+' stream'+(allStreams.length!==1?'s':'')),
+            React.createElement('input',{
+              type:'text',placeholder:'Search waste streams...',value:wsSearch,
+              onChange:function(e){setWsSearch(e.target.value)},
+              style:{padding:'6px 12px',borderRadius:6,border:'1px solid #ddd',fontSize:14,width:220}
+            }),
+            React.createElement('button',{className:'btn btn-success',onClick:function(){profileRef.current&&profileRef.current.click()}},'Import Profile'),
+            React.createElement('button',{className:'btn btn-success',onClick:function(){bulkRef.current&&bulkRef.current.click()},style:{background:'#065f46'}},'Bulk Import Folder'),
+            React.createElement('button',{className:'btn btn-primary',onClick:function(){setEditing(null);setShowModal(true)}},'+New Waste Stream'),
+            React.createElement('input',{ref:profileRef,type:'file',accept:'.pdf',style:{display:'none'},onChange:handleProfileUpload}),
+            React.createElement('input',{ref:bulkRef,type:'file',accept:'.pdf',multiple:true,webkitdirectory:'true',style:{display:'none'},onChange:handleBulkUpload})
+          )
+        ),
+        // Bulk import progress
+        bulkProgress&&!bulkProgress.done?React.createElement('div',{className:'card',style:{background:'#f0f4ff',padding:12,marginBottom:12}},
+          React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
+            React.createElement('strong',null,'Bulk Import: Processing ' + bulkProgress.current + ' of ' + bulkProgress.total + '...'),
+            React.createElement('span',{style:{fontSize:12,color:'#666'}},bulkProgress.currentFile || '')
+          ),
+          React.createElement('div',{style:{background:'#e5e7eb',borderRadius:4,height:8,overflow:'hidden'}},
+            React.createElement('div',{style:{background:'#3b82f6',height:'100%',width:Math.round(bulkProgress.current/bulkProgress.total*100)+'%',transition:'width 0.3s'}})
+          ),
+          React.createElement('div',{style:{display:'flex',gap:16,marginTop:6,fontSize:12}},
+            React.createElement('span',{style:{color:'#065f46'}},bulkProgress.imported+' imported'),
+            React.createElement('span',{style:{color:'#92400e'}},bulkProgress.skipped+' skipped (already exist)'),
+            bulkProgress.failed>0?React.createElement('span',{style:{color:'#991b1b'}},bulkProgress.failed+' failed'):null
+          )
+        ):null,
+        // Bulk import done summary
+        bulkProgress&&bulkProgress.done?React.createElement('div',{className:'card',style:{background:'#d1fae5',padding:12,marginBottom:12}},
+          React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+            React.createElement('div',null,
+              React.createElement('strong',null,'Bulk Import Complete: '),
+              bulkProgress.imported+' new profile'+(bulkProgress.imported!==1?'s':'')+' imported',
+              bulkProgress.skipped>0?', '+bulkProgress.skipped+' skipped (already existed)':'',
+              bulkProgress.failed>0?', '+bulkProgress.failed+' failed':''
+            ),
+            React.createElement('button',{className:'btn btn-sm btn-secondary',onClick:function(){setBulkProgress(null)}},'Dismiss')
+          ),
+          bulkProgress.errors.length>0?React.createElement('div',{style:{marginTop:8,fontSize:12,color:'#991b1b'}},
+            bulkProgress.errors.map(function(err,i){return React.createElement('div',{key:i},err)})
+          ):null
+        ):null,
+        profileUploading?React.createElement('div',{className:'card',style:{background:'#f0f4ff',padding:12,marginBottom:12}},'Parsing waste profile PDF...'):null,
+        profileResult&&profileResult.success?React.createElement('div',{className:'card',style:{background:'#d1fae5',padding:12,marginBottom:12}},
+          React.createElement('strong',null,profileResult.source==='EWS'?'Imported (EWS): ':profileResult.source==='Samex'?'Imported (Samex): ':'Imported: '),
+          profileResult.wasteStream.profileId?'Profile #'+profileResult.wasteStream.profileId+' - ':'',
+          profileResult.wasteStream.name,' - ',profileResult.wasteStream.dotDescription,
+          profileResult.wasteStream.wasteCodes?' | Waste Codes: '+profileResult.wasteStream.wasteCodes:'',
+          profileResult.wasteStream.stateWasteCodes?' | State Codes: '+profileResult.wasteStream.stateWasteCodes:'',
+          profileResult.wasteStream.unNum?' | UN#: '+profileResult.wasteStream.unNum:'',
+          profileResult.wasteStream.hazardClass?' | Class: '+profileResult.wasteStream.hazardClass:'',
+          profileResult.wasteStream.packingGroup?' | PG: '+profileResult.wasteStream.packingGroup:'',
+          profileResult.wasteStream.composition?' | Composition: '+profileResult.wasteStream.composition:'',
+          React.createElement('button',{className:'btn btn-sm btn-secondary',style:{marginLeft:12},onClick:function(){setProfileResult(null)}},'Dismiss')
+        ):null,
+        profileResult&&profileResult.error?React.createElement('div',{className:'card',style:{background:'#fee2e2',padding:12,marginBottom:12,color:'#991b1b'}},
+          profileResult.error,
+          React.createElement('button',{className:'btn btn-sm btn-secondary',style:{marginLeft:12},onClick:function(){setProfileResult(null)}},'Dismiss')
+        ):null,
+        React.createElement('div',{className:'card'},
+          React.createElement('table',{className:'data-table'},
+            React.createElement('thead',null,
+              React.createElement('tr',null,
+                React.createElement('th',null,'Profile ID'),
+                React.createElement('th',null,'Name'),
+                React.createElement('th',null,'DOT Description'),
+                React.createElement('th',null,'UN#'),
+                React.createElement('th',null,'Class'),
+                React.createElement('th',null,'PG'),
+                React.createElement('th',null,'RCRA Codes'),
+                React.createElement('th',null,'State Codes'),
+                React.createElement('th',null,'Actions')
+              )
+            ),
+            React.createElement('tbody',null,
+              filtered.length===0?React.createElement('tr',null,React.createElement('td',{colSpan:'9',style:{textAlign:'center',color:'#999',padding:24}},wsSearch?'No waste streams match "'+wsSearch+'"':'No waste streams yet.')):null,
+              filtered.map(function(w){return React.createElement('tr',{key:w.id},
+                React.createElement('td',null,w.profileId||'-'),
+                React.createElement('td',{style:{fontWeight:600}},w.name),
+                React.createElement('td',{style:{fontSize:12}},w.dotDescription||'-'),
+                React.createElement('td',null,w.unNum||'-'),
+                React.createElement('td',null,w.hazardClass||'-'),
+                React.createElement('td',null,w.packingGroup||'-'),
+                React.createElement('td',null,w.wasteCodes||'-'),
+                React.createElement('td',null,w.stateWasteCodes||'-'),
+                React.createElement('td',{style:{display:'flex',gap:4}},
+                  React.createElement('button',{className:'btn btn-sm btn-secondary',onClick:function(){setEditing(w);setShowModal(true)}},'Edit'),
+                  React.createElement('button',{className:'btn btn-sm btn-danger',onClick:function(){handleDelete(w.id)}},'X')
+                )
+              )})
+            )
+          )
+        ),
+        showModal?React.createElement('div',{className:'modal-overlay',onClick:function(){setShowModal(false);setEditing(null)}},
+          React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation()}},
+            React.createElement('h3',null,(editing?'Edit':'New')+' Waste Stream Template'),
+            React.createElement(WasteStreamForm,{item:editing,onSave:handleSave,onClose:function(){setShowModal(false);setEditing(null)}})
+          )
+        ):null
+      );
+    }
+
+    function WasteStreamForm(props){
+      var item=props.item;var onSave=props.onSave;var onClose=props.onClose;
+      var f1=useState(item||{name:'',profileId:'',dotDescription:'',hm:'',containerType:'',unit:'',wasteCodes:'',unNum:'',hazardClass:'',packingGroup:'',ergNum:'',stateWasteCodes:''});var form=f1[0];var setForm=f1[1];
+      function set(k,v){setForm(function(f){var n=Object.assign({},f);n[k]=v;return n})}
+      return React.createElement('div',null,
+        React.createElement('div',{className:'form-grid'},
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'Profile ID'),
+            React.createElement('input',{value:form.profileId||'',onChange:function(e){set('profileId',e.target.value)},placeholder:'e.g. 1139708'})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'Template Name'),
+            React.createElement('input',{value:form.name||'',onChange:function(e){set('name',e.target.value)},placeholder:'e.g. Used Oil'})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'HM (X if hazmat)'),
+            React.createElement('input',{value:form.hm||'',onChange:function(e){set('hm',e.target.value)},maxLength:1})
+          ),
+          React.createElement('div',{className:'form-group full-width'},
+            React.createElement('label',null,'US DOT Description'),
+            React.createElement('input',{value:form.dotDescription||'',onChange:function(e){set('dotDescription',e.target.value)},placeholder:'e.g. RQ, Hazardous Waste, Liquid, NOS'})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'UN/NA #'),
+            React.createElement('input',{value:form.unNum||'',onChange:function(e){set('unNum',e.target.value)},placeholder:'e.g. UN3266'})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'Hazard Class'),
+            React.createElement('input',{value:form.hazardClass||'',onChange:function(e){set('hazardClass',e.target.value)},placeholder:'e.g. 8'})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'Packing Group'),
+            React.createElement('input',{value:form.packingGroup||'',onChange:function(e){set('packingGroup',e.target.value)},placeholder:'e.g. I, II, III'})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'ERG #'),
+            React.createElement('input',{value:form.ergNum||'',onChange:function(e){set('ergNum',e.target.value)}})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'Container Type'),
+            React.createElement('select',{value:form.containerType||'',onChange:function(e){set('containerType',e.target.value)}},
+              React.createElement('option',{value:''},'--'),
+              CONTAINER_TYPES.map(function(ct){return React.createElement('option',{key:ct.code,value:ct.code},ct.code+' - '+ct.label)})
+            )
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'Unit of Measure'),
+            React.createElement('select',{value:form.unit||'',onChange:function(e){set('unit',e.target.value)}},
+              React.createElement('option',{value:''},'--'),
+              UNIT_TYPES.map(function(u){return React.createElement('option',{key:u.code,value:u.code},u.code+' - '+u.label)})
+            )
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'RCRA Waste Codes'),
+            React.createElement('input',{value:form.wasteCodes||'',onChange:function(e){set('wasteCodes',e.target.value)},placeholder:'D001 D002 D003'})
+          ),
+          React.createElement('div',{className:'form-group'},
+            React.createElement('label',null,'State Waste Codes'),
+            React.createElement('input',{value:form.stateWasteCodes||'',onChange:function(e){set('stateWasteCodes',e.target.value)},placeholder:'e.g. CA-122'})
+          )
+        ),
+        React.createElement('div',{className:'modal-actions'},
+          React.createElement('button',{className:'btn btn-secondary',onClick:onClose},'Cancel'),
+          React.createElement('button',{className:'btn btn-primary',onClick:function(){onSave(form)}},'Save Waste Stream')
+        )
+      );
+    }
+
+    function ImportTab(props){
+      var reload=props.reload;
+      var s1=useState(null);var result=s1[0];var setResult=s1[1];
+      var s2=useState(false);var uploading=s2[0];var setUploading=s2[1];
+      var fileRef=useRef();
+      function handleUpload(e){var file=e.target.files[0];if(!file)return;setUploading(true);setResult(null);var formData=new FormData();formData.append('file',file);fetch('/api/import/quickbooks',{method:'POST',body:formData}).then(function(res){return res.json()}).then(function(data){if(data.error){setResult({error:data.error})}else{setResult({success:true,imported:data.imported,skipped:data.skipped||0,total:data.total});reload()}setUploading(false);if(fileRef.current)fileRef.current.value=''}).catch(function(err){setResult({error:'Upload failed: '+err.message});setUploading(false);if(fileRef.current)fileRef.current.value=''})}
+      return React.createElement('div',null,
+        React.createElement('h2',{style:{fontSize:22,fontWeight:700,marginBottom:16}},'Import from QuickBooks'),
+        React.createElement('div',{className:'card'},
+          React.createElement('h4',{style:{marginBottom:12}},'Upload Customer List (Excel or CSV)'),
+          React.createElement('p',{style:{color:'#666',marginBottom:16}},'Export your customer list from QuickBooks. Bill Address maps to mailing address, Ship Address maps to site address.'),
+          React.createElement('div',{className:'upload-area',onClick:function(){fileRef.current&&fileRef.current.click()}},
+            React.createElement('div',{style:{fontSize:24,fontWeight:600}},'Upload File'),
+            React.createElement('p',null,React.createElement('strong',null,'Click to upload'),' or drag and drop'),
+            React.createElement('p',{style:{fontSize:12}},'Excel (.xlsx, .xls) or CSV files'),
+            React.createElement('input',{ref:fileRef,type:'file',accept:'.xlsx,.xls,.csv',style:{display:'none'},onChange:handleUpload})
+          ),
+          uploading?React.createElement('p',{style:{marginTop:12,color:'#888'}},'Importing...'):null,
+          result&&result.success?React.createElement('div',{style:{marginTop:16,padding:12,background:'#d1fae5',borderRadius:8,color:'#065f46'}},'Successfully imported ',React.createElement('strong',null,result.imported),' new generators out of ',result.total,' rows.',(result.skipped>0?' ('+result.skipped+' duplicates skipped)':'')):null,
+          result&&result.error?React.createElement('div',{style:{marginTop:16,padding:12,background:'#fee2e2',borderRadius:8,color:'#991b1b'}},'Error: ',result.error):null
+        ),
+        React.createElement('div',{className:'card',style:{marginTop:20}},
+          React.createElement('h4',{style:{marginBottom:12}},'Column Mapping'),
+          React.createElement('table',{className:'data-table'},
+            React.createElement('thead',null,
+              React.createElement('tr',null,
+                React.createElement('th',null,'QuickBooks Column'),
+                React.createElement('th',null,'Maps To')
+              )
+            ),
+            React.createElement('tbody',null,
+              React.createElement('tr',null,React.createElement('td',null,'Customer full name'),React.createElement('td',null,'Generator Name')),
+              React.createElement('tr',null,React.createElement('td',null,'Bill address'),React.createElement('td',null,'Mailing Address')),
+              React.createElement('tr',null,React.createElement('td',null,'Ship address'),React.createElement('td',null,'Site Address')),
+              React.createElement('tr',null,React.createElement('td',null,'Phone numbers'),React.createElement('td',null,'Phone')),
+              React.createElement('tr',null,React.createElement('td',null,'EPA ID Number'),React.createElement('td',null,'EPA ID'))
+            )
+          )
+        )
+      );
+    }
+
+    function ProfilesTab(props) {
+      var data = props.data;
+      var reload = props.reload;
+      var profiles = data.profiles || [];
+      var s1 = useState(''); var searchTerm = s1[0]; var setSearchTerm = s1[1];
+      var s2 = useState(null); var confirmDelete = s2[0]; var setConfirmDelete = s2[1];
+      var s3 = useState(null); var expandedGen = s3[0]; var setExpandedGen = s3[1];
+      var s4 = useState(null); var viewingPdf = s4[0]; var setViewingPdf = s4[1];
+      var s8 = useState(null); var mergingGen = s8[0]; var setMergingGen = s8[1];
+      var s9 = useState(''); var mergeTarget = s9[0]; var setMergeTarget = s9[1];
+
+      function handleMerge(fromGen) {
+        if (!mergeTarget) return;
+        api.post('/api/profiles/merge', { from: fromGen, to: mergeTarget }).then(function() {
+          reload();
+          setMergingGen(null);
+          setMergeTarget('');
+        });
+      }
+
+      function handleView(profile) {
+        setViewingPdf(profile);
+      }
+
+      function handleDelete(profile) {
+        if (confirmDelete === profile.id) {
+          api.del('/api/profiles/' + profile.id).then(function() {
+            reload();
+            setConfirmDelete(null);
+          });
+        } else {
+          setConfirmDelete(profile.id);
+          setTimeout(function() { setConfirmDelete(null); }, 3000);
+        }
+      }
+
+      function formatFileSize(bytes) {
+        if (!bytes) return '';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+
+      function formatDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+      }
+
+      // Filter profiles by search term
+      var filtered = profiles;
+      if (searchTerm) {
+        var term = searchTerm.toLowerCase();
+        filtered = profiles.filter(function(p) {
+          return (p.profileId || '').toLowerCase().indexOf(term) !== -1 ||
+            (p.wasteStreamName || '').toLowerCase().indexOf(term) !== -1 ||
+            (p.generatorName || '').toLowerCase().indexOf(term) !== -1 ||
+            (p.source || '').toLowerCase().indexOf(term) !== -1 ||
+            (p.originalName || '').toLowerCase().indexOf(term) !== -1;
+        });
+      }
+
+      // Group profiles by generator name
+      var genGroups = {};
+      var genOrder = [];
+      for (var gi = 0; gi < filtered.length; gi++) {
+        var genKey = filtered[gi].generatorName || 'Unknown Generator';
+        if (!genGroups[genKey]) {
+          genGroups[genKey] = [];
+          genOrder.push(genKey);
+        }
+        genGroups[genKey].push(filtered[gi]);
+      }
+      // Sort generators alphabetically
+      genOrder.sort(function(a, b) { return a.localeCompare(b); });
+      // Sort profiles within each generator alphabetically by waste stream name
+      for (var gk = 0; gk < genOrder.length; gk++) {
+        genGroups[genOrder[gk]].sort(function(a, b) {
+          return (a.wasteStreamName || '').toLowerCase().localeCompare((b.wasteStreamName || '').toLowerCase());
+        });
+      }
+
+      // If search is active, auto-expand all generators
+      var isSearching = searchTerm.length > 0;
+
+      function sourceBadge(source) {
+        return React.createElement('span', {style: {
+          background: source === 'EWS' ? '#dbeafe' : source === 'Samex' ? '#fef3c7' : '#d1fae5',
+          color: source === 'EWS' ? '#1e40af' : source === 'Samex' ? '#92400e' : '#065f46',
+          padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600
+        }}, source || 'Republic');
+      }
+
+      return React.createElement('div', null,
+        React.createElement('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}},
+          React.createElement('h2', {style: {fontSize: 22, fontWeight: 700}}, 'Imported Profiles'),
+          React.createElement('div', {style: {display: 'flex', gap: 8, alignItems: 'center'}},
+            React.createElement('span', {style: {fontSize: 13, color: '#888'}}, profiles.length + ' profile' + (profiles.length !== 1 ? 's' : '') + ' across ' + genOrder.length + ' generator' + (genOrder.length !== 1 ? 's' : '')),
+            React.createElement('input', {
+              type: 'text', placeholder: 'Search profiles...', value: searchTerm,
+              onChange: function(e) { setSearchTerm(e.target.value); },
+              style: {padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', fontSize: 14, width: 220}
+            })
+          )
+        ),
+        profiles.length === 0 ?
+          React.createElement('div', {className: 'card', style: {textAlign: 'center', padding: 40, color: '#888'}},
+            React.createElement('div', {style: {fontSize: 40, marginBottom: 12}}, '\uD83D\uDCC4'),
+            React.createElement('div', {style: {fontSize: 16, fontWeight: 600, marginBottom: 4}}, 'No profiles stored yet'),
+            React.createElement('div', {style: {fontSize: 13}}, 'When you import a waste profile PDF in the Waste Streams tab, it will automatically be saved here.')
+          ) :
+          // PDF viewer overlay
+          viewingPdf ? React.createElement('div', {
+            style: {
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.7)', zIndex: 9999,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+            },
+            onClick: function(e) { if (e.target === e.currentTarget) setViewingPdf(null); }
+          },
+            // Header bar with title and X
+            React.createElement('div', {style: {
+              width: '90%', maxWidth: 1000, background: '#1a1a2e', color: '#fff',
+              padding: '10px 16px', borderRadius: '8px 8px 0 0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }},
+              React.createElement('div', {style: {display: 'flex', alignItems: 'center', gap: 10}},
+                React.createElement('span', {style: {fontWeight: 700, fontSize: 15}}, viewingPdf.profileId || 'Profile'),
+                React.createElement('span', {style: {color: 'rgba(255,255,255,0.6)', fontSize: 13}}, viewingPdf.wasteStreamName || ''),
+                React.createElement('span', {style: {color: 'rgba(255,255,255,0.4)', fontSize: 12}}, viewingPdf.generatorName || '')
+              ),
+              React.createElement('button', {
+                onClick: function() { setViewingPdf(null); },
+                style: {
+                  background: 'none', border: 'none', color: '#fff', fontSize: 24,
+                  cursor: 'pointer', padding: '0 4px', lineHeight: 1, fontWeight: 700
+                }
+              }, 'X')
+            ),
+            // PDF iframe
+            React.createElement('iframe', {
+              src: '/api/profiles/' + viewingPdf.id + '/pdf',
+              style: {
+                width: '90%', maxWidth: 1000, height: '80vh',
+                border: 'none', borderRadius: '0 0 8px 8px', background: '#fff'
+              }
+            })
+          ) : null,
+          genOrder.map(function(genName) {
+            var genProfiles = genGroups[genName];
+            var isExpanded = isSearching || expandedGen === genName;
+            // Collect unique sources for this generator
+            var genSources = {};
+            for (var si = 0; si < genProfiles.length; si++) {
+              genSources[genProfiles[si].source || 'Republic'] = true;
+            }
+            var sourceList = Object.keys(genSources);
+
+            return React.createElement('div', {key: genName, className: 'card', style: {marginBottom: 12, overflow: 'hidden'}},
+              // Generator header row (clickable to expand/collapse)
+              React.createElement('div', {
+                style: {
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '12px 16px', cursor: 'pointer', background: isExpanded ? '#f8f9fa' : '#fff',
+                  borderBottom: isExpanded ? '1px solid #eee' : 'none'
+                },
+                onClick: function() { setExpandedGen(isExpanded && !isSearching ? null : genName); }
+              },
+                React.createElement('div', {style: {display: 'flex', alignItems: 'center', gap: 10}},
+                  React.createElement('span', {style: {fontSize: 14, color: '#888', fontFamily: 'monospace', width: 16}}, isExpanded ? 'v' : '>'),
+                  React.createElement('span', {style: {fontWeight: 700, fontSize: 15, color: '#1a1a2e'}}, genName),
+                  React.createElement('span', {style: {
+                    background: '#f0f0f0', color: '#666', padding: '1px 8px', borderRadius: 10,
+                    fontSize: 12, fontWeight: 600
+                  }}, genProfiles.length + ' profile' + (genProfiles.length !== 1 ? 's' : ''))
+                ),
+                React.createElement('div', {style: {display: 'flex', gap: 6, alignItems: 'center'}},
+                  sourceList.map(function(src) { return sourceBadge(src); }),
+                  React.createElement('button', {
+                    className: 'btn btn-sm btn-secondary',
+                    onClick: function(e) {
+                      e.stopPropagation();
+                      if (mergingGen === genName) { setMergingGen(null); setMergeTarget(''); }
+                      else { setMergingGen(genName); setMergeTarget(''); }
+                    },
+                    style: {marginLeft: 4, fontSize: 11, padding: '2px 8px'}
+                  }, mergingGen === genName ? 'Cancel' : 'Move to...')
+                )
+              ),
+              // Merge UI - shown when "Move to..." is clicked
+              mergingGen === genName ? React.createElement('div', {
+                style: {padding: '10px 16px', background: '#fffbeb', borderBottom: '1px solid #fde68a', display: 'flex', alignItems: 'center', gap: 8},
+                onClick: function(e) { e.stopPropagation(); }
+              },
+                React.createElement('span', {style: {fontSize: 13, fontWeight: 600, color: '#92400e'}}, 'Move all profiles to:'),
+                React.createElement('select', {
+                  value: mergeTarget,
+                  onChange: function(e) { setMergeTarget(e.target.value); },
+                  style: {padding: '4px 8px', borderRadius: 4, border: '1px solid #ddd', fontSize: 13, minWidth: 250}
+                },
+                  React.createElement('option', {value: ''}, '-- Select generator --'),
+                  genOrder.filter(function(g) { return g !== genName; }).map(function(g) {
+                    return React.createElement('option', {key: g, value: g}, g + ' (' + genGroups[g].length + ')');
+                  })
+                ),
+                React.createElement('button', {
+                  className: 'btn btn-sm btn-primary',
+                  disabled: !mergeTarget,
+                  onClick: function() { handleMerge(genName); },
+                  style: {fontSize: 12}
+                }, 'Move ' + genProfiles.length + ' profile' + (genProfiles.length !== 1 ? 's' : ''))
+              ) : null,
+              // Expanded: show profile table
+              isExpanded ? React.createElement('div', {style: {padding: 0}},
+                React.createElement('table', {className: 'data-table', style: {marginBottom: 0}},
+                  React.createElement('thead', null,
+                    React.createElement('tr', {style: {background: '#f8f9fa'}},
+                      React.createElement('th', null, 'Profile #'),
+                      React.createElement('th', null, 'Waste Stream'),
+                      React.createElement('th', null, 'Source'),
+                      React.createElement('th', null, 'File'),
+                      React.createElement('th', null, 'Size'),
+                      React.createElement('th', null, 'Imported'),
+                      React.createElement('th', {style: {width: 140}}, 'Actions')
+                    )
+                  ),
+                  React.createElement('tbody', null,
+                    genProfiles.map(function(p) {
+                      return React.createElement('tr', {key: p.id},
+                        React.createElement('td', {style: {fontWeight: 600, color: '#e94560'}}, p.profileId || '-'),
+                        React.createElement('td', null, p.wasteStreamName || '-'),
+                        React.createElement('td', null, sourceBadge(p.source)),
+                        React.createElement('td', {style: {fontSize: 12, color: '#666', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}, p.originalName || '-'),
+                        React.createElement('td', {style: {fontSize: 12, color: '#888'}}, formatFileSize(p.fileSize)),
+                        React.createElement('td', {style: {fontSize: 12}}, formatDate(p.importedAt)),
+                        React.createElement('td', null,
+                          React.createElement('button', {className: 'btn btn-sm btn-primary', onClick: function() { handleView(p); }, style: {marginRight: 4}}, 'View PDF'),
+                          React.createElement('button', {
+                            className: 'btn btn-sm ' + (confirmDelete === p.id ? 'btn-danger' : 'btn-secondary'),
+                            onClick: function() { handleDelete(p); }
+                          }, confirmDelete === p.id ? 'Confirm?' : 'Delete')
+                        )
+                      );
+                    })
+                  )
+                )
+              ) : null
+            );
+          })
+      );
+    }
+
+    function AlignmentEditor(){
+      var s1=useState({});var alignData=s1[0];var setAlignData=s1[1];
+      var s2=useState(null);var selected=s2[0];var setSelected=s2[1];
+      var s3=useState('');var status=s3[0];var setStatus=s3[1];
+      var s4=useState(false);var hasPrevious=s4[0];var setHasPrevious=s4[1];
+      var s5=useState(0);var colOffset=s5[0];var setColOffset=s5[1];
+      var s6=useState(0);var leftMargin=s6[0];var setLeftMargin=s6[1];
+
+      var FIELD_LABELS={
+        generatorEpaId:'Box 1 - EPA ID',page:'Box 2 - Page',totalPages:'Box 2 - Total Pages',
+        emergencyPhone:'Box 3 - Emergency Phone',
+        generatorName:'Box 5 - Generator Name',generatorMailAddr:'Box 5 - Mail Address',
+        generatorMailCity:'Box 5 - Mail City/St/Zip',generatorPhone:'Box 5 - Phone',
+        generatorSiteAddr:'Box 5 - Site Address',generatorSiteCity:'Box 5 - Site City/St/Zip',
+        transporter1Name:'Box 6 - Transporter 1',transporter1EpaId:'Box 6 - Trans 1 EPA ID',
+        transporter2Name:'Box 7 - Transporter 2',transporter2EpaId:'Box 7 - Trans 2 EPA ID',
+        facilityName:'Box 8 - Facility',facilityEpaId:'Box 8 - EPA ID',facilityAddress:'Box 8 - Address',facilityPhone:'Box 8 - Phone',facilityCity:'Box 8 - City',facilityState:'Box 8 - State',facilityZip:'Box 8 - Zip',
+        waste1hm:'Waste 1 - HM',waste1desc:'Waste 1 - Description',waste1containerNum:'Waste 1 - Container #',waste1container:'Waste 1 - Type',waste1qty:'Waste 1 - Qty',waste1uom:'Waste 1 - UOM',
+        waste1wc1:'Waste 1 - Code 1',waste1wc2:'Waste 1 - Code 2',waste1wc3:'Waste 1 - Code 3',waste1wc4:'Waste 1 - Code 4',waste1wc5:'Waste 1 - Code 5',waste1wc6:'Waste 1 - Code 6',
+        waste2hm:'Waste 2 - HM',waste2desc:'Waste 2 - Description',waste2containerNum:'Waste 2 - Container #',waste2container:'Waste 2 - Type',waste2qty:'Waste 2 - Qty',waste2uom:'Waste 2 - UOM',
+        waste2wc1:'Waste 2 - Code 1',waste2wc2:'Waste 2 - Code 2',waste2wc3:'Waste 2 - Code 3',waste2wc4:'Waste 2 - Code 4',waste2wc5:'Waste 2 - Code 5',waste2wc6:'Waste 2 - Code 6',
+        waste3hm:'Waste 3 - HM',waste3desc:'Waste 3 - Description',waste3containerNum:'Waste 3 - Container #',waste3container:'Waste 3 - Type',waste3qty:'Waste 3 - Qty',waste3uom:'Waste 3 - UOM',
+        waste3wc1:'Waste 3 - Code 1',waste3wc2:'Waste 3 - Code 2',waste3wc3:'Waste 3 - Code 3',waste3wc4:'Waste 3 - Code 4',waste3wc5:'Waste 3 - Code 5',waste3wc6:'Waste 3 - Code 6',
+        waste4hm:'Waste 4 - HM',waste4desc:'Waste 4 - Description',waste4containerNum:'Waste 4 - Container #',waste4container:'Waste 4 - Type',waste4qty:'Waste 4 - Qty',waste4uom:'Waste 4 - UOM',
+        waste4wc1:'Waste 4 - Code 1',waste4wc2:'Waste 4 - Code 2',waste4wc3:'Waste 4 - Code 3',waste4wc4:'Waste 4 - Code 4',waste4wc5:'Waste 4 - Code 5',waste4wc6:'Waste 4 - Code 6'
+      };
+
+      useEffect(function(){api.get('/api/alignment').then(function(d){if(d.fields)setAlignData(d.fields);if(typeof d.colOffset==='number')setColOffset(d.colOffset);if(typeof d.leftMargin==='number')setLeftMargin(d.leftMargin);if(d.hasPrevious)setHasPrevious(true)})},[]);
+      function handleSave(){api.put('/api/alignment',{fields:alignData,colOffset:colOffset,leftMargin:leftMargin}).then(function(){setHasPrevious(true);setStatus('Saved!');setTimeout(function(){setStatus('')},2000)})}
+      function handleUndo(){api.post('/api/alignment/undo').then(function(d){if(d.fields)setAlignData(d.fields);if(typeof d.colOffset==='number')setColOffset(d.colOffset);if(typeof d.leftMargin==='number')setLeftMargin(d.leftMargin);setStatus('Restored previous settings');setTimeout(function(){setStatus('')},2000)})}
+      function handleReset(){api.post('/api/alignment/reset').then(function(){setAlignData({});setColOffset(0);setLeftMargin(0);setStatus('Reset to defaults');setTimeout(function(){setStatus('')},2000)})}
+      function updateField(fk,dim,val){var v=parseInt(val);if(!isNaN(v)&&v>=1&&v<=100){var newData=Object.assign({},alignData);newData[fk]=Object.assign({},alignData[fk]||{row:1,col:1});newData[fk][dim]=v;setAlignData(newData)}}
+      function nudge(fk,dim,amt){var current=alignData[fk]||{row:1,col:1};var nv=current[dim]+amt;if(nv>=1&&nv<=100){updateField(fk,dim,nv)}}
+
+      var groups=[
+        {title:'Box 1 (EPA ID)',fields:['generatorEpaId','page','totalPages']},
+        {title:'Box 3 (Emergency Phone)',fields:['emergencyPhone']},
+        {title:'Box 5 (Generator)',fields:['generatorName','generatorMailAddr','generatorMailCity','generatorPhone','generatorSiteAddr','generatorSiteCity']},
+        {title:'Box 6-7 (Transporters)',fields:['transporter1Name','transporter1EpaId','transporter2Name','transporter2EpaId']},
+        {title:'Box 8 (Facility)',fields:['facilityName','facilityEpaId','facilityAddress','facilityPhone','facilityCity','facilityState','facilityZip']},
+        {title:'Waste Line 1 - Boxes 9-12',fields:['waste1hm','waste1desc','waste1containerNum','waste1container','waste1qty','waste1uom']},
+        {title:'Waste Line 1 - Box 13 (Codes)',fields:['waste1wc1','waste1wc2','waste1wc3','waste1wc4','waste1wc5','waste1wc6']},
+        {title:'Waste Line 2 - Boxes 9-12',fields:['waste2hm','waste2desc','waste2containerNum','waste2container','waste2qty','waste2uom']},
+        {title:'Waste Line 2 - Box 13 (Codes)',fields:['waste2wc1','waste2wc2','waste2wc3','waste2wc4','waste2wc5','waste2wc6']},
+        {title:'Waste Line 3 - Boxes 9-12',fields:['waste3hm','waste3desc','waste3containerNum','waste3container','waste3qty','waste3uom']},
+        {title:'Waste Line 3 - Box 13 (Codes)',fields:['waste3wc1','waste3wc2','waste3wc3','waste3wc4','waste3wc5','waste3wc6']},
+        {title:'Waste Line 4 - Boxes 9-12',fields:['waste4hm','waste4desc','waste4containerNum','waste4container','waste4qty','waste4uom']},
+        {title:'Waste Line 4 - Box 13 (Codes)',fields:['waste4wc1','waste4wc2','waste4wc3','waste4wc4','waste4wc5','waste4wc6']},
+        {title:'Box 14 (Special Handling)',fields:['specialHandling','specialHandling2','specialHandling3']},
+        {title:'Box 15 (Certification)',fields:['generatorCertName']}
+      ];
+
+      return React.createElement('div',null,
+        React.createElement('h2',{style:{fontSize:22,fontWeight:700,marginBottom:8}},'Print Alignment Editor'),
+        React.createElement('p',{style:{color:'#666',marginBottom:16}},'Click a field to select it, then use arrow keys to move it. Up/Down arrows move text up and down on the page. Left/Right arrows move text left and right. Save when done, then print a test.'),
+        React.createElement('div',{className:'card',style:{marginBottom:16,padding:16,background:'#fffbeb',border:'1px solid #f59e0b'}},
+          React.createElement('div',{style:{display:'flex',gap:24,flexWrap:'wrap'}},
+            React.createElement('div',null,
+              React.createElement('h4',{style:{marginBottom:8}},'Left Margin'),
+              React.createElement('p',{style:{color:'#666',fontSize:13,marginBottom:12}},'Adds space on the left side. Increase if paper is pinned all the way left and text prints too far left on the form.'),
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+                React.createElement('button',{onClick:function(){setLeftMargin(Math.max(0,leftMargin-1))},style:{width:32,height:32,cursor:'pointer',fontSize:18,border:'1px solid #ccc',borderRadius:4}},String.fromCharCode(9664)),
+                React.createElement('input',{type:'number',value:leftMargin,onChange:function(e){var v=parseInt(e.target.value);if(!isNaN(v)&&v>=0&&v<=40)setLeftMargin(v)},style:{width:60,textAlign:'center',padding:'4px 8px',fontSize:16,border:'1px solid #ccc',borderRadius:4}}),
+                React.createElement('button',{onClick:function(){setLeftMargin(Math.min(40,leftMargin+1))},style:{width:32,height:32,cursor:'pointer',fontSize:18,border:'1px solid #ccc',borderRadius:4}},String.fromCharCode(9654)),
+                React.createElement('span',{style:{marginLeft:12,color:'#666',fontSize:13}},leftMargin+' columns added to left')
+              )
+            ),
+            React.createElement('div',null,
+              React.createElement('h4',{style:{marginBottom:8}},'Global Shift'),
+              React.createElement('p',{style:{color:'#666',fontSize:13,marginBottom:12}},'Shifts ALL text to the left. Use to make room on the right side for waste codes.'),
+              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+                React.createElement('button',{onClick:function(){setColOffset(Math.max(0,colOffset-1))},style:{width:32,height:32,cursor:'pointer',fontSize:18,border:'1px solid #ccc',borderRadius:4}},String.fromCharCode(9664)),
+                React.createElement('input',{type:'number',value:colOffset,onChange:function(e){var v=parseInt(e.target.value);if(!isNaN(v)&&v>=0&&v<=40)setColOffset(v)},style:{width:60,textAlign:'center',padding:'4px 8px',fontSize:16,border:'1px solid #ccc',borderRadius:4}}),
+                React.createElement('button',{onClick:function(){setColOffset(Math.min(40,colOffset+1))},style:{width:32,height:32,cursor:'pointer',fontSize:18,border:'1px solid #ccc',borderRadius:4}},String.fromCharCode(9654)),
+                React.createElement('span',{style:{marginLeft:12,color:'#666',fontSize:13}},'Shifts everything '+colOffset+' columns left')
+              )
+            )
+          )
+        ),
+        React.createElement('div',{style:{display:'flex',gap:12,marginBottom:16,flexWrap:'wrap'}},
+          React.createElement('button',{className:'btn btn-primary',onClick:handleSave,style:{padding:'10px 24px',fontSize:16}},'Save Alignment'),
+          React.createElement('button',{className:'btn',onClick:handleUndo,style:{padding:'10px 24px',background:hasPrevious?'#f59e0b':'#999',cursor:hasPrevious?'pointer':'not-allowed',color:'#fff'},disabled:!hasPrevious},'Undo (Previous Settings)'),
+          React.createElement('button',{className:'btn',onClick:handleReset,style:{padding:'10px 24px',background:'#666'}},'Reset to Defaults'),
+          status?React.createElement('span',{style:{color:'#4ade80',fontWeight:600,alignSelf:'center'}},status):null,
+          selected?React.createElement('span',{style:{color:'#60a5fa',fontWeight:600,alignSelf:'center',marginLeft:8}},'Selected: '+(FIELD_LABELS[selected]||selected)+' (use arrow keys)'):React.createElement('span',{style:{color:'#999',alignSelf:'center',marginLeft:8}},'Click a field to select it')
+        ),
+        groups.map(function(group){
+          return React.createElement('div',{key:group.title,className:'card',style:{marginBottom:12,padding:16}},
+            React.createElement('h4',{style:{marginBottom:12,borderBottom:'1px solid #eee',paddingBottom:8}},group.title),
+            React.createElement('table',{style:{width:'100%',borderCollapse:'collapse'}},
+              React.createElement('thead',null,
+                React.createElement('tr',null,
+                  React.createElement('th',{style:{textAlign:'left',padding:'4px 8px',width:'40%'}},'Field'),
+                  React.createElement('th',{style:{textAlign:'center',padding:'4px 8px',width:'30%'}},'Up / Down'),
+                  React.createElement('th',{style:{textAlign:'center',padding:'4px 8px',width:'30%'}},'Left / Right')
+                )
+              ),
+              React.createElement('tbody',null,
+                (function(){
+                  var rows=[];
+                  for(var fi=0;fi<group.fields.length;fi++){
+                    (function(fk){
+                      var pos=alignData[fk]||{row:1,col:1};
+                      var isSelected=selected===fk;
+                      rows.push(React.createElement('tr',{key:fk,onClick:function(){setSelected(fk)},style:{background:isSelected?'rgba(233,69,96,0.1)':'transparent',cursor:'pointer',borderBottom:'1px solid #f0f0f0'}},
+                        React.createElement('td',{style:{padding:'6px 8px',fontSize:13,fontWeight:isSelected?700:400}},FIELD_LABELS[fk]||fk),
+                        React.createElement('td',{style:{textAlign:'center',padding:'6px 4px'}},
+                          React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:4}},
+                            React.createElement('button',{onClick:function(e){e.stopPropagation();nudge(fk,'row',-1)},style:{width:26,height:26,cursor:'pointer',border:'1px solid #ccc',borderRadius:4,background:'#f8f8f8'}},String.fromCharCode(9650)),
+                            React.createElement('input',{type:'number',value:pos.row,onClick:function(e){e.stopPropagation()},onChange:function(e){updateField(fk,'row',e.target.value)},style:{width:45,textAlign:'center',padding:'2px 4px',border:'1px solid #ccc',borderRadius:4}}),
+                            React.createElement('button',{onClick:function(e){e.stopPropagation();nudge(fk,'row',1)},style:{width:26,height:26,cursor:'pointer',border:'1px solid #ccc',borderRadius:4,background:'#f8f8f8'}},String.fromCharCode(9660))
+                          )
+                        ),
+                        React.createElement('td',{style:{textAlign:'center',padding:'6px 4px'}},
+                          React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:4}},
+                            React.createElement('button',{onClick:function(e){e.stopPropagation();nudge(fk,'col',-1)},style:{width:26,height:26,cursor:'pointer',border:'1px solid #ccc',borderRadius:4,background:'#f8f8f8'}},String.fromCharCode(9664)),
+                            React.createElement('input',{type:'number',value:pos.col,onClick:function(e){e.stopPropagation()},onChange:function(e){updateField(fk,'col',e.target.value)},style:{width:45,textAlign:'center',padding:'2px 4px',border:'1px solid #ccc',borderRadius:4}}),
+                            React.createElement('button',{onClick:function(e){e.stopPropagation();nudge(fk,'col',1)},style:{width:26,height:26,cursor:'pointer',border:'1px solid #ccc',borderRadius:4,background:'#f8f8f8'}},String.fromCharCode(9654))
+                          )
+                        )
+                      ));
+                    })(group.fields[fi]);
+                  }
+                  return rows;
+                })()
+              )
+            )
+          );
+        })
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+</body>
+</html>
