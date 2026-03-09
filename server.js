@@ -1,1419 +1,505 @@
-var express = require('express');
-var multer = require('multer');
-var XLSX = require('xlsx');
-var pdfParse = require('pdf-parse');
-var fs = require('fs');
-var path = require('path');
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const multer = require('multer');
 
-var app = express();
-var PORT = process.env.PORT || 3000;
-var DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || './data';
-var DATA_FILE = path.join(DATA_DIR, 'manifest-data.json');
-var upload = multer({ dest: path.join(DATA_DIR, 'uploads/') });
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Ensure data directories exist
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// Use persistent volume on Railway, local directory otherwise
+var DATA_DIR = __dirname;
+if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
+  DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+  console.log('Using Railway volume: ' + DATA_DIR);
+} else if (process.env.RAILWAY_ENVIRONMENT) {
+  DATA_DIR = '/data';
+  console.log('Using Railway data dir: ' + DATA_DIR);
 }
-var PROFILES_DIR = path.join(DATA_DIR, 'profiles');
-if (!fs.existsSync(PROFILES_DIR)) {
-  fs.mkdirSync(PROFILES_DIR, { recursive: true });
-}
+if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
 
-// Initialize data
-var defaultData = {
-  generators: [],
-  transporters: [],
-  facilities: [],
-  wasteStreams: [],
-  manifests: [],
-  profiles: []
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+
+const defaultData = {
+  drivers: [
+    {id:'d1',name:'Brian',role:'Driver',skills:[]},
+    {id:'d2',name:'Dicky',role:'Driver',skills:[]},
+    {id:'d3',name:'Kevin',role:'Driver',skills:[]},
+    {id:'d4',name:'Lenny',role:'Driver',skills:[]},
+    {id:'d5',name:'Oscar',role:'Driver',skills:[]},
+    {id:'d6',name:'Tony',role:'Driver',skills:[]},
+    {id:'d7',name:'John',role:'Driver',skills:[]},
+    {id:'d8',name:'Kasey',role:'Tech',skills:[]},
+    {id:'d9',name:'Chucky',role:'Warehouse',skills:[]},
+    {id:'d10',name:'Blake',role:'Sales/Driver',skills:[]},
+    {id:'d11',name:'Miguel',role:'Driver',skills:[]},
+    {id:'d12',name:'Trevor',role:'Tech',skills:[]},
+  ],
+  trucks: [
+    {id:'t1',name:'Truck 1',type:'Standard',status:'Active'},
+    {id:'t2',name:'Truck 2',type:'Standard',status:'Active'},
+    {id:'t3',name:'Truck 3',type:'Flatbed',status:'Active'},
+    {id:'t4',name:'Truck 4',type:'Standard',status:'Active'},
+    {id:'t5',name:'Truck 5',type:'Standard',status:'Active'},
+    {id:'t6',name:'Truck 6',type:'Standard',status:'Active'},
+    {id:'t7',name:'Truck 7',type:'Standard',status:'Active'},
+    {id:'t8',name:'Truck 8',type:'Standard',status:'Active'},
+    {id:'t9',name:'Truck 9',type:'Vac Truck',status:'Active'},
+  ],
+  trailers: [
+    {id:'tr1',name:'Trailer 1',type:'Standard'},
+    {id:'tr2',name:'Trailer 2',type:'Flatbed'},
+    {id:'tr3',name:'Trailer 3',type:'Tanker'},
+  ],
+  jobs: [],
+  customers: [],
+  equipment: ['Liftgate','Drum Dolly','Placards','PPE','Bins','Totes'],
+  locations: ['EWS','Brenntag Fresno','Brenntag Richmond','Coast','GQ','Avenal','Lost Hills','Madera','Thatcher','Bolthouse','Leprinos','Eagle Quick Lube','Faraday','PAC','PRR','Local Route','Parc/Atlas/High Bar','F&T Farms']
 };
 
 function loadData() {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      var raw = fs.readFileSync(DATA_FILE, 'utf8');
-      return JSON.parse(raw);
-    }
-  } catch (e) {
-    console.error('Error loading data:', e);
-  }
-  return JSON.parse(JSON.stringify(defaultData));
+    if (fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  } catch (e) { console.error('Error loading data:', e.message); }
+  saveData(defaultData);
+  return defaultData;
 }
 
-function saveData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+function saveData(d) { fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2)); }
+
+function createBackup() {
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
+    var date = new Date().toISOString().slice(0, 10);
+    var backupFile = path.join(BACKUP_DIR, 'data-' + date + '.json');
+    if (!fs.existsSync(backupFile) && fs.existsSync(DATA_FILE)) {
+      fs.copyFileSync(DATA_FILE, backupFile);
+      console.log('Backup created: ' + backupFile);
+      var files = fs.readdirSync(BACKUP_DIR).sort();
+      while (files.length > 30) fs.unlinkSync(path.join(BACKUP_DIR, files.shift()));
+    }
+  } catch(e) { console.error('Backup error:', e.message); }
 }
 
 var data = loadData();
-// Ensure profiles array exists for older data files
-if (!data.profiles) { data.profiles = []; saveData(data); }
+if (!data.locations) { data.locations = defaultData.locations; saveData(data); }
+if (!data.customers) { data.customers = []; saveData(data); }
+console.log('DATA_DIR = ' + DATA_DIR);
+console.log('DATA_FILE = ' + DATA_FILE);
+console.log('RAILWAY_VOLUME_MOUNT_PATH = ' + (process.env.RAILWAY_VOLUME_MOUNT_PATH || 'NOT SET'));
+console.log('Data file exists: ' + fs.existsSync(DATA_FILE));
+console.log('Drivers count: ' + data.drivers.length);
+console.log('Jobs count: ' + data.jobs.length);
+createBackup();
+setInterval(createBackup, 3600000);
 
-// Middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// SSE connections
-var sseClients = [];
-app.get('/api/events', function(req, res) {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
-  });
-  res.write('data: connected\n\n');
-  sseClients.push(res);
-  req.on('close', function() {
-    sseClients = sseClients.filter(function(c) { return c !== res; });
-  });
-});
-
-function broadcast(event, payload) {
-  var msg = 'event: ' + event + '\ndata: ' + JSON.stringify(payload) + '\n\n';
-  sseClients.forEach(function(c) { c.write(msg); });
+var clients = [];
+function broadcast(msg) {
+  var payload = 'data: ' + JSON.stringify(msg) + '\n\n';
+  clients.forEach(function(res) { res.write(payload); });
 }
 
-// Get all data
-app.get('/api/data', function(req, res) {
-  res.json(data);
+app.use(express.json({ limit: '5mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// DOCUMENTS / FILE UPLOADS
+var UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); }
+var DOCS_FILE = path.join(DATA_DIR, 'documents.json');
+
+function loadDocs() {
+  try {
+    if (fs.existsSync(DOCS_FILE)) return JSON.parse(fs.readFileSync(DOCS_FILE, 'utf8'));
+  } catch(e) { console.error('Error loading docs:', e.message); }
+  return [];
+}
+function saveDocs(docs) { fs.writeFileSync(DOCS_FILE, JSON.stringify(docs, null, 2)); }
+var documents = loadDocs();
+
+var upload = multer({
+  storage: multer.diskStorage({
+    destination: function(req, file, cb) { cb(null, UPLOADS_DIR); },
+    filename: function(req, file, cb) { cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')); }
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// CRUD for each collection
-var collections = ['generators', 'transporters', 'facilities', 'wasteStreams', 'manifests'];
+app.get('/api/documents', function(req, res) { res.json(documents); });
 
-collections.forEach(function(col) {
-  // Get all
-  app.get('/api/' + col, function(req, res) {
-    res.json(data[col] || []);
-  });
-
-  // Create
-  app.post('/api/' + col, function(req, res) {
-    var item = req.body;
-    item.id = Date.now().toString();
-    item.createdAt = new Date().toISOString();
-    if (!data[col]) data[col] = [];
-    data[col].push(item);
-    saveData(data);
-    broadcast('update', { collection: col, action: 'create', item: item });
-    res.json(item);
-  });
-
-  // Update
-  app.put('/api/' + col + '/:id', function(req, res) {
-    var idx = -1;
-    for (var i = 0; i < (data[col] || []).length; i++) {
-      if (data[col][i].id === req.params.id) { idx = i; break; }
-    }
-    if (idx === -1) return res.status(404).json({ error: 'Not found' });
-    data[col][idx] = Object.assign({}, data[col][idx], req.body);
-    saveData(data);
-    broadcast('update', { collection: col, action: 'update', item: data[col][idx] });
-    res.json(data[col][idx]);
-  });
-
-  // Delete single
-  app.delete('/api/' + col + '/:id', function(req, res) {
-    var before = (data[col] || []).length;
-    data[col] = (data[col] || []).filter(function(item) { return item.id !== req.params.id; });
-    if (data[col].length === before) return res.status(404).json({ error: 'Not found' });
-    saveData(data);
-    broadcast('update', { collection: col, action: 'delete', id: req.params.id });
-    res.json({ success: true });
-  });
+app.post('/api/documents', upload.single('file'), function(req, res) {
+  if (!req.file) return res.status(400).json({error:'No file uploaded'});
+  var doc = {
+    id: 'doc' + Date.now(),
+    name: req.file.originalname,
+    filename: req.file.filename,
+    size: req.file.size,
+    type: req.file.mimetype,
+    uploadedAt: new Date().toISOString(),
+    category: req.body.category || 'General'
+  };
+  documents.push(doc);
+  saveDocs(documents);
+  res.json(doc);
 });
 
-// Waste Streams routes (HTML uses /api/waste-streams with hyphen)
-app.get('/api/waste-streams', function(req, res) { res.json(data.wasteStreams || []); });
-app.post('/api/waste-streams', function(req, res) {
-  var item = req.body; item.id = Date.now().toString(); item.createdAt = new Date().toISOString();
-  if (!data.wasteStreams) data.wasteStreams = [];
-  data.wasteStreams.push(item); saveData(data);
-  broadcast('update', { collection: 'wasteStreams', action: 'create', item: item }); res.json(item);
-});
-app.put('/api/waste-streams/:id', function(req, res) {
-  var idx = -1;
-  for (var i = 0; i < (data.wasteStreams || []).length; i++) { if (data.wasteStreams[i].id === req.params.id) { idx = i; break; } }
-  if (idx === -1) return res.status(404).json({ error: 'Not found' });
-  data.wasteStreams[idx] = Object.assign({}, data.wasteStreams[idx], req.body); saveData(data);
-  broadcast('update', { collection: 'wasteStreams', action: 'update', item: data.wasteStreams[idx] }); res.json(data.wasteStreams[idx]);
-});
-app.delete('/api/waste-streams/:id', function(req, res) {
-  var before = (data.wasteStreams || []).length;
-  data.wasteStreams = (data.wasteStreams || []).filter(function(item) { return item.id !== req.params.id; });
-  if (data.wasteStreams.length === before) return res.status(404).json({ error: 'Not found' });
-  saveData(data); broadcast('update', { collection: 'wasteStreams', action: 'delete', id: req.params.id }); res.json({ success: true });
+app.get('/api/documents/:id/download', function(req, res) {
+  var doc = documents.find(function(d) { return d.id === req.params.id; });
+  if (!doc) return res.status(404).json({error:'Not found'});
+  var filePath = path.join(UPLOADS_DIR, doc.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({error:'File not found'});
+  res.download(filePath, doc.name);
 });
 
-// ===== PROFILES (stored PDFs) =====
-// List all stored profiles
-app.get('/api/profiles', function(req, res) {
-  res.json(data.profiles || []);
-});
-
-// Serve a profile PDF file
-app.get('/api/profiles/:id/pdf', function(req, res) {
-  var profile = null;
-  for (var i = 0; i < (data.profiles || []).length; i++) {
-    if (data.profiles[i].id === req.params.id) { profile = data.profiles[i]; break; }
-  }
-  if (!profile) return res.status(404).json({ error: 'Profile not found' });
-  var filePath = path.join(PROFILES_DIR, profile.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'PDF file not found' });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'inline; filename="' + profile.originalName + '"');
+app.get('/api/documents/:id/view', function(req, res) {
+  var doc = documents.find(function(d) { return d.id === req.params.id; });
+  if (!doc) return res.status(404).json({error:'Not found'});
+  var filePath = path.join(UPLOADS_DIR, doc.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({error:'File not found'});
+  var ext = doc.name.split('.').pop().toLowerCase();
+  var mimeTypes = {
+    'pdf':'application/pdf','png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg',
+    'gif':'image/gif','txt':'text/plain','csv':'text/csv','html':'text/html',
+    'doc':'application/msword','docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls':'application/vnd.ms-excel','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  };
+  var mime = mimeTypes[ext] || 'application/octet-stream';
+  res.setHeader('Content-Type', mime);
+  res.setHeader('Content-Disposition', 'inline; filename="' + doc.name + '"');
   fs.createReadStream(filePath).pipe(res);
 });
 
-// Delete a stored profile
-app.delete('/api/profiles/:id', function(req, res) {
-  var idx = -1;
-  for (var i = 0; i < (data.profiles || []).length; i++) {
-    if (data.profiles[i].id === req.params.id) { idx = i; break; }
-  }
-  if (idx === -1) return res.status(404).json({ error: 'Not found' });
-  var profile = data.profiles[idx];
-  // Delete the PDF file
-  var filePath = path.join(PROFILES_DIR, profile.filename);
-  try { fs.unlinkSync(filePath); } catch (e) {}
-  data.profiles.splice(idx, 1);
-  saveData(data);
-  broadcast('update', { collection: 'profiles', action: 'delete', id: req.params.id });
-  res.json({ success: true });
+app.delete('/api/documents/:id', function(req, res) {
+  var doc = documents.find(function(d) { return d.id === req.params.id; });
+  if (!doc) return res.status(404).json({error:'Not found'});
+  var filePath = path.join(UPLOADS_DIR, doc.filename);
+  try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch(e) {}
+  documents = documents.filter(function(d) { return d.id !== req.params.id; });
+  saveDocs(documents);
+  res.json({ok:true});
 });
 
-// Merge/move profiles from one generator to another
-app.post('/api/profiles/merge', function(req, res) {
-  var fromGen = req.body.from;
-  var toGen = req.body.to;
-  if (!fromGen || !toGen) return res.status(400).json({ error: 'Both "from" and "to" generator names required' });
-  var count = 0;
-  for (var i = 0; i < (data.profiles || []).length; i++) {
-    if (data.profiles[i].generatorName === fromGen) {
-      data.profiles[i].generatorName = toGen;
-      count++;
-    }
-  }
-  if (count === 0) return res.status(404).json({ error: 'No profiles found for generator "' + fromGen + '"' });
-  saveData(data);
-  broadcast('update', { collection: 'profiles', action: 'merge' });
-  res.json({ success: true, moved: count });
-});
-
-// Helper: save an imported profile PDF
-function saveProfilePDF(reqFile, profileId, source, wasteStreamName, generatorName, originalFilename) {
-  var ext = path.extname(originalFilename || reqFile.originalname || '.pdf');
-  var safeFilename = profileId + '-' + Date.now() + ext;
-  var destPath = path.join(PROFILES_DIR, safeFilename);
-  fs.copyFileSync(reqFile.path, destPath);
-  var profileRecord = {
-    id: Date.now().toString(),
-    profileId: profileId,
-    source: source,
-    wasteStreamName: wasteStreamName,
-    generatorName: generatorName,
-    originalName: originalFilename || reqFile.originalname || 'profile.pdf',
-    filename: safeFilename,
-    fileSize: reqFile.size || 0,
-    importedAt: new Date().toISOString()
-  };
-  if (!data.profiles) data.profiles = [];
-  data.profiles.push(profileRecord);
-  saveData(data);
-  broadcast('update', { collection: 'profiles', action: 'create', item: profileRecord });
-  return profileRecord;
-}
-
-// Delete ALL generators
-app.delete('/api/generators', function(req, res) {
-  var count = data.generators.length;
-  data.generators = [];
-  saveData(data);
-  broadcast('update', { collection: 'generators', action: 'clearAll' });
-  res.json({ success: true, deleted: count });
-});
-
-// QuickBooks Import
-app.post('/api/import/quickbooks', upload.single('file'), function(req, res) {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    var workbook = XLSX.readFile(req.file.path);
-    var sheetName = workbook.SheetNames[0];
-    var sheet = workbook.Sheets[sheetName];
-    var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-    // Find the header row (look for "Customer full name" or similar)
-    var headerRowIdx = -1;
-    var headers = [];
-    for (var r = 0; r < Math.min(rows.length, 10); r++) {
-      var row = rows[r];
-      if (!row) continue;
-      for (var c = 0; c < row.length; c++) {
-        var cell = String(row[c] || '').toLowerCase().trim();
-        if (cell.indexOf('customer') !== -1 && cell.indexOf('name') !== -1) {
-          headerRowIdx = r;
-          headers = row.map(function(h) { return String(h || '').trim(); });
-          break;
-        }
-      }
-      if (headerRowIdx !== -1) break;
-    }
-
-    if (headerRowIdx === -1) {
-      return res.status(400).json({ error: 'Could not find header row with Customer name column' });
-    }
-
-    // Flexible column finder
-    function findCol(keywords) {
-      for (var i = 0; i < headers.length; i++) {
-        var h = headers[i].toLowerCase();
-        var match = true;
-        for (var k = 0; k < keywords.length; k++) {
-          if (h.indexOf(keywords[k].toLowerCase()) === -1) { match = false; break; }
-        }
-        if (match) return i;
-      }
-      return -1;
-    }
-
-    var nameCol = findCol(['customer', 'name']);
-    var phoneCol = findCol(['phone']);
-    var billCol = findCol(['bill']);
-    var shipCol = findCol(['ship']);
-    var epaCol = findCol(['epa']);
-
-    // Parse address string like "4780 E Carmen Ave Fresno CA 93702"
-    function parseAddress(addr) {
-      if (!addr) return { street: '', city: '', state: '', zip: '' };
-      var str = String(addr).trim();
-      var parts = str.split(',');
-      if (parts.length >= 2) {
-        var street = parts[0].trim();
-        var rest = parts.slice(1).join(',').trim();
-        var stateZipMatch = rest.match(/\s*([A-Za-z]{2})\s+(\d{5}(-\d{4})?)\s*$/);
-        if (stateZipMatch) {
-          var city = rest.substring(0, rest.length - stateZipMatch[0].length).trim().replace(/,\s*$/, '');
-          return { street: street, city: city, state: stateZipMatch[1].toUpperCase(), zip: stateZipMatch[2] };
-        }
-        var fallback = rest.match(/^(.+?)\s+([A-Za-z]{2})\s+(\d{5}(-\d{4})?)/);
-        if (fallback) {
-          return { street: street, city: fallback[1].trim(), state: fallback[2].toUpperCase(), zip: fallback[3] };
-        }
-        return { street: street, city: rest, state: '', zip: '' };
-      }
-      var noComma = str.match(/^(.+?)\s+([A-Za-z]+)\s+([A-Za-z]{2})\s+(\d{5}(-\d{4})?)$/);
-      if (noComma) {
-        return { street: noComma[1], city: noComma[2], state: noComma[3].toUpperCase(), zip: noComma[4] };
-      }
-      return { street: str, city: '', state: '', zip: '' };
-    }
-
-    var imported = 0;
-    for (var r2 = headerRowIdx + 1; r2 < rows.length; r2++) {
-      var dataRow = rows[r2];
-      if (!dataRow || !dataRow[nameCol]) continue;
-      var name = String(dataRow[nameCol] || '').trim();
-      if (!name) continue;
-
-      var exists = false;
-      for (var d = 0; d < data.generators.length; d++) {
-        if (data.generators[d].name === name) { exists = true; break; }
-      }
-      if (exists) continue;
-
-      var phone = phoneCol !== -1 ? String(dataRow[phoneCol] || '').trim() : '';
-      var billAddr = billCol !== -1 ? parseAddress(dataRow[billCol]) : { street: '', city: '', state: '', zip: '' };
-      var shipAddr = shipCol !== -1 ? parseAddress(dataRow[shipCol]) : { street: '', city: '', state: '', zip: '' };
-      var epaId = epaCol !== -1 ? String(dataRow[epaCol] || '').trim() : '';
-
-      data.generators.push({
-        id: Date.now().toString() + '_' + r2,
-        name: name,
-        epaId: epaId,
-        phone: phone,
-        contactName: '',
-        emergencyPhone: '',
-        mailAddress: billAddr.street,
-        mailCity: billAddr.city,
-        mailState: billAddr.state,
-        mailZip: billAddr.zip,
-        siteAddress: shipAddr.street,
-        city: shipAddr.city,
-        state: shipAddr.state,
-        zip: shipAddr.zip,
-        createdAt: new Date().toISOString()
-      });
-      imported++;
-    }
-
-    saveData(data);
-    broadcast('update', { collection: 'generators', action: 'import' });
-    try { fs.unlinkSync(req.file.path); } catch (e) {}
-
-    res.json({
-      success: true,
-      imported: imported,
-      total: data.generators.length,
-      columns: { name: nameCol, phone: phoneCol, bill: billCol, ship: shipCol, epa: epaCol },
-      headers: headers
-    });
-  } catch (err) {
-    console.error('Import error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Waste Profile PDF Import
-app.post('/api/import/waste-profile', upload.single('file'), function(req, res) {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    var buffer = fs.readFileSync(req.file.path);
-    pdfParse(buffer).then(function(pdfData) {
-      var text = pdfData.text;
-      var lines = text.split('\n').map(function(l) { return l.trim(); });
-      var fullText = text;
-
-      // Helper: find text after a label
-      function findAfter(label) {
-        var idx = fullText.indexOf(label);
-        if (idx === -1) return '';
-        var after = fullText.substring(idx + label.length);
-        // Get text until next newline or next label-like pattern
-        var match = after.match(/^\s*:?\s*([^\n]*)/);
-        return match ? match[1].trim() : '';
-      }
-
-      // Helper: find text between two labels
-      function findBetween(startLabel, endLabel) {
-        var startIdx = fullText.indexOf(startLabel);
-        if (startIdx === -1) return '';
-        var after = fullText.substring(startIdx + startLabel.length);
-        var endIdx = endLabel ? after.indexOf(endLabel) : after.indexOf('\n');
-        if (endIdx === -1) endIdx = Math.min(after.length, 200);
-        return after.substring(0, endIdx).trim().replace(/^\s*:?\s*/, '');
-      }
-
-      // ===== DETECT EWS PROFILE FORMAT =====
-      var isEWS = fullText.indexOf('Environmental Waste Solution') !== -1 || fullText.indexOf('EWS') !== -1 && fullText.indexOf('GENERATOR WASTE PROFILE SHEET') !== -1;
-
-      if (isEWS) {
-        console.log('Detected EWS profile format');
-
-        // Profile Number - just need "EWS" + the numbers after it (e.g. EWS41291)
-        var ewsProfileId = '';
-        // First try: collapse all spaces/underscores from the full text and look for EWS followed by digits
-        var collapsed = fullText.replace(/[\s_]+/g, '');
-        var ewsNumMatch = collapsed.match(/EWS(\d{3,})/i);
-        if (ewsNumMatch) {
-          ewsProfileId = 'EWS' + ewsNumMatch[1];
-        }
-        // Fallback: check near Profile Number label
-        if (!ewsProfileId) {
-          var pidLine = fullText.match(/Profile Number[:\s]+([^\n]+)/i);
-          if (pidLine) {
-            var pidCollapsed = pidLine[1].replace(/[\s_]+/g, '');
-            var pidNumMatch = pidCollapsed.match(/EWS(\d{3,})/i);
-            if (pidNumMatch) ewsProfileId = 'EWS' + pidNumMatch[1];
-          }
-        }
-
-        // Generator info
-        var ewsGenName = '';
-        var gnMatch = fullText.match(/Generator Name[:\s]+([^\n]+)/i);
-        if (gnMatch) ewsGenName = gnMatch[1].trim();
-
-        var ewsEpaId = '';
-        // EPA ID may be on same line or a few lines below the label
-        var epaMatch = fullText.match(/EPA Identification Number[:\s]+([A-Z]{2}[A-Z0-9]{8,})/i);
-        if (epaMatch) {
-          ewsEpaId = epaMatch[1].trim();
-        } else {
-          // Look for standalone EPA ID pattern (2 letters + 9+ alphanumeric) near the label
-          var epaBlock = fullText.match(/EPA Identification Number[\s\S]{0,200}/i);
-          if (epaBlock) {
-            var epaLineMatch = epaBlock[0].match(/\b([A-Z]{2}[A-Z0-9]{8,12})\b/);
-            if (epaLineMatch) ewsEpaId = epaLineMatch[1].trim();
-          }
-        }
-
-        // Is EPA Hazardous Waste?
-        var ewsIsHaz = false;
-        var hazMatch = fullText.match(/US EPA HAZARDOUS WASTE[^)]*\)?\s*\??\s*(YES|NO)/i);
-        if (hazMatch) ewsIsHaz = hazMatch[1].toUpperCase() === 'YES';
-
-        // State Codes
-        var ewsStateCodes = '';
-        var scMatch = fullText.match(/State Codes[:\s]+([^\n]+)/i);
-        if (scMatch) {
-          ewsStateCodes = scMatch[1].trim().replace(/[A-Za-z]+-?/g, '').replace(/\s+/g, ' ').trim();
-          if (ewsStateCodes.toLowerCase() === 'none' || ewsStateCodes === '') ewsStateCodes = '';
-        }
-
-        // Waste Name (field 11a or "Common Waste Name" or "Waste Name")
-        var ewsWasteName = '';
-        var wnMatch = fullText.match(/(?:Common )?Waste Name[:\s]+([^\n]+)/i);
-        if (wnMatch) ewsWasteName = wnMatch[1].trim();
-        // Clean trailing field numbers
-        ewsWasteName = ewsWasteName.replace(/\s*\d+\.\s*US DOT.*$/i, '').trim();
-
-        // DOT Proper Shipping Name (field 11b or 13)
-        var ewsDotDesc = '';
-        var dotMatch = fullText.match(/(?:US )?DOT Proper Shipping Name[:\s]+([^\n]+)/i);
-        if (dotMatch) ewsDotDesc = dotMatch[1].trim();
-        // Clean up trailing field labels
-        ewsDotDesc = ewsDotDesc.replace(/\s*\d+\.\s*Physical.*$/i, '').trim();
-
-        // Try to extract UN/NA from the DOT description itself
-        var ewsUnNum = '';
-        var ewsUnMatch = ewsDotDesc.match(/\b(UN\d{4,5}|NA\d{4,5})\b/i);
-        if (ewsUnMatch) ewsUnNum = ewsUnMatch[1];
-
-        // Hazard class and packing group from description if present
-        var ewsHazClass = '';
-        var ewsPG = '';
-        var ewsHcMatch = ewsDotDesc.match(/\b(\d\.\d)\b/);
-        if (ewsHcMatch && ewsIsHaz) ewsHazClass = ewsHcMatch[1];
-        var ewsPgMatch = ewsDotDesc.match(/\bPG\s*(I{1,3})\b/i) || ewsDotDesc.match(/\b(I{1,3})\s*$/);
-        if (ewsPgMatch && ewsIsHaz) ewsPG = ewsPgMatch[1];
-
-        // Uppercase DOT description
-        if (ewsDotDesc) ewsDotDesc = ewsDotDesc.toUpperCase();
-        // If N.O.S., append common name
-        if (ewsDotDesc && ewsDotDesc.match(/N\.O\.S\.?\s*$/) && ewsWasteName) {
-          ewsDotDesc = ewsDotDesc + ' (' + ewsWasteName.toUpperCase() + ')';
-        }
-
-        // RCRA waste codes from description or text
-        var ewsRcraCodes = '';
-        var ewsRcraMatch = fullText.match(/RCRA Waste Codes?[:\s]+([A-Z0-9\s,]+)/i);
-        if (ewsRcraMatch) {
-          ewsRcraCodes = ewsRcraMatch[1].trim().replace(/\s+/g, ' ');
-          if (ewsRcraCodes.toLowerCase() === 'none') ewsRcraCodes = '';
-        }
-
-        // Physical state
-        var ewsPhysical = '';
-        var physMatch = fullText.match(/Physical State[^X\n]*X\s*(\w+)/i);
-        if (physMatch) ewsPhysical = physMatch[1].trim();
-
-        // Composition
-        var ewsComposition = '';
-        var compMatch = fullText.match(/Waste Composition[:\s]+([^\n]+([\n][A-Z][\w\s%.-]+)*)/i);
-        if (compMatch) ewsComposition = compMatch[1].replace(/\n/g, '; ').trim();
-
-        // pH and Flash Point from characteristic section
-        var ewsPH = '';
-        var phMatch = fullText.match(/pH[:\s]+([\d.-]+)/i);
-        if (phMatch) ewsPH = phMatch[1].trim();
-
-        var ewsFlash = '';
-        var fpMatch = fullText.match(/Flash Point[:\s]+([^\n]+)/i);
-        if (fpMatch) ewsFlash = fpMatch[1].trim().split(/\s{2,}/)[0].trim();
-
-        var ewsWasteStream = {
-          id: Date.now().toString(),
-          name: ewsWasteName || 'EWS Profile ' + ewsProfileId,
-          dotDescription: ewsDotDesc,
-          hm: ewsIsHaz ? 'X' : '',
-          containerType: '',
-          unit: '',
-          wasteCodes: ewsRcraCodes,
-          unNum: ewsUnNum,
-          hazardClass: ewsHazClass,
-          packingGroup: ewsPG,
-          stateWasteCodes: ewsStateCodes,
-          ergNum: '',
-          profileId: ewsProfileId,
-          source: 'EWS',
-          generatorName: ewsGenName,
-          generatorEpaId: ewsEpaId,
-          composition: ewsComposition,
-          physicalState: ewsPhysical,
-          pH: ewsPH,
-          flashPoint: ewsFlash,
-          createdAt: new Date().toISOString()
-        };
-
-        // Check for duplicate
-        var ewsExists = false;
-        for (var ed = 0; ed < (data.wasteStreams || []).length; ed++) {
-          if (data.wasteStreams[ed].name === ewsWasteStream.name) { ewsExists = true; break; }
-        }
-        if (ewsExists) {
-          try { fs.unlinkSync(req.file.path); } catch (e) {}
-          return res.json({ success: false, error: 'A waste stream named "' + ewsWasteStream.name + '" already exists.', extracted: ewsWasteStream });
-        }
-
-        if (!data.wasteStreams) data.wasteStreams = [];
-        data.wasteStreams.push(ewsWasteStream);
-        saveData(data);
-        broadcast('update', { collection: 'wasteStreams', action: 'create', item: ewsWasteStream });
-        saveProfilePDF(req.file, ewsProfileId, 'EWS', ewsWasteStream.name, ewsGenName, req.file.originalname);
-        try { fs.unlinkSync(req.file.path); } catch (e) {}
-
-        return res.json({ success: true, wasteStream: ewsWasteStream, source: 'EWS' });
-      }
-
-      // ===== DETECT SAMEX PROFILE FORMAT =====
-      var isSamex = fullText.indexOf('WASTE PROFILE') !== -1 && fullText.indexOf('A.- Generator Information') !== -1 && fullText.indexOf('I.- Trans Information') !== -1;
-
-      if (isSamex) {
-        console.log('Detected Samex profile format');
-
-        // Profile Number - "Profile# 36183" -> "SMX36183"
-        var smxProfileId = '';
-        var smxPidMatch = fullText.match(/Profile#\s*(\d+)/i);
-        if (smxPidMatch) smxProfileId = 'SMX' + smxPidMatch[1];
-
-        // Generator Name - appears between "Generator Module" and "Name:" in raw text
-        var smxGenName = '';
-        var genBlock = fullText.match(/Generator (?:Module|Information)[\s\S]{0,500}/i);
-        if (genBlock) {
-          // Try the line right after "Generator Module" text and before "Name:"
-          var genLines = genBlock[0].split('\n');
-          for (var gl = 0; gl < genLines.length; gl++) {
-            var gline = genLines[gl].trim();
-            if (gline.length > 10 && gline === gline.toUpperCase() && gline.indexOf('*') === -1 && gline.indexOf('Generator') === -1 && gline.indexOf('WASTE') === -1 && gline.indexOf('ALL ') === -1 && gline.indexOf('Module') === -1) {
-              smxGenName = gline;
-              break;
-            }
-          }
-        }
-        // Fallback: try "Name:" label directly
-        if (!smxGenName) {
-          var nameMatch = fullText.match(/(?:^|\n)\s*Name:\s*([^\n]+)/);
-          if (nameMatch && nameMatch[1].trim().length > 3) smxGenName = nameMatch[1].trim();
-        }
-
-        // EPA ID
-        var smxEpaId = '';
-        var smxEpaMatch = fullText.match(/EPA ID#?[:\s]+([A-Z]{2}[A-Z0-9]{8,})/i);
-        if (!smxEpaMatch) {
-          // EPA ID may be on a separate line
-          var epaBlock = fullText.match(/EPA ID#?[\s\S]{0,100}/i);
-          if (epaBlock) {
-            var epaLineMatch = epaBlock[0].match(/\b([A-Z]{2}[A-Z0-9]{8,12})\b/);
-            if (epaLineMatch) smxEpaId = epaLineMatch[1];
-          }
-        } else {
-          smxEpaId = smxEpaMatch[1];
-        }
-
-        // Generator address
-        var smxAddress = '';
-        var smxCity = '';
-        var smxState = '';
-        var smxZip = '';
-        var siteAddrMatch = fullText.match(/Site\s*Address[:\s]+([^\n]+)/i);
-        if (siteAddrMatch) smxAddress = siteAddrMatch[1].trim();
-        // City/State/Zip after Site Address section
-        var addrBlock = fullText.match(/Site\s*Address[\s\S]{0,300}/i);
-        if (addrBlock) {
-          var cityMatch = addrBlock[0].match(/City[:\s]+([A-Z][A-Z\s]+)/i);
-          if (cityMatch) smxCity = cityMatch[1].trim();
-          var stateMatch = addrBlock[0].match(/State[:\s]+([A-Z]{2})/i);
-          if (stateMatch) smxState = stateMatch[1].trim();
-          var zipMatch = addrBlock[0].match(/Zip[:\s]+(\d{5})/);
-          if (zipMatch) smxZip = zipMatch[1].trim();
-        }
-
-        // State Waste Codes - in Samex PDFs, the value may be on a different line
-        var smxStateCodes = '';
-        var smxScBlock = fullText.match(/State Waste\s*Code\(s\)[\s\S]{0,300}?(?=Waste Common|Generating)/i);
-        if (smxScBlock) {
-          // Find standalone numbers (like 331) that aren't part of other fields
-          var scNums = smxScBlock[0].match(/\b(\d{3,4})\b/g);
-          if (scNums) {
-            // Filter out numbers that are likely D-code numbers
-            var stateOnly = [];
-            for (var sn = 0; sn < scNums.length; sn++) {
-              if (!smxScBlock[0].match(new RegExp('[DFKPU]' + scNums[sn]))) stateOnly.push(scNums[sn]);
-            }
-            smxStateCodes = stateOnly.join(' ');
-          }
-        }
-
-        // EPA Waste Codes
-        var smxWasteCodes = '';
-        var smxEpaWcBlock = fullText.match(/EPA Waste\s*Code\(s\)[\s\S]{0,200}/i);
-        if (smxEpaWcBlock) {
-          // Look for D/F/K/P/U codes in the block
-          var wcMatches = smxEpaWcBlock[0].match(/\b[DFKPU]\d{3}\b/g);
-          if (wcMatches) smxWasteCodes = wcMatches.join(' ');
-        }
-
-        // Is hazardous? Based on whether we have EPA waste codes or DOT Hazardous: Yes
-        var smxIsHaz = smxWasteCodes.length > 0;
-        var dotHazMatch = fullText.match(/DOT Hazardous[:\s]+(Yes|No)/i);
-        if (dotHazMatch && dotHazMatch[1].toUpperCase() === 'YES') smxIsHaz = true;
-
-        // Waste Common Name
-        var smxWasteName = '';
-        var smxWnMatch = fullText.match(/Waste Common\s*Name[:\s]+([^\n]+)/i);
-        if (smxWnMatch) smxWasteName = smxWnMatch[1].trim();
-        // Sometimes name is on the next line
-        if (!smxWasteName) {
-          var wnBlock = fullText.match(/Waste Common\s*\n([^\n]+)/i);
-          if (wnBlock) smxWasteName = wnBlock[1].replace(/Name[:\s]*/i, '').trim();
-        }
-
-        // DOT Shipping Name
-        var smxDotDesc = '';
-        var smxDotMatch = fullText.match(/DOT Shipping Name[:\s]+([^\n]+)/i);
-        if (smxDotMatch) smxDotDesc = smxDotMatch[1].trim();
-
-        // UN/NA# - explicit field
-        var smxUnNum = '';
-        var smxUnMatch = fullText.match(/UN\/NA#[:\s]+((?:UN|NA)\d{4,5})/i);
-        if (smxUnMatch) smxUnNum = smxUnMatch[1];
-        // Fallback: extract from DOT shipping name
-        if (!smxUnNum) {
-          var dotUnMatch = (smxDotDesc || '').match(/\b(UN\d{4,5}|NA\d{4,5})\b/i);
-          if (dotUnMatch) smxUnNum = dotUnMatch[1];
-        }
-
-        // Hazard Class - explicit field
-        var smxHazClass = '';
-        var smxHcMatch = fullText.match(/Hazard Class[:\s]+(\d(?:\.\d)?)\b/i);
-        if (smxHcMatch && smxIsHaz) smxHazClass = smxHcMatch[1];
-
-        // ERG Number
-        var smxErg = '';
-        var smxErgMatch = fullText.match(/ERG#[:\s]+(\d{2,4})/i);
-        if (smxErgMatch) smxErg = smxErgMatch[1];
-
-        // Packing Group - "Group: II" or "Packaging Group: II"
-        var smxPG = '';
-        var smxPgMatch = fullText.match(/(?:Packaging\s*)?Group[:\s]+(I{1,3})\b/i);
-        if (smxPgMatch && smxIsHaz) smxPG = smxPgMatch[1];
-
-        // Physical State
-        var smxPhysical = '';
-        var physBlock = fullText.match(/Physical State[\s\S]{0,200}/i);
-        if (physBlock) {
-          // Look for the selected radio option (comes after the bullet markers in PDF text)
-          if (physBlock[0].match(/Liquid/i)) smxPhysical = 'Liquid';
-          else if (physBlock[0].match(/Solid/i)) smxPhysical = 'Solid';
-          else if (physBlock[0].match(/Sludge/i)) smxPhysical = 'Sludge';
-          else if (physBlock[0].match(/Gas/i)) smxPhysical = 'Gas';
-        }
-
-        // Container Size/Type
-        var smxContainer = '';
-        var smxContMatch = fullText.match(/Container \(Size\/Type\)[:\s]+([^\n]+)/i);
-        if (smxContMatch) smxContainer = smxContMatch[1].trim();
-
-        // Flash Point range
-        var smxFlash = '';
-        var flashBlock = fullText.match(/Flash Point[\s\S]{0,200}/i);
-        if (flashBlock) {
-          if (flashBlock[0].indexOf('<73') !== -1 && flashBlock[0].match(/\<73/)) smxFlash = '<73F';
-          else if (flashBlock[0].match(/73-100/)) smxFlash = '73-100F';
-          else if (flashBlock[0].match(/101-141/)) smxFlash = '101-141F';
-          else if (flashBlock[0].match(/141-200/)) smxFlash = '141-200F';
-          else if (flashBlock[0].match(/>200/)) smxFlash = '>200F';
-        }
-
-        // Chemical Composition - two-column table, values separated by blank lines
-        // Pattern: Name, (blank), Min%, (blank), Max%, (blank), [2nd col name]
-        var smxComposition = '';
-        var compBlock = fullText.match(/H\.\-?\s*Chemical Composition[\s\S]{0,1500}?(?=I\.\-?\s*Trans)/i);
-        if (compBlock) {
-          var chemLines = [];
-          // Strip blank lines to get clean sequence
-          var compNonBlank = compBlock[0].split('\n').map(function(l){return l.trim()}).filter(function(l){return l.length > 0});
-          // Find where actual data starts (after "Names)" header)
-          var dataStart = -1;
-          for (var cn = 0; cn < compNonBlank.length; cn++) {
-            if (compNonBlank[cn] === 'Names)' && cn > compNonBlank.length / 2) { dataStart = cn + 1; break; }
-          }
-          if (dataStart > 0) {
-            var ci = dataStart;
-            while (ci < compNonBlank.length) {
-              var chemName = compNonBlank[ci];
-              // Check if this is a chemical name followed by min and max numbers
-              if (chemName.match(/^[A-Za-z]/) && ci + 2 < compNonBlank.length) {
-                var minVal = compNonBlank[ci + 1];
-                var maxVal = compNonBlank[ci + 2];
-                if (minVal.match(/^\d{1,3}$/) && maxVal.match(/^\d{1,3}$/)) {
-                  chemLines.push(chemName + ' ' + minVal + '-' + maxVal + '%');
-                  ci += 3;
-                  // Skip 2nd column name if present (no numbers after it)
-                  if (ci < compNonBlank.length && compNonBlank[ci].match(/^[A-Za-z]/) && (ci + 1 >= compNonBlank.length || !compNonBlank[ci + 1].match(/^\d{1,3}$/))) {
-                    ci++;
-                  }
-                  continue;
-                }
-              }
-              ci++;
-            }
-          }
-          smxComposition = chemLines.join('; ');
-        }
-
-        // Build the DOT description for the manifest
-        // Strip UN/NA number, hazard class, and PG from the shipping name since they're stored separately
-        var smxDotForManifest = smxDotDesc.toUpperCase();
-        // Remove UN/NA number from front (loadWasteStream will re-add from unNum field)
-        smxDotForManifest = smxDotForManifest.replace(/\b(UN|NA)\d{4,5}\s*,?\s*/gi, '').trim();
-        // Remove trailing ", 3, II" or ", 3, III" etc (hazard class + PG at end)
-        if (smxHazClass) smxDotForManifest = smxDotForManifest.replace(new RegExp(',\\s*' + smxHazClass.replace('.', '\\.') + '\\s*$'), '').replace(new RegExp(',\\s*' + smxHazClass.replace('.', '\\.') + '\\s*,'), ',');
-        if (smxPG) smxDotForManifest = smxDotForManifest.replace(new RegExp(',\\s*' + smxPG + '\\s*$', 'i'), '');
-        // Clean up trailing/leading commas and spaces
-        smxDotForManifest = smxDotForManifest.replace(/^[\s,]+|[\s,]+$/g, '').replace(/,\s*,/g, ',').trim();
-
-        var smxWasteStream = {
-          id: Date.now().toString(),
-          name: smxWasteName || 'Samex Profile ' + smxProfileId,
-          dotDescription: smxDotForManifest,
-          hm: smxIsHaz ? 'X' : '',
-          containerType: smxContainer,
-          unit: '',
-          wasteCodes: smxWasteCodes,
-          unNum: smxUnNum,
-          hazardClass: smxHazClass,
-          packingGroup: smxPG,
-          stateWasteCodes: smxStateCodes,
-          ergNum: smxErg,
-          profileId: smxProfileId,
-          source: 'Samex',
-          generatorName: smxGenName,
-          generatorEpaId: smxEpaId,
-          generatorAddress: smxAddress,
-          generatorCity: smxCity,
-          generatorState: smxState,
-          generatorZip: smxZip,
-          composition: smxComposition,
-          physicalState: smxPhysical,
-          flashPoint: smxFlash,
-          createdAt: new Date().toISOString()
-        };
-
-        console.log('Samex parsed:', JSON.stringify(smxWasteStream, null, 2));
-
-        // Check for duplicate
-        var smxExists = false;
-        for (var sd = 0; sd < (data.wasteStreams || []).length; sd++) {
-          if (data.wasteStreams[sd].profileId === smxProfileId) { smxExists = true; break; }
-        }
-        if (smxExists) {
-          try { fs.unlinkSync(req.file.path); } catch (e) {}
-          return res.json({ success: false, error: 'A waste stream with profile "' + smxProfileId + '" already exists.', extracted: smxWasteStream });
-        }
-
-        if (!data.wasteStreams) data.wasteStreams = [];
-        data.wasteStreams.push(smxWasteStream);
-        saveData(data);
-        broadcast('update', { collection: 'wasteStreams', action: 'create', item: smxWasteStream });
-        saveProfilePDF(req.file, smxProfileId, 'Samex', smxWasteStream.name, smxGenName, req.file.originalname);
-        try { fs.unlinkSync(req.file.path); } catch (e) {}
-
-        return res.json({ success: true, wasteStream: smxWasteStream, source: 'Samex' });
-      }
-
-      // ===== REPUBLIC PROFILE FORMAT (original parser) =====
-      // Extract fields
-      var commonName = '';
-      var dotDescription = '';
-      var isHazMat = false;
-      //var containerType = ''; // excluded - varies per shipment
-      //var unitOfMeasure = ''; // excluded - varies per shipment
-      var wasteCodes = '';
-      var unNum = '';
-      var hazardClass = '';
-      var packingGroup = '';
-      var stateWasteCodes = '';
-      var ergNum = '';
-
-      // B.1 Common Name
-      for (var i = 0; i < lines.length; i++) {
-        if (lines[i].indexOf('Common Name') !== -1 && lines[i].indexOf(':') !== -1) {
-          commonName = lines[i].split(':').slice(1).join(':').trim();
-          if (!commonName && i + 1 < lines.length) commonName = lines[i + 1].trim();
-          break;
-        }
-      }
-      // Also try after the label in full text
-      if (!commonName) {
-        var cnMatch = fullText.match(/Common Name[:\s]+([A-Z][A-Z\s,.-]+)/i);
-        if (cnMatch) commonName = cnMatch[1].trim();
-      }
-
-      // C.1 Proper Shipping Name (DOT description)
-      var psnMatch = fullText.match(/Proper Shipping Name[:\s]+([^\n]+)/i);
-      if (psnMatch) dotDescription = psnMatch[1].trim();
-      // Clean up - remove trailing field labels
-      dotDescription = dotDescription.replace(/\s*(2\.\s*Additional|RQ Threshold|UN\/NA).*$/i, '').trim();
-
-      // DOT Hazardous Materials
-      var dotHazMatch = fullText.match(/DOT Hazardous Materials\?\s*(.*?)Proper/i);
-      if (dotHazMatch) {
-        isHazMat = dotHazMatch[1].indexOf('Yes') !== -1;
-      }
-
-      // UN/NA# - try multiple patterns since pdf-parse layouts vary
-      var unMatch = fullText.match(/UN\/NA\s*#\s*:?\s*(UN\d{3,5}|NA\d{3,5})/i);
-      if (!unMatch) unMatch = fullText.match(/UN\/NA\s*(?:Number|#|No\.?)\s*:?\s*(UN\d{3,5}|NA\d{3,5})/i);
-      if (!unMatch) unMatch = fullText.match(/(UN\d{4,5})/);
-      if (!unMatch) unMatch = fullText.match(/(NA\d{4,5})/);
-      if (unMatch && isHazMat) unNum = unMatch[1].trim();
-
-      // Hazard Class - only match valid DOT hazard classes (1-9, with optional subdivision like 3, 4.1, 6.1, 8)
-      var hcMatch = fullText.match(/Hazard Class[:\s]+(\d(?:\.\d)?)\b/i);
-      if (hcMatch && isHazMat) hazardClass = hcMatch[1].trim();
-
-      // Packing Group - only match valid values (I, II, III or PG I, PG II, PG III)
-      var pgMatch = fullText.match(/Packing Group[:\s]+(I{1,3}|PG\s*I{1,3})\b/i);
-      if (pgMatch && isHazMat) packingGroup = pgMatch[1].trim();
-
-      // ERG#
-      var ergMatch = fullText.match(/ERG#[:\s]+(\S+)/i);
-      if (ergMatch) ergNum = ergMatch[1].trim();
-
-      // Container Type and Unit of Measure excluded - vary per shipment
-
-      // RCRA Waste Codes (E.3) - strip "None" so it comes through empty
-      var rcraMatch = fullText.match(/RCRA Waste Codes[:\s]+([A-Z0-9\s,]+)/i);
-      if (rcraMatch) {
-        wasteCodes = rcraMatch[1].trim().replace(/\s+/g, ' ').replace(/If None.*$/i, '').trim();
-        if (wasteCodes.toLowerCase() === 'none') wasteCodes = '';
-      }
-
-      // State Waste Codes (E.2) - grab just the code, strip letter prefixes (CA-122 -> 122)
-      var stMatch = fullText.match(/State Waste Codes[:\s]+([A-Z0-9][A-Z0-9\s,.-]*)/i);
-      if (stMatch) {
-        var rawStateCodes = stMatch[1].trim().split('\n')[0].trim();
-        // Strip letter prefixes like CA-, AZ- etc. Keep only numbers
-        stateWasteCodes = rawStateCodes.replace(/[A-Za-z]+-?/g, '').replace(/\s+/g, ' ').trim();
-      }
-
-      // Uppercase entire DOT description to match proper DOT style
-      if (dotDescription) {
-        dotDescription = dotDescription.toUpperCase();
-      }
-      // If DOT description contains N.O.S., append common name in parentheses
-      if (dotDescription && dotDescription.match(/N\.O\.S\.?\s*$/i) && commonName) {
-        dotDescription = dotDescription + ' (' + commonName.toUpperCase() + ')';
-      }
-
-      // Build the waste stream template
-      var profileId = '';
-      var pidMatch = fullText.match(/Profile\s*ID[:\s]+(\d+)/i);
-      if (pidMatch) profileId = pidMatch[1];
-
-      // Extract generator name from Section A / A.1
-      var repGenName = '';
-      var repGenMatch = fullText.match(/A\.?\s*1\.?\s*Generator[:\s]+([^\n]+)/i) ||
-                        fullText.match(/Generator Name[:\s]+([^\n]+)/i) ||
-                        fullText.match(/Section A[\s\S]{0,300}Generator[:\s]+([^\n]+)/i);
-      if (repGenMatch) repGenName = repGenMatch[1].trim();
-      // If not found, try looking for a line after "A.1" or "Generator" label
-      if (!repGenName) {
-        var genBlock = fullText.match(/Generator[\s\S]{0,200}/i);
-        if (genBlock) {
-          var gbLines = genBlock[0].split('\n');
-          for (var gb = 1; gb < gbLines.length; gb++) {
-            var gbl = gbLines[gb].trim();
-            if (gbl.length > 5 && !gbl.match(/^(address|city|state|zip|phone|contact|fax|email|site|mailing)/i)) {
-              repGenName = gbl;
-              break;
-            }
-          }
-        }
-      }
-
-      // Detect generic "Add Gen" profiles - Various Sites means no specific generator
-      var isAddGen = repGenName.match(/various\s*sites/i) || repGenName.match(/multiple\s*generators/i) || repGenName.match(/add\s*gen/i);
-      var profileGenName = isAddGen ? 'Republic / USE Add Gens' : repGenName;
-
-      var wasteStream = {
-        id: Date.now().toString(),
-        name: commonName || 'Imported Profile ' + profileId,
-        dotDescription: dotDescription,
-        hm: isHazMat ? 'X' : '',
-        containerType: '',
-        unit: '',
-        wasteCodes: wasteCodes,
-        unNum: unNum,
-        hazardClass: hazardClass,
-        packingGroup: packingGroup,
-        stateWasteCodes: stateWasteCodes,
-        ergNum: ergNum,
-        profileId: profileId,
-        createdAt: new Date().toISOString()
-      };
-
-      // Check for duplicate by name
-      var exists = false;
-      for (var d = 0; d < (data.wasteStreams || []).length; d++) {
-        if (data.wasteStreams[d].name === wasteStream.name) { exists = true; break; }
-      }
-
-      if (exists) {
-        try { fs.unlinkSync(req.file.path); } catch (e) {}
-        return res.json({
-          success: false,
-          error: 'A waste stream named "' + wasteStream.name + '" already exists.',
-          extracted: wasteStream
-        });
-      }
-
-      if (!data.wasteStreams) data.wasteStreams = [];
-      data.wasteStreams.push(wasteStream);
-      saveData(data);
-      broadcast('update', { collection: 'wasteStreams', action: 'create', item: wasteStream });
-      saveProfilePDF(req.file, profileId || wasteStream.id, 'Republic', wasteStream.name, profileGenName, req.file.originalname);
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
-
-      res.json({
-        success: true,
-        wasteStream: wasteStream
-      });
-    }).catch(function(err) {
-      console.error('PDF parse error:', err);
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
-      res.status(500).json({ error: 'Failed to parse PDF: ' + err.message });
-    });
-  } catch (err) {
-    console.error('Waste profile import error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-// EPA Form 8700-22 Print Map
-// 10 CPI (chars per inch), 6 LPI (lines per inch), 66 lines/page
-// Box 5: Mailing address LEFT side, Site address RIGHT side
-// ============================================================
-var FORM_8700_MAP = {
-  // 12 CPI with tractor pin all the way left
-  // Box 1 - Generator's US EPA ID Number
-  generatorEpaId:     { row: 4, col: 18 },
-  // Box 2 - Page __ of __
-  page:               { row: 4, col: 40 },
-  totalPages:         { row: 4, col: 43 },
-  // Box 3 - Emergency Response Phone
-  emergencyPhone:     { row: 4, col: 47 },
-  // Box 5 - Generator
-  generatorName:      { row: 6, col: 16 },
-  // Mailing Address (LEFT side of Box 5)
-  generatorMailAddr:  { row: 7, col: 16 },
-  generatorMailCity:  { row: 8, col: 16 },
-  generatorPhone:     { row: 8, col: 34 },
-  // Site Address (RIGHT side of Box 5)
-  generatorSiteAddr:  { row: 7, col: 48 },
-  generatorSiteCity:  { row: 8, col: 48 },
-  // Box 6 - Transporter 1
-  transporter1Name:   { row: 10, col: 8 },
-  transporter1EpaId:  { row: 10, col: 62 },
-  // Box 7 - Transporter 2
-  transporter2Name:   { row: 12, col: 8 },
-  transporter2EpaId:  { row: 12, col: 62 },
-  // Box 8 - Designated Facility
-  facilityName:       { row: 14, col: 8 },
-  facilityEpaId:      { row: 14, col: 62 },
-  facilityAddress:    { row: 15, col: 8 },
-  facilityPhone:      { row: 16, col: 8 },
-  facilityCity:       { row: 16, col: 24 },
-  facilityState:      { row: 16, col: 38 },
-  facilityZip:        { row: 16, col: 42 },
-  // Box 9a - HM
-  waste1hm:           { row: 21, col: 4 },
-  waste2hm:           { row: 24, col: 4 },
-  waste3hm:           { row: 27, col: 4 },
-  waste4hm:           { row: 30, col: 4 },
-  // Box 9b - Description
-  waste1desc:         { row: 21, col: 9 },
-  waste2desc:         { row: 24, col: 9 },
-  waste3desc:         { row: 27, col: 9 },
-  waste4desc:         { row: 30, col: 9 },
-  // Box 10 - Containers (number + type)
-  waste1containerNum: { row: 21, col: 56 },
-  waste1container:    { row: 21, col: 61 },
-  waste2containerNum: { row: 24, col: 56 },
-  waste2container:    { row: 24, col: 61 },
-  waste3containerNum: { row: 27, col: 56 },
-  waste3container:    { row: 27, col: 61 },
-  waste4containerNum: { row: 30, col: 56 },
-  waste4container:    { row: 30, col: 61 },
-  // Box 11 - Quantity
-  waste1qty:          { row: 21, col: 66 },
-  waste2qty:          { row: 24, col: 66 },
-  waste3qty:          { row: 27, col: 66 },
-  waste4qty:          { row: 30, col: 66 },
-  // Box 12 - Unit
-  waste1uom:          { row: 21, col: 73 },
-  waste2uom:          { row: 24, col: 73 },
-  waste3uom:          { row: 27, col: 73 },
-  waste4uom:          { row: 30, col: 73 },
-  // Box 13 - Waste Codes (6 per line: 3 on row 1, 3 on row 2)
-  waste1wc1:          { row: 21, col: 76 },
-  waste1wc2:          { row: 21, col: 81 },
-  waste1wc3:          { row: 21, col: 86 },
-  waste1wc4:          { row: 22, col: 76 },
-  waste1wc5:          { row: 22, col: 81 },
-  waste1wc6:          { row: 22, col: 86 },
-  waste2wc1:          { row: 24, col: 76 },
-  waste2wc2:          { row: 24, col: 81 },
-  waste2wc3:          { row: 24, col: 86 },
-  waste2wc4:          { row: 25, col: 76 },
-  waste2wc5:          { row: 25, col: 81 },
-  waste2wc6:          { row: 25, col: 86 },
-  waste3wc1:          { row: 27, col: 76 },
-  waste3wc2:          { row: 27, col: 81 },
-  waste3wc3:          { row: 27, col: 86 },
-  waste3wc4:          { row: 28, col: 76 },
-  waste3wc5:          { row: 28, col: 81 },
-  waste3wc6:          { row: 28, col: 86 },
-  waste4wc1:          { row: 30, col: 76 },
-  waste4wc2:          { row: 30, col: 81 },
-  waste4wc3:          { row: 30, col: 86 },
-  waste4wc4:          { row: 31, col: 76 },
-  waste4wc5:          { row: 31, col: 81 },
-  waste4wc6:          { row: 31, col: 86 },
-  // Box 14 - Special Handling (3 lines, MIS permanent on line 3)
-  specialHandling:    { row: 33, col: 8 },
-  specialHandling2:   { row: 34, col: 8 },
-  specialHandling3:   { row: 35, col: 8 },
-  // Box 15 - Generator Certification
-  generatorCertName:  { row: 38, col: 8 }
-};
-
-// Print manifest - plain text for dot matrix
-// Uses manifest fields directly (as saved by the frontend)
-var BUILD_VERSION = 'v24-2026-03-06';
-app.get('/api/version', function(req, res) { res.json({ version: BUILD_VERSION }); });
-
-// Alignment editor endpoints
-var customAlignment = data.customAlignment || null;
-var previousAlignment = data.previousAlignment || null;
-var colOffset = (typeof data.colOffset === 'number') ? data.colOffset : 0;
-var leftMargin = (typeof data.leftMargin === 'number') ? data.leftMargin : 0;
-
-// V18 migration: if custom alignment exists from before the +10 offset change, migrate it
-if (customAlignment && !data.migratedToV18) {
-  var cKeys = Object.keys(customAlignment);
-  for (var mi = 0; mi < cKeys.length; mi++) {
-    if (customAlignment[cKeys[mi]] && typeof customAlignment[cKeys[mi]].col === 'number') {
-      customAlignment[cKeys[mi]].col = customAlignment[cKeys[mi]].col + 10;
-    }
-  }
-  data.customAlignment = customAlignment;
-  // Also migrate previous alignment if it exists
-  if (previousAlignment) {
-    var pKeys = Object.keys(previousAlignment);
-    for (var pi = 0; pi < pKeys.length; pi++) {
-      if (previousAlignment[pKeys[pi]] && typeof previousAlignment[pKeys[pi]].col === 'number') {
-        previousAlignment[pKeys[pi]].col = previousAlignment[pKeys[pi]].col + 10;
-      }
-    }
-    data.previousAlignment = previousAlignment;
-  }
-  // Set colOffset to 10 if it was 0
-  if (colOffset === 0) {
-    colOffset = 10;
-    data.colOffset = 10;
-  }
-  data.migratedToV18 = true;
-  saveData(data);
-  console.log('V18 migration: added +10 to all custom alignment column values');
-}
-
-// V20 migration: clear custom alignment so new Box 10-13 defaults take effect
-if (!data.migratedToV20) {
-  customAlignment = null;
-  delete data.customAlignment;
-  previousAlignment = null;
-  delete data.previousAlignment;
-  data.migratedToV20 = true;
-  saveData(data);
-  console.log('V20 migration: cleared custom alignment for new Box 10-13 positions');
-}
-
-// V21 migration: switch to 12 CPI positions, clear custom alignment, reset Global Shift to 0
-if (!data.migratedToV21) {
-  customAlignment = null;
-  delete data.customAlignment;
-  previousAlignment = null;
-  delete data.previousAlignment;
-  colOffset = 0;
-  data.colOffset = 0;
-  data.migratedToV21 = true;
-  saveData(data);
-  console.log('V21 migration: switched to 12 CPI positions, Global Shift reset to 0');
-}
-
-// V23 migration: recalibrated for 12 CPI with tractor pin all the way left
-if (!data.migratedToV23) {
-  customAlignment = null;
-  delete data.customAlignment;
-  previousAlignment = null;
-  delete data.previousAlignment;
-  colOffset = 0;
-  data.colOffset = 0;
-  leftMargin = 0;
-  data.leftMargin = 0;
-  data.migratedToV23 = true;
-  saveData(data);
-  console.log('V23 migration: recalibrated for 12 CPI pin-left');
-}
-
-// V24 migration: shift everything 8 columns left to fix "too far right" at 12 CPI pin-left
-if (!data.migratedToV24) {
-  customAlignment = null;
-  delete data.customAlignment;
-  previousAlignment = null;
-  delete data.previousAlignment;
-  colOffset = 8;
-  data.colOffset = 8;
-  leftMargin = 0;
-  data.leftMargin = 0;
-  data.migratedToV24 = true;
-  saveData(data);
-  console.log('V24 migration: Global Shift set to 8 to fix rightward offset');
-}
-
-function getActiveMap() {
-  if (!customAlignment) return FORM_8700_MAP;
-  var merged = {};
-  var keys = Object.keys(FORM_8700_MAP);
-  for (var i = 0; i < keys.length; i++) {
-    if (customAlignment[keys[i]]) {
-      merged[keys[i]] = customAlignment[keys[i]];
-    } else {
-      merged[keys[i]] = FORM_8700_MAP[keys[i]];
-    }
-  }
-  return merged;
-}
-
-app.get('/api/alignment', function(req, res) {
-  res.json({
-    map: getActiveMap(),
-    defaults: FORM_8700_MAP,
-    hasPrevious: previousAlignment !== null,
-    colOffset: colOffset,
-    leftMargin: leftMargin
+app.get('/api/events', function(req, res) {
+  res.writeHead(200, { 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'Connection':'keep-alive' });
+  res.write('data: ' + JSON.stringify({ type:'connected', data: data }) + '\n\n');
+  clients.push(res);
+  console.log('Client connected (' + clients.length + ' total)');
+  req.on('close', function() {
+    clients = clients.filter(function(c) { return c !== res; });
+    console.log('Client disconnected (' + clients.length + ' total)');
   });
 });
 
-app.put('/api/alignment', function(req, res) {
-  // Save current as previous before overwriting
-  previousAlignment = customAlignment ? JSON.parse(JSON.stringify(customAlignment)) : null;
-  data.previousAlignment = previousAlignment;
-  customAlignment = req.body.map || null;
-  data.customAlignment = customAlignment;
-  if (typeof req.body.colOffset === 'number') {
-    colOffset = req.body.colOffset;
-    data.colOffset = colOffset;
-  }
-  if (typeof req.body.leftMargin === 'number') {
-    leftMargin = req.body.leftMargin;
-    data.leftMargin = leftMargin;
-  }
-  saveData(data);
-  res.json({ ok: true });
-});
+app.get('/api/data', function(req, res) { res.json(data); });
 
-app.post('/api/alignment/reset', function(req, res) {
-  // Save current as previous before resetting
-  previousAlignment = customAlignment ? JSON.parse(JSON.stringify(customAlignment)) : null;
-  data.previousAlignment = previousAlignment;
-  customAlignment = null;
-  delete data.customAlignment;
-  colOffset = 0;
-  data.colOffset = 0;
-  leftMargin = 0;
-  data.leftMargin = 0;
-  saveData(data);
-  res.json({ ok: true });
-});
+// PRINT JOB PAGE - serves a clean printable page via POST with multiple customers
+app.use(express.urlencoded({extended:true}));
+app.post('/print-job', function(req, res) {
+  var jobData;
+  try { jobData = JSON.parse(req.body.jobData); } catch(e) { return res.status(400).send('Invalid data'); }
+  var q = jobData;
+  var customers = q.customers || [];
+  if(customers.length === 0) customers = [null]; // at least one page even with no customer
 
-app.post('/api/alignment/undo', function(req, res) {
-  if (previousAlignment === null) {
-    return res.json({ ok: false, message: 'No previous settings to restore' });
-  }
-  // Swap current and previous
-  var temp = customAlignment ? JSON.parse(JSON.stringify(customAlignment)) : null;
-  customAlignment = JSON.parse(JSON.stringify(previousAlignment));
-  previousAlignment = temp;
-  data.customAlignment = customAlignment;
-  data.previousAlignment = previousAlignment;
-  saveData(data);
-  res.json({ ok: true, map: getActiveMap() });
-});
+  var html = '<!DOCTYPE html><html><head><title>Job - ' + (q.driver||'') + ' - ' + (q.date||'') + '</title>';
+  html += '<style>';
+  html += '*{margin:0;padding:0;box-sizing:border-box}';
+  html += 'body{font-family:Arial,Helvetica,sans-serif;padding:20px 30px;color:#000;max-width:800px;margin:0 auto;font-size:13px}';
+  html += '.page{page-break-after:always}';
+  html += '.page:last-child{page-break-after:auto}';
+  html += '.header{text-align:center;margin-bottom:12px;padding-bottom:8px;border-bottom:3px solid #000}';
+  html += '.header h1{font-size:20px;font-weight:900;margin-bottom:2px}';
+  html += '.header .company{font-size:12px;color:#444;font-weight:600;letter-spacing:0.5px}';
+  html += '.row{display:flex;padding:6px 0;border-bottom:1px solid #ddd;font-size:13px}';
+  html += '.label{font-weight:700;min-width:140px;color:#333}';
+  html += '.value{flex:1;font-size:13px}';
+  html += '.cust-box{margin:8px 0;border:2px solid #2563eb;border-radius:6px;padding:8px 10px;background:#eff6ff}';
+  html += '.cust-box .cust-title{font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px}';
+  html += '.placards-section{margin-top:8px;border:2px solid #d97706;padding:8px 10px;background:#fffbeb}';
+  html += '.placards-section h3{font-size:12px;font-weight:700;margin-bottom:4px;color:#92400e;text-transform:uppercase;letter-spacing:0.5px}';
+  html += '.placards-section .placard-tag{display:inline-block;background:#fef3c7;border:1px solid #d97706;border-radius:4px;padding:2px 6px;margin:1px 3px 1px 0;font-size:11px;font-weight:600}';
+  html += '.notes-section{margin-top:8px;border:2px solid #000;padding:8px 10px;background:#f8f8f8}';
+  html += '.notes-section h3{font-size:12px;font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px}';
+  html += '.notes-section p{font-size:12px;line-height:1.4;white-space:pre-wrap}';
+  html += '.signature{margin-top:20px;display:flex;gap:40px}';
+  html += '.sig-line{flex:1;border-bottom:1px solid #000;padding-bottom:4px;font-size:10px;color:#666}';
+  html += '.footer{margin-top:14px;padding-top:6px;border-top:2px solid #000;font-size:9px;color:#888;display:flex;justify-content:space-between}';
+  html += '.back-link{display:inline-block;margin-bottom:10px;color:#2563eb;text-decoration:none;font-size:13px}';
+  html += '@media print{.back-link{display:none}body{padding:15px 20px}.cust-box{background:#eff6ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section{background:#fffbeb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section .placard-tag{background:#fef3c7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}div[style*="background:#f5f3ff"]{background:#f5f3ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '</style></head><body>';
+  html += '<a href="javascript:history.back()" class="back-link">&larr; Back to RouteBoard</a>';
 
-app.get('/api/print/manifest/:id', function(req, res) {
-  var manifest = null;
-  for (var i = 0; i < data.manifests.length; i++) {
-    if (data.manifests[i].id === req.params.id) { manifest = data.manifests[i]; break; }
-  }
-  if (!manifest) return res.status(404).send('Manifest not found');
-
-  var MAP = getActiveMap();
-  var lines = [];
-  for (var l = 0; l < 66; l++) {
-    var row = '';
-    for (var c = 0; c < 132; c++) { row += ' '; }
-    lines.push(row);
-  }
-
-  var activeOffset = colOffset || 0;
-  var activeLeftMargin = leftMargin || 0;
-  function placeText(row, col, text) {
-    if (!text) return;
-    text = String(text);
-    if (row < 1 || row > 66) return;
-    var actualCol = col - activeOffset + activeLeftMargin;
-    if (actualCol < 1) return;
-    var line = lines[row - 1];
-    var before = line.substring(0, actualCol - 1);
-    var after = line.substring(actualCol - 1 + text.length);
-    lines[row - 1] = before + text + after;
-  }
-
-  // Box 1 - Generator EPA ID
-  placeText(MAP.generatorEpaId.row, MAP.generatorEpaId.col, manifest.generatorEpaId);
-  // Box 2 - Page
-  placeText(MAP.page.row, MAP.page.col, manifest.pageNum || '1');
-  placeText(MAP.totalPages.row, MAP.totalPages.col, manifest.pageTotal || '1');
-  // Box 3 - Emergency Response Phone
-  placeText(MAP.emergencyPhone.row, MAP.emergencyPhone.col, manifest.emergencyPhone);
-
-  // Box 5 - Generator
-  placeText(MAP.generatorName.row, MAP.generatorName.col, manifest.generatorName);
-  placeText(MAP.generatorPhone.row, MAP.generatorPhone.col, manifest.generatorPhone);
-  placeText(MAP.generatorMailAddr.row, MAP.generatorMailAddr.col, manifest.generatorMailAddress);
-  placeText(MAP.generatorMailCity.row, MAP.generatorMailCity.col, manifest.generatorMailCityStZip);
-  placeText(MAP.generatorSiteAddr.row, MAP.generatorSiteAddr.col, manifest.genSiteAddress);
-  placeText(MAP.generatorSiteCity.row, MAP.generatorSiteCity.col, manifest.genSiteCityStZip);
-
-  // Box 6 - Transporter 1
-  placeText(MAP.transporter1Name.row, MAP.transporter1Name.col, manifest.transporter1Name);
-  placeText(MAP.transporter1EpaId.row, MAP.transporter1EpaId.col, manifest.transporter1EpaId);
-  // Box 7 - Transporter 2
-  placeText(MAP.transporter2Name.row, MAP.transporter2Name.col, manifest.transporter2Name);
-  placeText(MAP.transporter2EpaId.row, MAP.transporter2EpaId.col, manifest.transporter2EpaId);
-
-  // Box 8 - Facility
-  placeText(MAP.facilityName.row, MAP.facilityName.col, manifest.facilityName);
-  placeText(MAP.facilityPhone.row, MAP.facilityPhone.col, manifest.facilityPhone);
-  placeText(MAP.facilityAddress.row, MAP.facilityAddress.col, manifest.facilityAddress);
-  placeText(MAP.facilityCity.row, MAP.facilityCity.col, manifest.facilityCityStZip);
-  placeText(MAP.facilityEpaId.row, MAP.facilityEpaId.col, manifest.facilityEpaId);
-
-  // Box 9-13 - Waste lines (all positions independent)
-  var descRow1Width = MAP.waste1containerNum.col - MAP.waste1desc.col - 1;
-  var descContWidth = 55;
-  function wrapDescLines(text, firstMax, contMax) {
-    if (!text) return [];
-    var result = [];
-    var remaining = String(text);
-    if (remaining.length <= firstMax) { return [remaining]; }
-    var cut = remaining.lastIndexOf(' ', firstMax);
-    if (cut <= 0) cut = firstMax;
-    result.push(remaining.substring(0, cut));
-    remaining = remaining.substring(cut).replace(/^\s+/, '');
-    while (remaining.length > 0) {
-      if (remaining.length <= contMax) { result.push(remaining); break; }
-      cut = remaining.lastIndexOf(' ', contMax);
-      if (cut <= 0) cut = contMax;
-      result.push(remaining.substring(0, cut));
-      remaining = remaining.substring(cut).replace(/^\s+/, '');
+  customers.forEach(function(cust, idx) {
+    html += '<div class="page">';
+    html += '<div class="header"><h1>Job Assignment</h1><div class="company">Independence Environmental Services</div></div>';
+    html += '<div class="row"><div class="label">Date:</div><div class="value">' + (q.date||'') + '</div></div>';
+    html += '<div class="row"><div class="label">Driver:</div><div class="value"><strong>' + (q.driver||'') + '</strong></div></div>';
+    html += '<div class="row"><div class="label">Location / Job:</div><div class="value"><strong>' + (q.location||'') + '</strong></div></div>';
+    if(cust) {
+      html += '<div class="cust-box"><div class="cust-title">Customer Information</div>';
+      html += '<div style="font-size:13px;font-weight:700;margin-bottom:2px">' + (cust.name||'') + '</div>';
+      if(cust.address) html += '<div style="font-size:12px;margin-bottom:1px">' + cust.address + '</div>';
+      if(cust.phone) html += '<div style="font-size:12px;margin-bottom:1px">Phone: ' + cust.phone + '</div>';
+      if(cust.contact) html += '<div style="font-size:12px;margin-bottom:1px">Contact: ' + cust.contact + '</div>';
+      if(cust.pricing) html += '<div style="font-size:11px;margin-top:4px;padding-top:4px;border-top:1px solid #93c5fd;white-space:pre-wrap">' + cust.pricing + '</div>';
+      html += '</div>';
     }
-    return result;
-  }
-  for (var w = 1; w <= 4; w++) {
-    var wasteDesc = manifest['waste' + w + 'Description'] || '';
-    var descLines = wrapDescLines(wasteDesc, descRow1Width, descContWidth);
-    var descRow = MAP['waste' + w + 'desc'].row;
-    for (var dl = 0; dl < descLines.length && dl < 3; dl++) {
-      placeText(descRow + dl, MAP['waste' + w + 'desc'].col, descLines[dl]);
+    html += '<div class="row"><div class="label">Truck:</div><div class="value">' + (q.truck||'None') + '</div></div>';
+    html += '<div class="row"><div class="label">Trailer:</div><div class="value">' + (q.trailer||'None') + '</div></div>';
+    var custTime = cust && cust.timeWindow ? cust.timeWindow : (q.timeWindow || '');
+    var custEquip = cust && cust.equipment ? cust.equipment : (q.equipment || 'None');
+    var custPlac = cust && cust.placards ? cust.placards : '';
+    html += '<div class="row"><div class="label">Time Window:</div><div class="value">' + (custTime||'\u2014') + '</div></div>';
+    html += '<div class="row"><div class="label">Equipment:</div><div class="value">' + (custEquip||'None') + '</div></div>';
+    html += '<div class="row"><div class="label">Status:</div><div class="value">' + (q.status||'') + '</div></div>';
+    if(custPlac && custPlac !== 'None') {
+      html += '<div class="placards-section"><h3>&#9888; Required Placards</h3>';
+      var pList = custPlac.split(', ');
+      pList.forEach(function(p) { html += '<span class="placard-tag">' + p + '</span>'; });
+      html += '</div>';
     }
-    // 9a - HM
-    placeText(MAP['waste' + w + 'hm'].row, MAP['waste' + w + 'hm'].col, manifest['waste' + w + 'HM']);
-    // 10 - Containers
-    placeText(MAP['waste' + w + 'containerNum'].row, MAP['waste' + w + 'containerNum'].col, manifest['waste' + w + 'ContainerNum']);
-    placeText(MAP['waste' + w + 'container'].row, MAP['waste' + w + 'container'].col, manifest['waste' + w + 'ContainerType']);
-    // 11 - Qty
-    placeText(MAP['waste' + w + 'qty'].row, MAP['waste' + w + 'qty'].col, manifest['waste' + w + 'Qty']);
-    // 12 - Unit
-    placeText(MAP['waste' + w + 'uom'].row, MAP['waste' + w + 'uom'].col, manifest['waste' + w + 'Unit']);
-    // 13 - Waste codes (6 per line, each with independent row/col)
-    var allCodes = (manifest['waste' + w + 'WasteCodes'] || '').trim();
-    if (allCodes) {
-      var codeArr = allCodes.split(/[\s,]+/).filter(function(c) { return c.length > 0; });
-      var needsSmart = false;
-      for (var sc = 0; sc < codeArr.length; sc++) {
-        if (codeArr[sc].length > 4) { needsSmart = true; break; }
-      }
-      if (needsSmart) {
-        var smartCodes = [];
-        var joined = allCodes.replace(/[\s,]+/g, '');
-        var letterRe = /[A-Za-z]\d{3}/g;
-        var lm;
-        var positions = [];
-        while ((lm = letterRe.exec(joined)) !== null) {
-          positions.push({start: lm.index, end: lm.index + lm[0].length, code: lm[0]});
-        }
-        var lastEnd = 0;
-        for (var pi = 0; pi < positions.length; pi++) {
-          var gap = joined.substring(lastEnd, positions[pi].start);
-          if (gap.length > 0) {
-            var gapNums = gap.match(/\d{3}/g);
-            if (gapNums) { for (var gi = 0; gi < gapNums.length; gi++) smartCodes.push(gapNums[gi]); }
-          }
-          smartCodes.push(positions[pi].code);
-          lastEnd = positions[pi].end;
-        }
-        var trail = joined.substring(lastEnd);
-        if (trail.length > 0) {
-          var trailNums = trail.match(/\d{3}/g);
-          if (trailNums) { for (var ti = 0; ti < trailNums.length; ti++) smartCodes.push(trailNums[ti]); }
-        }
-        if (smartCodes.length > 1) codeArr = smartCodes;
-      }
-      // Place each code at its own independent row/col from the map
-      for (var ci = 0; ci < 6; ci++) {
-        if (codeArr[ci]) {
-          var wcKey = 'waste' + w + 'wc' + (ci + 1);
-          if (MAP[wcKey]) {
-            placeText(MAP[wcKey].row, MAP[wcKey].col, codeArr[ci]);
-          }
-        }
-      }
+    if(q.notes) {
+      html += '<div class="notes-section"><h3>Notes / Special Instructions</h3><p>' + q.notes + '</p></div>';
     }
-  }
+    if(cust && cust.jobNotes) {
+      html += '<div style="margin-top:8px;border:2px solid #7c3aed;border-radius:6px;padding:8px 10px;background:#f5f3ff">';
+      html += '<div style="font-size:11px;font-weight:700;color:#6d28d9;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Customer-Specific Notes</div>';
+      html += '<p style="font-size:12px;line-height:1.4;white-space:pre-wrap;margin:0">' + cust.jobNotes + '</p>';
+      html += '</div>';
+    }
+    html += '<div class="signature"><div class="sig-line">Driver Signature</div><div class="sig-line">Date</div></div>';
+    html += '<div class="footer"><span>Independence Environmental Services</span><span>Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
+    html += '</div>';
+  });
 
-  // Box 14 - Special Handling
-  placeText(MAP.specialHandling.row, MAP.specialHandling.col, manifest.specialHandling);
-  placeText(MAP.specialHandling2.row, MAP.specialHandling2.col, manifest.specialHandling2);
-  placeText(MAP.specialHandling3.row, MAP.specialHandling3.col, manifest.specialHandling3);
-
-  // Box 15 - Generator Certification (date NOT printed - handwritten on form)
-  placeText(MAP.generatorCertName.row, MAP.generatorCertName.col, manifest.generatorPrintName);
-
-  var output = lines.join('\n');
-  res.set('Content-Type', 'text/plain');
-  res.send(output);
+  html += '</body></html>';
+  res.send(html);
 });
 
-// Download .prn file
-app.get('/api/print/raw/:id', function(req, res) {
-  var manifest = null;
-  for (var i = 0; i < data.manifests.length; i++) {
-    if (data.manifests[i].id === req.params.id) { manifest = data.manifests[i]; break; }
+// PRINT CUSTOMER PAGE
+app.get('/print-customer', function(req, res) {
+  var q = req.query;
+  var addr = [q.address, q.city, q.state, q.zip].filter(Boolean).join(', ');
+  var html = '<!DOCTYPE html><html><head><title>Customer - ' + (q.name||'') + '</title>';
+  html += '<style>';
+  html += '*{margin:0;padding:0;box-sizing:border-box}';
+  html += 'body{font-family:Arial,Helvetica,sans-serif;padding:40px;color:#000;max-width:800px;margin:0 auto}';
+  html += '.header{text-align:center;margin-bottom:30px;padding-bottom:16px;border-bottom:4px solid #000}';
+  html += '.header h1{font-size:26px;font-weight:900;margin-bottom:4px}';
+  html += '.header .company{font-size:14px;color:#444;font-weight:600;letter-spacing:0.5px}';
+  html += '.cust-name{font-size:22px;font-weight:800;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #333}';
+  html += '.row{display:flex;padding:10px 0;border-bottom:1px solid #ddd;font-size:15px}';
+  html += '.label{font-weight:700;min-width:150px;color:#333}';
+  html += '.value{flex:1;font-size:15px}';
+  html += '.section{margin-top:20px;border:2px solid #000;padding:16px}';
+  html += '.section h3{font-size:14px;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}';
+  html += '.section p{font-size:14px;line-height:1.7;white-space:pre-wrap}';
+  html += '.pricing{background:#f0fdf4;border-color:#16a34a}';
+  html += '.notes{background:#f8f8f8;border-color:#000}';
+  html += '.footer{margin-top:30px;padding-top:10px;border-top:2px solid #000;font-size:10px;color:#888;display:flex;justify-content:space-between}';
+  html += '.back-link{display:inline-block;margin-bottom:20px;color:#2563eb;text-decoration:none;font-size:14px}';
+  html += '@media print{.back-link{display:none}body{padding:30px}.pricing{background:#f0fdf4 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '</style></head><body>';
+  html += '<a href="javascript:history.back()" class="back-link">&larr; Back to Scheduler</a>';
+  html += '<div class="header"><h1>Customer Information</h1><div class="company">Independence Environmental Services</div></div>';
+  html += '<div class="cust-name">' + (q.name||'') + '</div>';
+  if(q.contact) html += '<div class="row"><div class="label">Contact:</div><div class="value">' + q.contact + '</div></div>';
+  if(addr) html += '<div class="row"><div class="label">Address:</div><div class="value">' + addr + '</div></div>';
+  if(q.phone) html += '<div class="row"><div class="label">Phone:</div><div class="value">' + q.phone + '</div></div>';
+  if(q.email) html += '<div class="row"><div class="label">Email:</div><div class="value">' + q.email + '</div></div>';
+  if(q.pricing) {
+    html += '<div class="section pricing"><h3>Pricing Information</h3><p>' + q.pricing + '</p></div>';
   }
-  if (!manifest) return res.status(404).send('Manifest not found');
-  res.redirect('/api/print/manifest/' + req.params.id);
+  if(q.notes) {
+    html += '<div class="section notes"><h3>Notes / Special Instructions</h3><p>' + q.notes + '</p></div>';
+  }
+  html += '<div class="footer"><span>Independence Environmental Services</span><span>Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
+  html += '</body></html>';
+  res.send(html);
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname)));
+// JOBS
+app.post('/api/jobs', function(req, res) {
+  var job = Object.assign({}, req.body, { id: 'j' + Date.now() + Math.random().toString(36).slice(2) });
+  data.jobs.push(job); saveData(data); broadcast({type:'job-added',job:job}); res.json(job);
+});
+app.put('/api/jobs/:id', function(req, res) {
+  var idx = data.jobs.findIndex(function(j) { return j.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.jobs[idx], req.body);
+  saveData(data); broadcast({type:'job-updated',job:data.jobs[idx]}); res.json(data.jobs[idx]);
+});
+app.delete('/api/jobs/:id', function(req, res) {
+  data.jobs = data.jobs.filter(function(j) { return j.id !== req.params.id; });
+  saveData(data); broadcast({type:'job-deleted',jobId:req.params.id}); res.json({ok:true});
+});
 
-// Start server
-app.listen(PORT, function() {
-  console.log('Manifest Platform running on port ' + PORT);
-  console.log('Data directory: ' + DATA_DIR);
+// DRIVERS
+app.post('/api/drivers', function(req, res) {
+  var driver = Object.assign({}, req.body, { id: 'd' + Date.now() });
+  data.drivers.push(driver); saveData(data); broadcast({type:'full-sync',data:data}); res.json(driver);
+});
+app.put('/api/drivers/:id', function(req, res) {
+  var idx = data.drivers.findIndex(function(d) { return d.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.drivers[idx], req.body);
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json(data.drivers[idx]);
+});
+app.delete('/api/drivers/:id', function(req, res) {
+  data.drivers = data.drivers.filter(function(d) { return d.id !== req.params.id; });
+  data.jobs = data.jobs.filter(function(j) { return j.driverId !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// DRIVER REORDER
+app.put('/api/drivers-reorder', function(req, res) {
+  var ids = req.body.order;
+  if (!ids || !Array.isArray(ids)) return res.status(400).json({error:'order array required'});
+  var reordered = [];
+  ids.forEach(function(id) {
+    var d = data.drivers.find(function(x) { return x.id === id; });
+    if (d) reordered.push(d);
+  });
+  data.drivers.forEach(function(d) {
+    if (ids.indexOf(d.id) === -1) reordered.push(d);
+  });
+  data.drivers = reordered;
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// TRUCKS
+app.post('/api/trucks', function(req, res) {
+  var truck = Object.assign({}, req.body, { id: 't' + Date.now() });
+  data.trucks.push(truck); saveData(data); broadcast({type:'full-sync',data:data}); res.json(truck);
+});
+app.put('/api/trucks/:id', function(req, res) {
+  var idx = data.trucks.findIndex(function(t) { return t.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.trucks[idx], req.body);
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json(data.trucks[idx]);
+});
+app.delete('/api/trucks/:id', function(req, res) {
+  data.trucks = data.trucks.filter(function(t) { return t.id !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// TRAILERS
+app.post('/api/trailers', function(req, res) {
+  var trailer = Object.assign({}, req.body, { id: 'tr' + Date.now() });
+  data.trailers.push(trailer); saveData(data); broadcast({type:'full-sync',data:data}); res.json(trailer);
+});
+app.put('/api/trailers/:id', function(req, res) {
+  var idx = data.trailers.findIndex(function(t) { return t.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.trailers[idx], req.body);
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json(data.trailers[idx]);
+});
+app.delete('/api/trailers/:id', function(req, res) {
+  data.trailers = data.trailers.filter(function(t) { return t.id !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// EQUIPMENT
+app.post('/api/equipment', function(req, res) {
+  if (req.body.name && data.equipment.indexOf(req.body.name) === -1) {
+    data.equipment.push(req.body.name); saveData(data); broadcast({type:'full-sync',data:data});
+  }
+  res.json({ok:true});
+});
+app.delete('/api/equipment/:name', function(req, res) {
+  data.equipment = data.equipment.filter(function(e) { return e !== req.params.name; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// LOCATIONS
+app.post('/api/locations', function(req, res) {
+  if (req.body.name && data.locations.indexOf(req.body.name) === -1) {
+    data.locations.push(req.body.name); data.locations.sort();
+    saveData(data); broadcast({type:'full-sync',data:data});
+  }
+  res.json({ok:true});
+});
+app.put('/api/locations', function(req, res) {
+  if (req.body.oldName && req.body.newName) {
+    var idx = data.locations.indexOf(req.body.oldName);
+    if (idx !== -1) { data.locations[idx] = req.body.newName; data.locations.sort(); saveData(data); broadcast({type:'full-sync',data:data}); }
+  }
+  res.json({ok:true});
+});
+app.delete('/api/locations/:name', function(req, res) {
+  data.locations = data.locations.filter(function(l) { return l !== req.params.name; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// CUSTOMERS
+app.get('/api/customers', function(req, res) { res.json(data.customers || []); });
+app.post('/api/customers', function(req, res) {
+  var cust = Object.assign({}, req.body, { id: 'cust' + Date.now() });
+  data.customers.push(cust); saveData(data); broadcast({type:'full-sync',data:data}); res.json(cust);
+});
+app.put('/api/customers/:id', function(req, res) {
+  var idx = data.customers.findIndex(function(c) { return c.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.customers[idx], req.body);
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json(data.customers[idx]);
+});
+app.delete('/api/customers/:id', function(req, res) {
+  data.customers = data.customers.filter(function(c) { return c.id !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+app.delete('/api/customers', function(req, res) {
+  data.customers = [];
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+app.post('/api/customers/import', function(req, res) {
+  var rows = req.body.customers;
+  if (!rows || !Array.isArray(rows)) return res.status(400).json({error:'customers array required'});
+  var count = 0;
+  rows.forEach(function(r) {
+    if (!r.name || !r.name.trim()) return;
+    var cust = {
+      id: 'cust' + Date.now() + Math.random().toString(36).slice(2),
+      name: (r.name||'').trim(),
+      address: (r.address||'').trim(),
+      city: (r.city||'').trim(),
+      state: (r.state||'').trim(),
+      zip: (r.zip||'').trim(),
+      phone: (r.phone||'').trim(),
+      email: (r.email||'').trim(),
+      contact: (r.contact||'').trim(),
+      pricing: (r.pricing||'').trim(),
+      notes: (r.notes||'').trim()
+    };
+    data.customers.push(cust);
+    count++;
+  });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ok:true, imported:count});
+});
+
+function getLocalIP() {
+  var interfaces = os.networkInterfaces();
+  var keys = Object.keys(interfaces);
+  for (var k = 0; k < keys.length; k++) {
+    var ifaces = interfaces[keys[k]];
+    for (var i = 0; i < ifaces.length; i++) {
+      if (ifaces[i].family === 'IPv4' && !ifaces[i].internal) return ifaces[i].address;
+    }
+  }
+  return 'localhost';
+}
+
+app.listen(PORT, '0.0.0.0', function() {
+  var ip = getLocalIP();
+  console.log('');
+  console.log('===========================================');
+  console.log('   FLEET SCHEDULER IS RUNNING');
+  console.log('===========================================');
+  console.log('');
+  console.log('   Open in browser:  http://localhost:' + PORT);
+  console.log('   Local network:    http://' + ip + ':' + PORT);
+  console.log('');
+  console.log('   Keep this window open while in use.');
+  console.log('   Data saved to: ' + DATA_FILE);
+  console.log('===========================================');
 });
