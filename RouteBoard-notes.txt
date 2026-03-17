@@ -1,0 +1,66 @@
+RouteBoard - Fleet Scheduler App
+Independence Environmental Services, LLC
+=========================================
+
+HOSTING & DEPLOYMENT
+- Hosted on Railway.app, deployed from GitHub
+- RAILWAY_VOLUME_MOUNT_PATH=/data (persistent storage)
+- Upload index.html to public/ folder on GitHub
+- Upload server.js and package.json to root folder on GitHub
+- Deploy triggers automatically after GitHub commit
+
+FILES
+- index.html (public/) - Entire frontend: React 18 + Babel standalone
+- server.js (root) - Express server with all API endpoints
+- package.json (root) - Dependencies: express, multer
+
+TECH STACK
+- Frontend: React 18 with Babel standalone (JSX in script tag), no build step
+- Backend: Node.js + Express
+- Real-time sync: Server-Sent Events (SSE) - all tabs update live
+- File uploads: Multer library
+- Excel/CSV import: SheetJS (xlsx) loaded from CDN
+- Data storage: JSON file on Railway volume (/data/fleet-data.json)
+- Documents stored in /data/uploads/
+
+TABS
+1. Weekly Schedule - Main scheduling grid, color-coded cells, copy/paste jobs
+2. People (Roster) - Add/edit/reorder drivers and staff
+3. Trucks & Trailers - Fleet management, active/inactive status
+4. Route View - Horizontal weekly view, all drivers shown every day
+5. Customers - Full CRUD, search, import from Excel, print cards
+6. Documents - Upload/view/download PDFs, Word docs, images, etc.
+
+KEY FEATURES
+- Print Job: POST to /print-job endpoint, opens clean page in new tab
+- Print Customer: GET to /print-customer endpoint
+- Documents: GET /api/documents/:id/view opens inline in browser
+- Multi-customer per job: Each customer gets their own page when printing
+- Per-customer fields: time window, equipment, placards, job notes
+- Searchable customer dropdown in Add Job popup
+- Copy/Paste job across drivers with clipboard
+- Multiple jobs per driver per day (+ button)
+- CSV/Excel import for bulk customer upload (QuickBooks compatible)
+- Hazmat placards: DOT hazard classes + 4-digit UN numbers, per-customer
+- Confirmation popup when updating existing jobs
+
+COLOR CODING (Weekly Schedule cells)
+- Red (#fca5a5) = Coast
+- Orange (#fed7aa) = Vac
+- Purple (#e9d5ff) = Roll Off
+- Pink (#fce7f3) = EWS, LA TSDF, PRR, USE
+- Green (#dcfce7) = Custom typed locations
+- Legend bar shown below Prev/Today/Next buttons
+
+SAFARI COMPATIBILITY
+- window.print() and window.open() don't work from React in Safari
+- Solution: Server-side endpoints serve clean HTML pages
+- Print buttons use <a target="_blank"> links or hidden POST forms
+
+TIPS FOR FUTURE CHANGES
+- Upload index.html and server.js to a new Claude chat
+- Include this notes file for quick context
+- All API calls go through the api() helper function in index.html
+- All tabs are separate React function components
+- Locations list is user-managed (added in Trucks & Trailers tab)
+- Equipment list is also user-managed

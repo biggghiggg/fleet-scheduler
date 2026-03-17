@@ -1,7 +1,7 @@
 {
   "name": "fleet-scheduler",
   "version": "1.0.0",
-  "description": "Live shared fleet scheduling app",
+  "description": "RouteBoard - Live shared fleet scheduling app",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
