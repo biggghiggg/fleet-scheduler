@@ -10,8 +10,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;transition:background .3s,color .3s}
 :root{--primary:#2563eb;--danger:#dc2626;--success:#16a34a;--bg-white:#fff;--border:#e2e8f0;--text-muted:#64748b;--shadow:0 1px 3px rgba(0,0,0,.1);--shadow-lg:0 4px 12px rgba(0,0,0,.15)}
+body.dark{background:#121212;color:#e0e0e0}
+body.dark :root,.dark{--bg-white:#1e1e1e;--border:#333;--text-muted:#999;--shadow:0 1px 3px rgba(0,0,0,.4);--shadow-lg:0 4px 12px rgba(0,0,0,.5)}
+body.dark input,body.dark select,body.dark textarea{background:#2a2a2a;color:#e0e0e0;border-color:#444}
+body.dark .grid{background:#1e1e1e}
+body.dark .grid th{background:#252525;color:#aaa}
+body.dark .grid td{border-color:#333}
+body.dark .grid td:first-child{background:#252525}
+body.dark .cell{background:#1e1e1e}
+body.dark .cell.today{background:#1a2a1a}
+body.dark .chip{background:#2a2a2a;border-color:#444}
+body.dark .tabs{background:#333}
+body.dark .tab{color:#999}
+body.dark .tab.on{background:#1e1e1e;color:#60a5fa}
+body.dark .modal{background:#1e1e1e;color:#e0e0e0}
+body.dark .overlay{background:rgba(0,0,0,.7)}
+body.dark button.bp{background:var(--primary);color:#fff}
+body.dark button.bc{background:#333;color:#e0e0e0}
+body.dark button.bd{background:#7f1d1d;color:#fca5a5}
 button{cursor:pointer;border:none;border-radius:6px;font-size:13px;padding:6px 14px;transition:all .15s}
 button:hover{filter:brightness(0.92)}
 input,select,textarea{border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;width:100%}
@@ -214,7 +232,10 @@ function App(){
     <div>
       <div className="app-header">
         <h1>RouteBoard</h1>
-        <span className={'conn-status '+(conn?'ok':'bad')}>{conn?'Live':'Reconnecting...'}</span>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={()=>{document.body.classList.toggle('dark');}} style={{background:'rgba(255,255,255,.2)',color:'#fff',padding:'4px 12px',borderRadius:20,fontSize:11,fontWeight:600,border:'1px solid rgba(255,255,255,.3)'}}>{'\u263D'} Dark Mode</button>
+          <span className={'conn-status '+(conn?'ok':'bad')}>{conn?'Live':'Reconnecting...'}</span>
+        </div>
       </div>
       <div className="tabs">
         {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
