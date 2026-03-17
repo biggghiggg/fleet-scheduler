@@ -258,7 +258,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
   const copyJob=()=>{if(!modal)return;const c={location:modal.location,customerIds:getCustEntries().map(x=>({...x})),truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
   const clearClip=()=>{setClip(null);if(show)show('Clipboard cleared.');};
   const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);};
-  const save=async()=>{if(eid)await api('PUT','/jobs/'+eid,modal);else await api('POST','/jobs',modal);setModal(null);setEid(null);};
+  const save=async()=>{if(eid){if(!confirm('Are you sure you want to update this job?'))return;await api('PUT','/jobs/'+eid,modal);}else{await api('POST','/jobs',modal);}setModal(null);setEid(null);};
   const del=async(id,e)=>{if(e)e.stopPropagation();await api('DELETE','/jobs/'+id);};
   const moveDriver=async(idx,dir)=>{
     const newIdx=idx+dir;
