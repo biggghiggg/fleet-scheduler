@@ -238,12 +238,13 @@ function App(){
         </div>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['pickups','Pickups'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
       <div className="main">
         {tab==='schedule'&&<Schedule {...{data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}}/>}
+        {tab==='pickups'&&<Pickups data={data}/>}
         {tab==='roster'&&<Roster data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
         {tab==='routes'&&<Routes data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
@@ -990,6 +991,296 @@ function Documents(){
         </div>
       ))}
     </div>
+  </div>);
+}
+
+// ============================================================
+// PICKUPS TAB
+// ============================================================
+function Pickups({data}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [viewMode, setViewMode] = useState('active');
+  const [search, setSearch] = useState('');
+  const [filterPri, setFilterPri] = useState('');
+  const [assigningId, setAssigningId] = useState(null);
+  const [assignDriver, setAssignDriver] = useState('');
+  const [assignDate, setAssignDate] = useState('');
+  const [custSearch, setCustSearch] = useState('');
+  const [custDropOpen, setCustDropOpen] = useState(false);
+
+  const empty = { customerName: '', customerId: '', customerAddress: '', customerPhone: '', customerContact: '', contactName: '', contactPhone: '', wasteDescription: '', containerInfo: '', requestedDate: '', requestedTimeWindow: '', priority: 'routine', notes: '', salesPerson: '' };
+  const [form, setForm] = useState(empty);
+
+  const pickups = data.pickups || [];
+  const customers = (data.customers || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  const active = pickups.filter(p => p.status !== 'archived');
+  const archived = pickups.filter(p => p.status === 'archived');
+  let display = viewMode === 'active' ? active : archived;
+
+  if (filterPri) display = display.filter(p => p.priority === filterPri);
+  if (search) {
+    const s = search.toLowerCase();
+    display = display.filter(p =>
+      (p.customerName || '').toLowerCase().includes(s) ||
+      (p.wasteDescription || '').toLowerCase().includes(s) ||
+      (p.salesPerson || '').toLowerCase().includes(s) ||
+      (p.assignedDriverName || '').toLowerCase().includes(s) ||
+      (p.notes || '').toLowerCase().includes(s)
+    );
+  }
+
+  // Sort: emergency > urgent > routine, then by date
+  const priOrd = { emergency: 0, urgent: 1, routine: 2 };
+  display = display.slice().sort((a, b) => {
+    const pa = priOrd[a.priority] ?? 2, pb = priOrd[b.priority] ?? 2;
+    if (pa !== pb) return pa - pb;
+    return (a.requestedDate || '').localeCompare(b.requestedDate || '');
+  });
+
+  const newCount = active.filter(p => p.status === 'new').length;
+  const assignedCount = active.filter(p => p.status === 'assigned').length;
+
+  const openAdd = () => { setEditId(null); setForm(empty); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
+  const openEdit = (p) => { setEditId(p.id); setForm({ customerName: p.customerName || '', customerId: p.customerId || '', customerAddress: p.customerAddress || '', customerPhone: p.customerPhone || '', customerContact: p.customerContact || '', contactName: p.contactName || '', contactPhone: p.contactPhone || '', wasteDescription: p.wasteDescription || '', containerInfo: p.containerInfo || '', requestedDate: p.requestedDate || '', requestedTimeWindow: p.requestedTimeWindow || '', priority: p.priority || 'routine', notes: p.notes || '', salesPerson: p.salesPerson || '' }); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
+
+  const selectCustomer = (c) => {
+    setForm(f => ({ ...f, customerId: c.id, customerName: c.name || '', customerAddress: [c.address, c.city, c.state, c.zip].filter(Boolean).join(', '), customerPhone: c.phone || '', customerContact: c.contact || '', contactName: f.contactName || c.contact || '', contactPhone: f.contactPhone || c.phone || '' }));
+    setCustSearch('');
+    setCustDropOpen(false);
+  };
+
+  const save = async () => {
+    if (!form.customerName) { alert('Please select a customer/generator'); return; }
+    if (!form.wasteDescription) { alert('Please enter waste description'); return; }
+    if (editId) { await api('PUT', '/pickups/' + editId, form); }
+    else { await api('POST', '/pickups', form); }
+    setShowForm(false); setEditId(null); setForm(empty);
+  };
+
+  const doAssign = async (pickupId) => {
+    if (!assignDriver) { alert('Please select a driver'); return; }
+    const driver = data.drivers.find(d => d.id === assignDriver);
+    await api('PUT', '/pickups/' + pickupId + '/assign', {
+      driverId: assignDriver,
+      driverName: driver ? driver.name : '',
+      date: assignDate
+    });
+    setAssigningId(null); setAssignDriver(''); setAssignDate('');
+  };
+
+  const doArchive = async (id) => { await api('PUT', '/pickups/' + id + '/archive'); };
+  const doUnarchive = async (id) => { await api('PUT', '/pickups/' + id + '/unarchive'); };
+  const doDelete = async (id) => { if (!confirm('Delete this pickup job?')) return; await api('DELETE', '/pickups/' + id); };
+
+  const priBadge = (pri) => {
+    const c = { emergency: '#dc2626', urgent: '#f59e0b', routine: '#10b981' };
+    const l = { emergency: 'EMERGENCY', urgent: 'URGENT', routine: 'Routine' };
+    return <span style={{ background: c[pri] || '#6b7280', color: '#fff', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 'bold' }}>{l[pri] || pri}</span>;
+  };
+
+  const stBadge = (st) => {
+    const c = { 'new': '#3b82f6', assigned: '#8b5cf6', archived: '#6b7280' };
+    const l = { 'new': 'NEW', assigned: 'ASSIGNED', archived: 'ARCHIVED' };
+    return <span style={{ background: c[st] || '#6b7280', color: '#fff', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 'bold', marginLeft: 6 }}>{l[st] || st}</span>;
+  };
+
+  // Customer search filtering
+  const filteredCustomers = custSearch.trim() ? customers.filter(c => (c.name || '').toLowerCase().includes(custSearch.toLowerCase())) : customers;
+
+  return (<div>
+    {/* Header */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <h2 style={{ margin: 0, fontSize: 20 }}>Job Pickups</h2>
+        <span style={{ background: '#3b82f6', color: '#fff', borderRadius: 12, padding: '2px 10px', fontSize: 12, fontWeight: 'bold' }}>{newCount} New</span>
+        <span style={{ background: '#8b5cf6', color: '#fff', borderRadius: 12, padding: '2px 10px', fontSize: 12, fontWeight: 'bold' }}>{assignedCount} Assigned</span>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, width: 160 }} />
+        <select value={filterPri} onChange={e => setFilterPri(e.target.value)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}>
+          <option value="">All Priorities</option>
+          <option value="emergency">Emergency</option>
+          <option value="urgent">Urgent</option>
+          <option value="routine">Routine</option>
+        </select>
+        <button onClick={() => setViewMode('active')} style={{ background: viewMode === 'active' ? 'var(--primary)' : '#94a3b8', color: '#fff', fontWeight: 600 }}>Active</button>
+        <button onClick={() => setViewMode('archived')} style={{ background: viewMode === 'archived' ? 'var(--primary)' : '#94a3b8', color: '#fff', fontWeight: 600 }}>Archive</button>
+        <button onClick={openAdd} style={{ background: 'var(--success)', color: '#fff', fontWeight: 700, padding: '8px 16px' }}>+ New Pickup</button>
+      </div>
+    </div>
+
+    {/* Pickup cards */}
+    {display.length === 0 ? (
+      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+        {viewMode === 'active' ? 'No active pickup jobs. Click "+ New Pickup" to create one.' : 'No archived jobs.'}
+      </div>
+    ) : (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {display.map(pickup => {
+          const isAssigning = assigningId === pickup.id;
+          const borderColor = pickup.priority === 'emergency' ? '#dc2626' : pickup.priority === 'urgent' ? '#f59e0b' : '#10b981';
+          return (
+            <div key={pickup.id} style={{ background: 'var(--bg-white)', border: '1px solid var(--border)', borderLeft: '4px solid ' + borderColor, borderRadius: 8, padding: 14, boxShadow: 'var(--shadow)' }}>
+              {/* Card header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div>
+                  <span style={{ fontWeight: 'bold', fontSize: 15 }}>{pickup.customerName || 'Unknown'}</span>
+                  {stBadge(pickup.status)}
+                  {priBadge(pickup.priority)}
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {viewMode === 'active' && pickup.status === 'new' && (
+                    <button onClick={() => { setAssigningId(pickup.id); setAssignDate(pickup.requestedDate || ''); }} style={{ background: '#8b5cf6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Assign Driver</button>
+                  )}
+                  {viewMode === 'active' && pickup.status === 'assigned' && (
+                    <button onClick={() => doArchive(pickup.id)} style={{ background: '#6b7280', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Complete &amp; Archive</button>
+                  )}
+                  {viewMode === 'archived' && (
+                    <button onClick={() => doUnarchive(pickup.id)} style={{ background: '#3b82f6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Restore</button>
+                  )}
+                  <button onClick={() => openEdit(pickup)} style={{ background: '#f59e0b', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Edit</button>
+                  <button onClick={() => doDelete(pickup.id)} style={{ background: '#ef4444', color: '#fff', fontSize: 11, padding: '5px 8px' }}>X</button>
+                </div>
+              </div>
+
+              {/* Card body */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px 16px', fontSize: 13 }}>
+                <div><strong>Waste: </strong>{pickup.wasteDescription || '-'}</div>
+                <div><strong>Containers: </strong>{pickup.containerInfo || '-'}</div>
+                <div><strong>Pickup Date: </strong>{pickup.requestedDate ? new Date(pickup.requestedDate + 'T12:00:00').toLocaleDateString() : 'TBD'}</div>
+                {pickup.requestedTimeWindow && <div><strong>Time: </strong>{pickup.requestedTimeWindow}</div>}
+                <div><strong>Address: </strong>{pickup.customerAddress || '-'}</div>
+                <div><strong>Contact: </strong>{(pickup.contactName || '-') + (pickup.contactPhone ? ' (' + pickup.contactPhone + ')' : '')}</div>
+                <div><strong>Salesperson: </strong>{pickup.salesPerson || '-'}</div>
+                {pickup.assignedDriverName && <div><strong>Driver: </strong><span style={{ color: '#7c3aed', fontWeight: 'bold' }}>{pickup.assignedDriverName}</span>{pickup.assignedDate ? ' (' + new Date(pickup.assignedDate + 'T12:00:00').toLocaleDateString() + ')' : ''}</div>}
+              </div>
+
+              {/* Notes */}
+              {pickup.notes && (
+                <div style={{ marginTop: 6, padding: '6px 10px', background: '#fffbeb', borderRadius: 4, fontSize: 12, color: '#92400e' }}>
+                  <strong>Notes: </strong>{pickup.notes}
+                </div>
+              )}
+
+              {/* Assignment panel */}
+              {isAssigning && (
+                <div style={{ marginTop: 10, padding: 12, background: '#f3f4f6', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 8, color: 'var(--primary)' }}>
+                    Assign Driver <span style={{ fontSize: 11, fontWeight: 'normal', color: '#7c3aed' }}>(auto-adds to Weekly Schedule)</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <select value={assignDriver} onChange={e => setAssignDriver(e.target.value)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', minWidth: 180 }}>
+                      <option value="">-- Select Driver --</option>
+                      {data.drivers.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}{d.role ? ' (' + d.role + ')' : ''}</option>
+                      ))}
+                    </select>
+                    <input type="date" value={assignDate} onChange={e => setAssignDate(e.target.value)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', width: 'auto' }} />
+                    <button onClick={() => doAssign(pickup.id)} style={{ background: 'var(--success)', color: '#fff', fontWeight: 700 }}>Assign</button>
+                    <button onClick={() => setAssigningId(null)} style={{ background: '#94a3b8', color: '#fff' }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 12 }}>
+                <span>Created: {new Date(pickup.createdAt).toLocaleDateString()}</span>
+                {pickup.routeBoardJobId && <span style={{ color: '#7c3aed' }}>On Schedule</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {/* New/Edit Pickup Modal */}
+    {showForm && (
+      <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 620, width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+          <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>{editId ? 'Edit Pickup Job' : 'New Pickup Job'}</h3>
+
+          {/* Customer/Generator selection with search */}
+          <div style={{ marginBottom: 12, position: 'relative' }}>
+            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Customer / Generator *</label>
+            <input type="text" placeholder="Search customers..." value={custSearch || form.customerName} onChange={e => { setCustSearch(e.target.value); setCustDropOpen(true); setForm(f => ({ ...f, customerName: e.target.value, customerId: '' })); }} onFocus={() => setCustDropOpen(true)} style={{ width: '100%' }} />
+            {custDropOpen && filteredCustomers.length > 0 && (
+              <div style={{ position: 'absolute', zIndex: 50, background: 'var(--bg-white)', border: '1px solid var(--border)', borderRadius: 6, maxHeight: 200, overflowY: 'auto', width: '100%', boxShadow: 'var(--shadow-lg)' }}>
+                {filteredCustomers.slice(0, 20).map(c => (
+                  <div key={c.id} onClick={() => selectCustomer(c)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                    <strong>{c.name}</strong>
+                    {c.city && <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: 12 }}>{c.city}{c.state ? ', ' + c.state : ''}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {form.customerAddress && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{form.customerAddress}{form.customerPhone ? ' | ' + form.customerPhone : ''}</div>}
+          </div>
+
+          {/* Contact info */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Site Contact Name</label>
+              <input value={form.contactName} onChange={e => setForm(f => ({ ...f, contactName: e.target.value }))} />
+            </div>
+            <div>
+              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Site Contact Phone</label>
+              <input value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))} />
+            </div>
+          </div>
+
+          {/* Waste info */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Waste Description *</label>
+            <textarea value={form.wasteDescription} onChange={e => setForm(f => ({ ...f, wasteDescription: e.target.value }))} rows={2} />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Container Info (qty, size, type)</label>
+            <input value={form.containerInfo} onChange={e => setForm(f => ({ ...f, containerInfo: e.target.value }))} placeholder="e.g. 4 x 55 gal drums" />
+          </div>
+
+          {/* Date, time, priority */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Requested Date</label>
+              <input type="date" value={form.requestedDate} onChange={e => setForm(f => ({ ...f, requestedDate: e.target.value }))} />
+            </div>
+            <div>
+              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Time Window</label>
+              <input value={form.requestedTimeWindow} onChange={e => setForm(f => ({ ...f, requestedTimeWindow: e.target.value }))} placeholder="e.g. 8am-12pm" />
+            </div>
+            <div>
+              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Priority</label>
+              <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                <option value="routine">Routine</option>
+                <option value="urgent">Urgent</option>
+                <option value="emergency">Emergency</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Salesperson */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Salesperson</label>
+            <input value={form.salesPerson} onChange={e => setForm(f => ({ ...f, salesPerson: e.target.value }))} />
+          </div>
+
+          {/* Notes */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Notes / Special Instructions</label>
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Anything the scheduler or driver needs to know..." />
+          </div>
+
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => { setShowForm(false); setEditId(null); }} className="bc" style={{ background: '#94a3b8', color: '#fff', padding: '8px 20px' }}>Cancel</button>
+            <button onClick={save} className="bp" style={{ background: 'var(--success)', color: '#fff', padding: '8px 20px', fontWeight: 700 }}>{editId ? 'Update Pickup' : 'Create Pickup'}</button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>);
 }
 
