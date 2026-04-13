@@ -85,6 +85,7 @@ function createBackup() {
 var data = loadData();
 if (!data.locations) { data.locations = defaultData.locations; saveData(data); }
 if (!data.customers) { data.customers = []; saveData(data); }
+if (!data.pickups) { data.pickups = []; saveData(data); }
 console.log('DATA_DIR = ' + DATA_DIR);
 console.log('DATA_FILE = ' + DATA_FILE);
 console.log('RAILWAY_VOLUME_MOUNT_PATH = ' + (process.env.RAILWAY_VOLUME_MOUNT_PATH || 'NOT SET'));
@@ -475,6 +476,102 @@ app.post('/api/customers/import', function(req, res) {
   });
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true, imported:count});
+});
+
+// PICKUPS
+app.get('/api/pickups', function(req, res) { res.json(data.pickups || []); });
+
+app.post('/api/pickups', function(req, res) {
+  var p = Object.assign({}, req.body, {
+    id: 'pk' + Date.now() + Math.random().toString(36).slice(2),
+    status: 'new',
+    assignedDriverId: '',
+    assignedDriverName: '',
+    assignedDate: '',
+    routeBoardJobId: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  data.pickups.push(p);
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json(p);
+});
+
+app.put('/api/pickups/:id', function(req, res) {
+  var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.pickups[idx], req.body, { updatedAt: new Date().toISOString() });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json(data.pickups[idx]);
+});
+
+// Assign driver + auto-create job on Weekly Schedule
+app.put('/api/pickups/:id/assign', function(req, res) {
+  var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  var pickup = data.pickups[idx];
+  var b = req.body || {};
+  pickup.assignedDriverId = b.driverId || '';
+  pickup.assignedDriverName = b.driverName || '';
+  pickup.assignedDate = b.date || pickup.requestedDate || '';
+  pickup.status = 'assigned';
+  pickup.updatedAt = new Date().toISOString();
+
+  // Auto-create a job on the Weekly Schedule
+  if (pickup.assignedDriverId && pickup.assignedDate) {
+    // Build the customer list from the pickup's customer/generator
+    var custIds = [];
+    if (pickup.customerId) {
+      custIds.push({ id: pickup.customerId, jobNotes: (pickup.wasteDescription || '') + (pickup.containerInfo || '') + (pickup.notes ? '\n' + pickup.notes : ''), timeWindow: pickup.requestedTimeWindow || '', equipment: '', placards: '' });
+    }
+    var job = {
+      id: 'j' + Date.now() + Math.random().toString(36).slice(2),
+      driverId: pickup.assignedDriverId,
+      date: pickup.assignedDate,
+      location: pickup.customerName || 'Pickup',
+      customerIds: custIds,
+      truckId: '',
+      trailerId: '',
+      timeWindow: pickup.requestedTimeWindow || '',
+      equipment: [],
+      notes: (pickup.wasteDescription || '') + (pickup.containerInfo ? ' | ' + pickup.containerInfo : '') + (pickup.notes ? '\n' + pickup.notes : ''),
+      status: 'Scheduled',
+      _pickupId: pickup.id
+    };
+    data.jobs.push(job);
+    pickup.routeBoardJobId = job.id;
+  }
+
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ ok: true, pickup: pickup });
+});
+
+// Archive a pickup
+app.put('/api/pickups/:id/archive', function(req, res) {
+  var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  data.pickups[idx].status = 'archived';
+  data.pickups[idx].archivedAt = new Date().toISOString();
+  data.pickups[idx].updatedAt = new Date().toISOString();
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ok:true});
+});
+
+// Unarchive
+app.put('/api/pickups/:id/unarchive', function(req, res) {
+  var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  data.pickups[idx].status = data.pickups[idx].assignedDriverId ? 'assigned' : 'new';
+  delete data.pickups[idx].archivedAt;
+  data.pickups[idx].updatedAt = new Date().toISOString();
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ok:true});
+});
+
+app.delete('/api/pickups/:id', function(req, res) {
+  data.pickups = (data.pickups || []).filter(function(p) { return p.id !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ok:true});
 });
 
 function getLocalIP() {
