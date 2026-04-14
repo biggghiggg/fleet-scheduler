@@ -238,7 +238,7 @@ function App(){
         </div>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['pickups','Job Tickets'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
@@ -1072,7 +1072,7 @@ function Pickups({data}) {
 
   const doArchive = async (id) => { await api('PUT', '/pickups/' + id + '/archive'); };
   const doUnarchive = async (id) => { await api('PUT', '/pickups/' + id + '/unarchive'); };
-  const doDelete = async (id) => { if (!confirm('Delete this job ticket?')) return; await api('DELETE', '/pickups/' + id); };
+  const doDelete = async (id) => { if (!confirm('Delete this job request?')) return; await api('DELETE', '/pickups/' + id); };
 
   const priBadge = (pri) => {
     const c = { emergency: '#dc2626', urgent: '#f59e0b', routine: '#10b981' };
@@ -1093,7 +1093,7 @@ function Pickups({data}) {
     {/* Header */}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: 20 }}>Job Tickets</h2>
+        <h2 style={{ margin: 0, fontSize: 20 }}>Job Requests</h2>
         <span style={{ background: '#3b82f6', color: '#fff', borderRadius: 12, padding: '2px 10px', fontSize: 12, fontWeight: 'bold' }}>{newCount} New</span>
         <span style={{ background: '#8b5cf6', color: '#fff', borderRadius: 12, padding: '2px 10px', fontSize: 12, fontWeight: 'bold' }}>{assignedCount} Assigned</span>
       </div>
@@ -1107,14 +1107,14 @@ function Pickups({data}) {
         </select>
         <button onClick={() => setViewMode('active')} style={{ background: viewMode === 'active' ? 'var(--primary)' : '#94a3b8', color: '#fff', fontWeight: 600 }}>Active</button>
         <button onClick={() => setViewMode('archived')} style={{ background: viewMode === 'archived' ? 'var(--primary)' : '#94a3b8', color: '#fff', fontWeight: 600 }}>Archive</button>
-        <button onClick={openAdd} style={{ background: 'var(--success)', color: '#fff', fontWeight: 700, padding: '8px 16px' }}>+ New Job Ticket</button>
+        <button onClick={openAdd} style={{ background: 'var(--success)', color: '#fff', fontWeight: 700, padding: '8px 16px' }}>+ New Job Request</button>
       </div>
     </div>
 
-    {/* Job Ticket cards */}
+    {/* Job Request cards */}
     {display.length === 0 ? (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-        {viewMode === 'active' ? 'No active job tickets. Click "+ New Job Ticket" to create one.' : 'No archived jobs.'}
+        {viewMode === 'active' ? 'No active job requests. Click "+ New Job Request" to create one.' : 'No archived jobs.'}
       </div>
     ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1195,11 +1195,11 @@ function Pickups({data}) {
       </div>
     )}
 
-    {/* New/Edit Job Ticket Modal */}
+    {/* New/Edit Job Request Modal */}
     {showForm && (
       <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
         <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 620, width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
-          <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>{editId ? 'Edit Job Ticket' : 'New Job Ticket'}</h3>
+          <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>{editId ? 'Edit Job Request' : 'New Job Request'}</h3>
 
           {/* Customer/Generator selection with search */}
           <div style={{ marginBottom: 12, position: 'relative' }}>
@@ -1276,7 +1276,7 @@ function Pickups({data}) {
           {/* Buttons */}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button onClick={() => { setShowForm(false); setEditId(null); }} className="bc" style={{ background: '#94a3b8', color: '#fff', padding: '8px 20px' }}>Cancel</button>
-            <button onClick={save} className="bp" style={{ background: 'var(--success)', color: '#fff', padding: '8px 20px', fontWeight: 700 }}>{editId ? 'Update Job Ticket' : 'Create Job Ticket'}</button>
+            <button onClick={save} className="bp" style={{ background: 'var(--success)', color: '#fff', padding: '8px 20px', fontWeight: 700 }}>{editId ? 'Update Job Request' : 'Create Job Request'}</button>
           </div>
         </div>
       </div>
