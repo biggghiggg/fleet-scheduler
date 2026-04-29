@@ -454,28 +454,48 @@ app.delete('/api/customers', function(req, res) {
 });
 app.post('/api/customers/import', function(req, res) {
   var rows = req.body.customers;
+  var updateExisting = req.body.updateExisting || false;
   if (!rows || !Array.isArray(rows)) return res.status(400).json({error:'customers array required'});
-  var count = 0;
+  var added = 0;
+  var updated = 0;
   rows.forEach(function(r) {
     if (!r.name || !r.name.trim()) return;
-    var cust = {
-      id: 'cust' + Date.now() + Math.random().toString(36).slice(2),
-      name: (r.name||'').trim(),
-      address: (r.address||'').trim(),
-      city: (r.city||'').trim(),
-      state: (r.state||'').trim(),
-      zip: (r.zip||'').trim(),
-      phone: (r.phone||'').trim(),
-      email: (r.email||'').trim(),
-      contact: (r.contact||'').trim(),
-      pricing: (r.pricing||'').trim(),
-      notes: (r.notes||'').trim()
-    };
-    data.customers.push(cust);
-    count++;
+    var trimmedName = r.name.trim().toLowerCase();
+    var existing = updateExisting ? data.customers.find(function(c) {
+      return (c.name||'').trim().toLowerCase() === trimmedName;
+    }) : null;
+    if (existing) {
+      // Update existing customer fields (only overwrite non-empty values)
+      if ((r.address||'').trim()) existing.address = r.address.trim();
+      if ((r.city||'').trim()) existing.city = r.city.trim();
+      if ((r.state||'').trim()) existing.state = r.state.trim();
+      if ((r.zip||'').trim()) existing.zip = r.zip.trim();
+      if ((r.phone||'').trim()) existing.phone = r.phone.trim();
+      if ((r.email||'').trim()) existing.email = r.email.trim();
+      if ((r.contact||'').trim()) existing.contact = r.contact.trim();
+      if ((r.pricing||'').trim()) existing.pricing = r.pricing.trim();
+      if ((r.notes||'').trim()) existing.notes = r.notes.trim();
+      updated++;
+    } else {
+      var cust = {
+        id: 'cust' + Date.now() + Math.random().toString(36).slice(2),
+        name: (r.name||'').trim(),
+        address: (r.address||'').trim(),
+        city: (r.city||'').trim(),
+        state: (r.state||'').trim(),
+        zip: (r.zip||'').trim(),
+        phone: (r.phone||'').trim(),
+        email: (r.email||'').trim(),
+        contact: (r.contact||'').trim(),
+        pricing: (r.pricing||'').trim(),
+        notes: (r.notes||'').trim()
+      };
+      data.customers.push(cust);
+      added++;
+    }
   });
   saveData(data); broadcast({type:'full-sync',data:data});
-  res.json({ok:true, imported:count});
+  res.json({ok:true, imported:added, updated:updated});
 });
 
 // PICKUPS
