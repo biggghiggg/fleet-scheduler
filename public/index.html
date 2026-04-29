@@ -1122,7 +1122,7 @@ function Pickups({data}) {
   const newCount = active.filter(p => p.status === 'new').length;
   const assignedCount = active.filter(p => p.status === 'assigned').length;
 
-  const SALESPEOPLE = ['Frank Kendrick', 'Keith Higgins', 'Marshall Holmes', 'Mike Hetrick'];
+  const SALESPEOPLE = ['Frank Kendrick', 'Keith Higgins', 'Marshall Holmes', 'Mike Hetrick', 'Robert Benitez'];
   const grouped = {};
   SALESPEOPLE.forEach(sp => { grouped[sp] = []; });
   grouped['Other'] = [];
@@ -1461,6 +1461,7 @@ function Pickups({data}) {
             <option value="Keith Higgins">Keith Higgins</option>
             <option value="Marshall Holmes">Marshall Holmes</option>
             <option value="Mike Hetrick">Mike Hetrick</option>
+            <option value="Robert Benitez">Robert Benitez</option>
           </select></div>
         <div className="mrow"><label>Attachments</label>
           <div>
