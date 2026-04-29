@@ -519,23 +519,28 @@ app.put('/api/pickups/:id/assign', function(req, res) {
 
   // Auto-create a job on the Weekly Schedule
   if (pickup.assignedDriverId && pickup.assignedDate) {
-    // Build the customer list from the pickup's customer/generator
-    var custIds = [];
-    if (pickup.customerId) {
-      custIds.push({ id: pickup.customerId, jobNotes: (pickup.wasteDescription || '') + (pickup.containerInfo || '') + (pickup.notes ? '\n' + pickup.notes : ''), timeWindow: pickup.requestedTimeWindow || '', equipment: '', placards: '' });
+    // Use new-format fields if available, fall back to old format
+    var custIds = pickup.customerIds || [];
+    if (custIds.length === 0 && pickup.customerId) {
+      custIds = [{ id: pickup.customerId, jobNotes: (pickup.wasteDescription || '') + (pickup.containerInfo || '') + (pickup.notes ? '\n' + pickup.notes : ''), timeWindow: pickup.requestedTimeWindow || '', equipment: '', placards: '' }];
     }
+    var jobStatus = 'Scheduled';
+    if (pickup.status === 'Scheduled' || pickup.status === 'Tentative' || pickup.status === 'Confirmed') {
+      jobStatus = pickup.status;
+    }
+    if (pickup.jobStatus) jobStatus = pickup.jobStatus;
     var job = {
       id: 'j' + Date.now() + Math.random().toString(36).slice(2),
       driverId: pickup.assignedDriverId,
       date: pickup.assignedDate,
-      location: pickup.customerName || 'Pickup',
+      location: pickup.location || pickup.customerName || 'Pickup',
       customerIds: custIds,
-      truckId: '',
-      trailerId: '',
-      timeWindow: pickup.requestedTimeWindow || '',
-      equipment: [],
-      notes: (pickup.wasteDescription || '') + (pickup.containerInfo ? ' | ' + pickup.containerInfo : '') + (pickup.notes ? '\n' + pickup.notes : ''),
-      status: 'Scheduled',
+      truckId: pickup.truckId || '',
+      trailerId: pickup.trailerId || '',
+      timeWindow: pickup.timeWindow || pickup.requestedTimeWindow || '',
+      equipment: pickup.equipment || [],
+      notes: pickup.notes || ((pickup.wasteDescription || '') + (pickup.containerInfo ? ' | ' + pickup.containerInfo : '')),
+      status: jobStatus,
       _pickupId: pickup.id
     };
     data.jobs.push(job);
