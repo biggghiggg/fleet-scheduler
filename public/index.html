@@ -275,11 +275,23 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
   const [showPlacards,setShowPlacards]=useState(null); /* null or customer id */
   const [custSearch,setCustSearch]=useState('');
   const [custDropOpen,setCustDropOpen]=useState(false);
-  const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
+  const [pinPrompt,setPinPrompt]=useState(null); /* null or {action: function, pin: ''} */
+  const [pinError,setPinError]=useState('');
+
+  const checkPin=(pin)=>{return data.drivers.some(d=>d.pin&&d.pin===pin);};
+
+  const requirePin=(actionFn)=>{setPinPrompt({action:actionFn,pin:''});setPinError('');};
+  const submitPin=()=>{
+    if(!pinPrompt)return;
+    if(checkPin(pinPrompt.pin)){pinPrompt.action();setPinPrompt(null);setPinError('');}
+    else{setPinError('Invalid PIN');}
+  };
+
+  const openAdd=(did,date)=>{requirePin(()=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}});};
   const getCustEntries=()=>(modal.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
   const copyJob=()=>{if(!modal)return;const c={location:modal.location,customerIds:getCustEntries().map(x=>({...x})),truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
   const clearClip=()=>{setClip(null);if(show)show('Clipboard cleared.');};
-  const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);};
+  const openEdit=(job,e)=>{e.stopPropagation();requirePin(()=>{setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);});};
   const save=async()=>{if(eid){if(!confirm('Are you sure you want to update this job?'))return;await api('PUT','/jobs/'+eid,modal);}else{await api('POST','/jobs',modal);}setModal(null);setEid(null);};
   const del=async(id,e)=>{if(e)e.stopPropagation();await api('DELETE','/jobs/'+id);};
   const moveDriver=async(idx,dir)=>{
@@ -352,6 +364,22 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       </div>);
     })}
 
+    {pinPrompt&&(<div className="overlay">
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:340,textAlign:'center'}}>
+        <h2 style={{marginBottom:4}}>Enter PIN</h2>
+        <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:16}}>Enter your 4-digit PIN to continue</p>
+        <input type="password" maxLength={4} value={pinPrompt.pin} autoFocus
+          onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,4);setPinPrompt({...pinPrompt,pin:v});setPinError('');}}
+          onKeyDown={e=>{if(e.key==='Enter')submitPin();if(e.key==='Escape'){setPinPrompt(null);setPinError('');}}}
+          style={{fontSize:28,textAlign:'center',letterSpacing:12,width:140,padding:'8px 12px',border:'2px solid '+(pinError?'#dc2626':'var(--border)'),borderRadius:8}}
+          placeholder="••••"/>
+        {pinError&&<div style={{color:'#dc2626',fontSize:13,marginTop:8,fontWeight:600}}>{pinError}</div>}
+        <div style={{marginTop:16,display:'flex',gap:8,justifyContent:'center'}}>
+          <button className="bc" onClick={()=>{setPinPrompt(null);setPinError('');}}>Cancel</button>
+          <button className="bp" onClick={submitPin}>Submit</button>
+        </div>
+      </div>
+    </div>)}
     {modal&&(<div className="overlay" onClick={()=>{setModal(null);setEid(null);}}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <h2>{eid?'Edit Job':'Add Job'}</h2>
@@ -517,6 +545,12 @@ function Roster({data}){
           <select value={d.role} onChange={e=>api('PUT','/drivers/'+d.id,{role:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:4}}>
             <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Sales/Driver</option>
           </select>
+          <div style={{marginTop:4,display:'flex',alignItems:'center',gap:4}}>
+            <label style={{fontSize:11,fontWeight:600,color:'#6b7280'}}>PIN:</label>
+            <input type="text" maxLength={4} value={d.pin||''} placeholder="----"
+              onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,4);api('PUT','/drivers/'+d.id,{pin:v});}}
+              style={{width:60,padding:'2px 6px',fontSize:12,textAlign:'center',letterSpacing:4,border:'1px solid var(--border)',borderRadius:4}}/>
+          </div>
         </div>
         <div className="acts"><button style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>remove(d)}>Remove</button></div>
       </div>))}
