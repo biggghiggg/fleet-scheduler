@@ -1122,6 +1122,16 @@ function Pickups({data}) {
   const newCount = active.filter(p => p.status === 'new').length;
   const assignedCount = active.filter(p => p.status === 'assigned').length;
 
+  const SALESPEOPLE = ['Frank Kendrick', 'Keith Higgins', 'Marshall Holmes', 'Mike Hetrick'];
+  const grouped = {};
+  SALESPEOPLE.forEach(sp => { grouped[sp] = []; });
+  grouped['Other'] = [];
+  display.forEach(p => {
+    const sp = p.salesPerson || '';
+    if (SALESPEOPLE.includes(sp)) { grouped[sp].push(p); }
+    else { grouped['Other'].push(p); }
+  });
+
   const openAdd = () => { setEditId(null); setForm(emptyForm); setAttachments([]); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
   const openEdit = (p) => {
     setEditId(p.id);
@@ -1203,15 +1213,25 @@ function Pickups({data}) {
       </div>
     </div>
 
-    {/* Job Request cards */}
+    {/* Job Request cards grouped by salesperson */}
     {display.length === 0 ? (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
         {viewMode === 'active' ? 'No active job requests. Click "+ New Job Request" to create one.' : 'No archived jobs.'}
       </div>
     ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {display.map(pickup => {
-          const isAssigning = assigningId === pickup.id;
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {[...SALESPEOPLE, 'Other'].map(sp => {
+          const items = grouped[sp];
+          if (items.length === 0) return null;
+          return (
+            <div key={sp}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, borderBottom: '2px solid var(--primary)', paddingBottom: 6 }}>
+                <h3 style={{ margin: 0, fontSize: 16, color: 'var(--primary)' }}>{sp}</h3>
+                <span style={{ background: '#e0e7ff', color: '#4338ca', borderRadius: 12, padding: '2px 10px', fontSize: 11, fontWeight: 'bold' }}>{items.length}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {items.map(pickup => {
+                  const isAssigning = assigningId === pickup.id;
           const borderColor = pickup.priority === 'emergency' ? '#dc2626' : pickup.priority === 'urgent' ? '#f59e0b' : '#10b981';
           return (
             <div key={pickup.id} style={{ background: 'var(--bg-white)', border: '1px solid var(--border)', borderLeft: '4px solid ' + borderColor, borderRadius: 8, padding: 14, boxShadow: 'var(--shadow)' }}>
@@ -1312,6 +1332,10 @@ function Pickups({data}) {
               <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 12 }}>
                 <span>Created: {new Date(pickup.createdAt).toLocaleDateString()}</span>
                 {pickup.routeBoardJobId && <span style={{ color: '#7c3aed' }}>On Schedule</span>}
+              </div>
+            </div>
+          );
+        })}
               </div>
             </div>
           );
@@ -1431,7 +1455,13 @@ function Pickups({data}) {
             <option value="routine">Routine</option><option value="urgent">Urgent</option><option value="emergency">Emergency</option>
           </select></div>
         <div className="mrow"><label>Salesperson</label>
-          <input value={form.salesPerson||''} onChange={e=>setForm({...form,salesPerson:e.target.value})} placeholder="Salesperson name"/></div>
+          <select value={form.salesPerson||''} onChange={e=>setForm({...form,salesPerson:e.target.value})}>
+            <option value="">-- Select Salesperson --</option>
+            <option value="Frank Kendrick">Frank Kendrick</option>
+            <option value="Keith Higgins">Keith Higgins</option>
+            <option value="Marshall Holmes">Marshall Holmes</option>
+            <option value="Mike Hetrick">Mike Hetrick</option>
+          </select></div>
         <div className="mrow"><label>Attachments</label>
           <div>
             <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={e=>{if(e.target.files.length>0){uploadFiles(Array.from(e.target.files));e.target.value='';}}} style={{fontSize:12}}/>
