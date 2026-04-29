@@ -1068,6 +1068,28 @@ function Pickups({data}) {
 
   const removeAttachment = (docId) => { setAttachments(prev => prev.filter(a => a.id !== docId)); };
 
+  const [pinPrompt, setPinPrompt] = useState(null); /* null or {pickupId, pin} */
+  const [pinError, setPinError] = useState('');
+
+  const checkPin = (pin) => data.drivers.some(d => d.pin && d.pin === pin);
+
+  const startAssign = (pickupId, requestedDate) => {
+    setPinPrompt({ pickupId, requestedDate: requestedDate || '', pin: '' });
+    setPinError('');
+  };
+
+  const submitAssignPin = () => {
+    if (!pinPrompt) return;
+    if (checkPin(pinPrompt.pin)) {
+      setAssigningId(pinPrompt.pickupId);
+      setAssignDate(pinPrompt.requestedDate);
+      setPinPrompt(null);
+      setPinError('');
+    } else {
+      setPinError('Invalid PIN');
+    }
+  };
+
   const getCustEntries = () => (form.customerIds || []).map(x => typeof x === 'string' ? { id: x, jobNotes: '' } : x);
 
   const pickups = data.pickups || [];
@@ -1201,7 +1223,7 @@ function Pickups({data}) {
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {viewMode === 'active' && pickup.status === 'new' && (
-                    <button onClick={() => { setAssigningId(pickup.id); setAssignDate(pickup.requestedDate || ''); }} style={{ background: '#8b5cf6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Assign Driver</button>
+                    <button onClick={() => startAssign(pickup.id, pickup.date || pickup.requestedDate)} style={{ background: '#8b5cf6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Assign Driver</button>
                   )}
                   {viewMode === 'active' && pickup.status === 'assigned' && (
                     <button onClick={() => doArchive(pickup.id)} style={{ background: '#6b7280', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Complete &amp; Archive</button>
@@ -1271,6 +1293,26 @@ function Pickups({data}) {
             </div>
           );
         })}
+      </div>
+    )}
+
+    {/* PIN Prompt for Assign */}
+    {pinPrompt && (
+      <div className="overlay">
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+          <h2 style={{ marginBottom: 4 }}>Enter PIN</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Enter your 4-digit PIN to assign this job</p>
+          <input type="password" maxLength={4} value={pinPrompt.pin} autoFocus
+            onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); setPinPrompt({ ...pinPrompt, pin: v }); setPinError(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') submitAssignPin(); if (e.key === 'Escape') { setPinPrompt(null); setPinError(''); } }}
+            style={{ fontSize: 28, textAlign: 'center', letterSpacing: 12, width: 140, padding: '8px 12px', border: '2px solid ' + (pinError ? '#dc2626' : 'var(--border)'), borderRadius: 8 }}
+            placeholder="••••" />
+          {pinError && <div style={{ color: '#dc2626', fontSize: 13, marginTop: 8, fontWeight: 600 }}>{pinError}</div>}
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="bc" onClick={() => { setPinPrompt(null); setPinError(''); }}>Cancel</button>
+            <button className="bp" onClick={submitAssignPin}>Submit</button>
+          </div>
+        </div>
       </div>
     )}
 
