@@ -1009,7 +1009,7 @@ function Pickups({data}) {
   const [custSearch, setCustSearch] = useState('');
   const [custDropOpen, setCustDropOpen] = useState(false);
 
-  const emptyForm = { date: '', driverId: '', location: '', customerIds: [], truckId: '', trailerId: '', timeWindow: '', equipment: [], notes: '', status: 'Scheduled', priority: 'routine', salesPerson: '' };
+  const emptyForm = { date: '', customerIds: [], truckTrailerType: '', timeWindow: '', equipment: [], notes: '', status: 'Scheduled', priority: 'routine', salesPerson: '' };
   const [form, setForm] = useState(emptyForm);
   const [showPlacards, setShowPlacards] = useState(null);
 
@@ -1051,11 +1051,8 @@ function Pickups({data}) {
     const custIds = p.customerIds || (p.customerId ? [{ id: p.customerId, jobNotes: (p.wasteDescription || '') + (p.containerInfo ? ' | ' + p.containerInfo : ''), timeWindow: p.requestedTimeWindow || '' }] : []);
     setForm({
       date: p.date || p.requestedDate || '',
-      driverId: p.driverId || p.assignedDriverId || '',
-      location: p.location || p.customerName || '',
       customerIds: custIds,
-      truckId: p.truckId || '',
-      trailerId: p.trailerId || '',
+      truckTrailerType: p.truckTrailerType || '',
       timeWindow: p.timeWindow || p.requestedTimeWindow || '',
       equipment: p.equipment || [],
       notes: p.notes || '',
@@ -1069,10 +1066,10 @@ function Pickups({data}) {
   };
 
   const save = async () => {
-    if (getCustEntries().length === 0 && !form.location) { alert('Please add a customer or enter a location'); return; }
+    if (getCustEntries().length === 0) { alert('Please add at least one customer'); return; }
     const entries = getCustEntries();
     const firstCust = entries.length > 0 ? (data.customers || []).find(c => c.id === entries[0].id) : null;
-    const payload = { ...form, customerName: firstCust ? firstCust.name : form.location, customerId: firstCust ? firstCust.id : '' };
+    const payload = { ...form, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '' };
     if (editId) { await api('PUT', '/pickups/' + editId, payload); }
     else { await api('POST', '/pickups', payload); }
     setShowForm(false); setEditId(null); setForm(emptyForm);
@@ -1163,12 +1160,10 @@ function Pickups({data}) {
 
               {/* Card body */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px 16px', fontSize: 13 }}>
-                <div><strong>Location: </strong>{pickup.location || pickup.customerName || '-'}</div>
                 <div><strong>Customer(s): </strong>{(()=>{ const ids = pickup.customerIds || []; if (ids.length > 0) { return ids.map(x => { const cid = typeof x === 'string' ? x : x.id; const c = (data.customers || []).find(cx => cx.id === cid); return c ? c.name : cid; }).join(', '); } return pickup.customerName || '-'; })()}</div>
                 <div><strong>Date: </strong>{(pickup.date || pickup.requestedDate) ? new Date((pickup.date || pickup.requestedDate) + 'T12:00:00').toLocaleDateString() : 'TBD'}</div>
                 {(pickup.timeWindow || pickup.requestedTimeWindow) && <div><strong>Time Window: </strong>{pickup.timeWindow || pickup.requestedTimeWindow}</div>}
-                <div><strong>Truck: </strong>{(()=>{ if (!pickup.truckId) return '-'; const t = data.trucks.find(x => x.id === pickup.truckId); return t ? t.name : '-'; })()}</div>
-                <div><strong>Trailer: </strong>{(()=>{ if (!pickup.trailerId) return '-'; const t = data.trailers.find(x => x.id === pickup.trailerId); return t ? t.name : '-'; })()}</div>
+                <div><strong>Truck/Trailer Type: </strong>{pickup.truckTrailerType || '-'}</div>
                 <div><strong>Salesperson: </strong>{pickup.salesPerson || '-'}</div>
                 {pickup.assignedDriverName && <div><strong>Driver: </strong><span style={{ color: '#7c3aed', fontWeight: 'bold' }}>{pickup.assignedDriverName}</span>{pickup.assignedDate ? ' (' + new Date(pickup.assignedDate + 'T12:00:00').toLocaleDateString() + ')' : ''}</div>}
               </div>
@@ -1218,23 +1213,6 @@ function Pickups({data}) {
         <div className="mrow"><label>Date</label>
           <input type="date" value={form.date||''} onChange={e=>setForm({...form,date:e.target.value})}/>
         </div>
-        <div className="mrow"><label>Person</label>
-          <select value={form.driverId||''} onChange={e=>setForm({...form,driverId:e.target.value})}>
-            <option value="">-- None (Assign Later) --</option>
-            {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
-          </select></div>
-        <div className="mrow"><label>Location / Job</label>
-          <select value={(data.locations||[]).includes(form.location)?form.location:'__custom'} onChange={e=>{
-            if(e.target.value==='__custom') setForm({...form,location:''});
-            else setForm({...form,location:e.target.value});
-          }}>
-            <option value="">-- Select Location --</option>
-            {(data.locations||[]).map(l=><option key={l} value={l}>{l}</option>)}
-            <option value="__custom">Other (type custom)...</option>
-          </select>
-          {(!(data.locations||[]).includes(form.location))&&(
-            <input value={form.location} onChange={e=>setForm({...form,location:e.target.value})} placeholder="Type custom location" style={{marginTop:4}}/>
-          )}</div>
         <div className="mrow"><label>Customer(s)</label>
           <div style={{position:'relative'}}>
             <input value={custSearch} onChange={e=>{setCustSearch(e.target.value);setCustDropOpen(true);}} onFocus={()=>setCustDropOpen(true)} placeholder="Search customers..." style={{width:'100%'}}/>
@@ -1276,15 +1254,15 @@ function Pickups({data}) {
               <textarea value={entry.jobNotes||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,jobNotes:e.target.value}:x);setForm({...form,customerIds:updated});}} rows={2} placeholder="Special instructions, requirements for this customer..." style={{width:'100%',marginTop:3,fontSize:12,padding:6,borderRadius:4,border:'1px solid #93c5fd'}}/></div>
           </div>:null;})}</div>}
         </div>
-        <div className="mrow"><label>Truck</label>
-          <select value={form.truckId||''} onChange={e=>setForm({...form,truckId:e.target.value})}>
-            <option value="">-- None --</option>
-            {data.trucks.filter(t=>t.status==='Active').map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
-          </select></div>
-        <div className="mrow"><label>Trailer</label>
-          <select value={form.trailerId||''} onChange={e=>setForm({...form,trailerId:e.target.value})}>
-            <option value="">-- None --</option>
-            {data.trailers.map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
+        <div className="mrow"><label>Truck/Trailer Type</label>
+          <select value={form.truckTrailerType||''} onChange={e=>setForm({...form,truckTrailerType:e.target.value})}>
+            <option value="">-- Select --</option>
+            <option value="26 Foot Trailer">26 Foot Trailer</option>
+            <option value="53 Foot Trailer">53 Foot Trailer</option>
+            <option value="Box Truck">Box Truck</option>
+            <option value="Flatbed">Flatbed</option>
+            <option value="Roll Off Trailer">Roll Off Trailer</option>
+            <option value="Vacuum Trailer">Vacuum Trailer</option>
           </select></div>
         {showPlacards&&(()=>{const pcid=showPlacards;const pEntry=getCustEntries().find(x=>x.id===pcid);const pCust=(data.customers||[]).find(x=>x.id===pcid);const curPl=pEntry?pEntry.placards||[]:[];
           const togglePl=(p)=>{const updated=getCustEntries().map(x=>x.id===pcid?{...x,placards:curPl.includes(p)?curPl.filter(z=>z!==p):[...curPl,p]}:x);setForm({...form,customerIds:updated});};
