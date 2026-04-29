@@ -423,7 +423,8 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
               <strong style={{fontSize:13}}>{c.name}</strong>
               <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setModal({...modal,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
             </div>
-            {c.address&&<div><strong>Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {c.address&&<div><strong>Pickup Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {(c.billingAddress||c.billingCity)&&<div><strong>Billing Address:</strong> {c.billingAddress||''}{c.billingCity?', '+c.billingCity:''}{c.billingState?' '+c.billingState:''} {c.billingZip||''}</div>}
             {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
             {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
             {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
@@ -494,7 +495,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
           <button style={{background:'#7c3aed',color:'#fff'}} onClick={copyJob}>Copy Job</button>
           <button onClick={()=>{
             const entries=getCustEntries();
-            const custs=entries.map(entry=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?{name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),phone:c.phone||'',contact:c.contact||'',pricing:c.pricing||c.notes||'',jobNotes:entry.jobNotes||'',timeWindow:entry.timeWindow||'',equipment:(entry.equipment||[]).join(', ')||'None',placards:(entry.placards||[]).join(', ')||'None'}:null;}).filter(Boolean);
+            const custs=entries.map(entry=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?{name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),billingAddress:(c.billingAddress||c.billingCity)?[c.billingAddress,c.billingCity,c.billingState,c.billingZip].filter(Boolean).join(', '):'',phone:c.phone||'',contact:c.contact||'',pricing:c.pricing||c.notes||'',jobNotes:entry.jobNotes||'',timeWindow:entry.timeWindow||'',equipment:(entry.equipment||[]).join(', ')||'None',placards:(entry.placards||[]).join(', ')||'None'}:null;}).filter(Boolean);
             const jobData={
               date:modal.date?(modal.date.split('-')[1]+'/'+modal.date.split('-')[2]+'/'+modal.date.split('-')[0]):'',
               driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
@@ -699,11 +700,11 @@ function Customers({data}){
   const [showForm,setShowForm]=useState(false);
   const [editId,setEditId]=useState(null);
   const [search,setSearch]=useState('');
-  const empty={name:'',address:'',city:'',state:'',zip:'',phone:'',email:'',contact:'',pricing:'',notes:''};
+  const empty={name:'',address:'',city:'',state:'',zip:'',billingAddress:'',billingCity:'',billingState:'',billingZip:'',phone:'',email:'',contact:'',pricing:'',notes:''};
   const [form,setForm]=useState(empty);
 
   const openAdd=()=>{setEditId(null);setForm(empty);setShowForm(true);};
-  const openEdit=(c)=>{setEditId(c.id);setForm({name:c.name||'',address:c.address||'',city:c.city||'',state:c.state||'',zip:c.zip||'',phone:c.phone||'',email:c.email||'',contact:c.contact||'',pricing:c.pricing||'',notes:c.notes||''});setShowForm(true);};
+  const openEdit=(c)=>{setEditId(c.id);setForm({name:c.name||'',address:c.address||'',city:c.city||'',state:c.state||'',zip:c.zip||'',billingAddress:c.billingAddress||'',billingCity:c.billingCity||'',billingState:c.billingState||'',billingZip:c.billingZip||'',phone:c.phone||'',email:c.email||'',contact:c.contact||'',pricing:c.pricing||'',notes:c.notes||''});setShowForm(true);};
   const save=async()=>{
     if(!form.name.trim()){alert('Customer name is required');return;}
     if(editId){await api('PUT','/customers/'+editId,form);}
@@ -887,13 +888,14 @@ function Customers({data}){
               {c.contact&&<div style={{fontSize:13,color:'var(--text-muted)',marginTop:2}}>Contact: {c.contact}</div>}
             </div>
             <div style={{display:'flex',gap:6}}>
-              <a href={'/print-customer?'+new URLSearchParams({name:c.name||'',contact:c.contact||'',address:c.address||'',city:c.city||'',state:c.state||'',zip:c.zip||'',phone:c.phone||'',email:c.email||'',pricing:c.pricing||'',notes:c.notes||''}).toString()} target="_blank" style={{display:'inline-block',background:'#475569',color:'#fff',padding:'3px 10px',borderRadius:6,fontSize:11,textDecoration:'none',cursor:'pointer'}} onClick={e=>e.stopPropagation()}>Print</a>
+              <a href={'/print-customer?'+new URLSearchParams({name:c.name||'',contact:c.contact||'',address:c.address||'',city:c.city||'',state:c.state||'',zip:c.zip||'',billingAddress:c.billingAddress||'',billingCity:c.billingCity||'',billingState:c.billingState||'',billingZip:c.billingZip||'',phone:c.phone||'',email:c.email||'',pricing:c.pricing||'',notes:c.notes||''}).toString()} target="_blank" style={{display:'inline-block',background:'#475569',color:'#fff',padding:'3px 10px',borderRadius:6,fontSize:11,textDecoration:'none',cursor:'pointer'}} onClick={e=>e.stopPropagation()}>Print</a>
               <button className="bp" style={{fontSize:11,padding:'3px 10px'}} onClick={e=>{e.stopPropagation();openEdit(c);}}>Edit</button>
               <button style={{background:'#fee2e2',color:'var(--danger)',fontSize:11,padding:'3px 10px'}} onClick={e=>{e.stopPropagation();del(c.id,c.name);}}>Delete</button>
             </div>
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:16,marginTop:8,fontSize:13}}>
-            {(c.address||c.city)&&<div style={{color:'#555'}}>{[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ')}</div>}
+            {(c.address||c.city)&&<div style={{color:'#555'}}>Pickup: {[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ')}</div>}
+            {(c.billingAddress||c.billingCity)&&<div style={{color:'#555'}}>Billing: {[c.billingAddress,c.billingCity,c.billingState,c.billingZip].filter(Boolean).join(', ')}</div>}
             {c.phone&&<div style={{color:'#555'}}>Phone: {c.phone}</div>}
             {c.email&&<div style={{color:'#555'}}>Email: {c.email}</div>}
           </div>
@@ -910,7 +912,7 @@ function Customers({data}){
           <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. Brenntag Fresno"/></div>
         <div className="mrow"><label>Contact Person</label>
           <input value={form.contact} onChange={e=>setForm({...form,contact:e.target.value})} placeholder="e.g. John Smith"/></div>
-        <div className="mrow"><label>Address</label>
+        <div className="mrow"><label style={{fontWeight:700,color:'#1B3A5C'}}>Pickup Address</label>
           <input value={form.address} onChange={e=>setForm({...form,address:e.target.value})} placeholder="Street address"/></div>
         <div style={{display:'flex',gap:8}}>
           <div className="mrow" style={{flex:2}}><label>City</label>
@@ -919,6 +921,16 @@ function Customers({data}){
             <input value={form.state} onChange={e=>setForm({...form,state:e.target.value})} placeholder="CA"/></div>
           <div className="mrow" style={{flex:1}}><label>Zip</label>
             <input value={form.zip} onChange={e=>setForm({...form,zip:e.target.value})} placeholder="93706"/></div>
+        </div>
+        <div className="mrow"><label style={{fontWeight:700,color:'#1B3A5C'}}>Billing Address <span style={{fontWeight:400,color:'#888',fontSize:12}}>(if different from pickup)</span></label>
+          <input value={form.billingAddress} onChange={e=>setForm({...form,billingAddress:e.target.value})} placeholder="Billing street address"/></div>
+        <div style={{display:'flex',gap:8}}>
+          <div className="mrow" style={{flex:2}}><label>Billing City</label>
+            <input value={form.billingCity} onChange={e=>setForm({...form,billingCity:e.target.value})} placeholder="City"/></div>
+          <div className="mrow" style={{flex:1}}><label>Billing State</label>
+            <input value={form.billingState} onChange={e=>setForm({...form,billingState:e.target.value})} placeholder="CA"/></div>
+          <div className="mrow" style={{flex:1}}><label>Billing Zip</label>
+            <input value={form.billingZip} onChange={e=>setForm({...form,billingZip:e.target.value})} placeholder="93706"/></div>
         </div>
         <div style={{display:'flex',gap:8}}>
           <div className="mrow" style={{flex:1}}><label>Phone</label>
@@ -1262,7 +1274,8 @@ function Pickups({data}) {
                     <div key={cid} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: 10, fontSize: 12 }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--primary)', marginBottom: 4 }}>{c.name}</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '4px 16px' }}>
-                        {c.address && <div><strong>Address: </strong>{c.address}{c.city ? ', ' + c.city : ''}{c.state ? ' ' + c.state : ''} {c.zip || ''}</div>}
+                        {c.address && <div><strong>Pickup Address: </strong>{c.address}{c.city ? ', ' + c.city : ''}{c.state ? ' ' + c.state : ''} {c.zip || ''}</div>}
+                        {(c.billingAddress || c.billingCity) && <div><strong>Billing Address: </strong>{c.billingAddress || ''}{c.billingCity ? ', ' + c.billingCity : ''}{c.billingState ? ' ' + c.billingState : ''} {c.billingZip || ''}</div>}
                         {c.phone && <div><strong>Phone: </strong>{c.phone}</div>}
                         {c.contact && <div><strong>Contact: </strong>{c.contact}</div>}
                         {(c.pricing || c.notes) && <div><strong>Pricing/Notes: </strong>{c.pricing || c.notes}</div>}
@@ -1380,7 +1393,8 @@ function Pickups({data}) {
               <strong style={{fontSize:13}}>{c.name}</strong>
               <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setForm({...form,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
             </div>
-            {c.address&&<div><strong>Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {c.address&&<div><strong>Pickup Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {(c.billingAddress||c.billingCity)&&<div><strong>Billing Address:</strong> {c.billingAddress||''}{c.billingCity?', '+c.billingCity:''}{c.billingState?' '+c.billingState:''} {c.billingZip||''}</div>}
             {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
             {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
             {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
