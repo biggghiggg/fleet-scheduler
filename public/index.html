@@ -1147,7 +1147,8 @@ function Pickups({data}) {
     if (getCustEntries().length === 0) { alert('Please add at least one customer'); return; }
     const entries = getCustEntries();
     const firstCust = entries.length > 0 ? (data.customers || []).find(c => c.id === entries[0].id) : null;
-    const payload = { ...form, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '', attachments: attachments };
+    const { status, ...formWithoutStatus } = form;
+    const payload = { ...formWithoutStatus, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '', attachments: attachments };
     if (editId) { await api('PUT', '/pickups/' + editId, payload); }
     else { await api('POST', '/pickups', payload); }
     setShowForm(false); setEditId(null); setForm(emptyForm);
