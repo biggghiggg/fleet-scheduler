@@ -814,13 +814,17 @@ function Customers({data}){
     if(importRef.current)importRef.current.value='';
   };
 
+  const [updateExisting,setUpdateExisting]=useState(true);
   const doImport=async()=>{
     if(!importPreview||!importPreview.length)return;
     setImporting(true);
     try{
-      const r=await fetch('/api/customers/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customers:importPreview})});
+      const r=await fetch('/api/customers/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customers:importPreview,updateExisting})});
       const result=await r.json();
-      alert('Imported '+result.imported+' customers!');
+      const msgs=[];
+      if(result.imported)msgs.push(result.imported+' new customers added');
+      if(result.updated)msgs.push(result.updated+' existing customers updated');
+      alert(msgs.length?msgs.join(', ')+'!':'No changes made.');
       setImportPreview(null);
     }catch(err){alert('Import error: '+err.message);}
     setImporting(false);
@@ -847,8 +851,12 @@ function Customers({data}){
 
     {importPreview&&<div style={{background:'#fffbeb',border:'2px solid #d97706',borderRadius:10,padding:16,marginBottom:16}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div><strong style={{fontSize:15}}>Preview: {importPreview.length} customers found</strong><div style={{fontSize:12,color:'#92400e'}}>Review below, then click Import to add them all.</div></div>
-        <div style={{display:'flex',gap:8}}>
+        <div><strong style={{fontSize:15}}>Preview: {importPreview.length} customers found</strong><div style={{fontSize:12,color:'#92400e'}}>Review below, then click Import.</div></div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <label style={{fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:4,background:'#fff',padding:'4px 10px',borderRadius:6,border:'1px solid #d97706'}}>
+            <input type="checkbox" checked={updateExisting} onChange={e=>setUpdateExisting(e.target.checked)} style={{width:'auto'}}/>
+            Update existing customers
+          </label>
           <button className="bc" onClick={()=>setImportPreview(null)}>Cancel</button>
           <button className="bp" onClick={doImport} style={{background:'#16a34a'}}>Import {importPreview.length} Customers</button>
         </div>
