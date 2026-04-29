@@ -1012,6 +1012,27 @@ function Pickups({data}) {
   const emptyForm = { date: '', customerIds: [], truckTrailerType: '', timeWindow: '', equipment: [], notes: '', status: 'Scheduled', priority: 'routine', salesPerson: '' };
   const [form, setForm] = useState(emptyForm);
   const [showPlacards, setShowPlacards] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFiles = async (files) => {
+    setUploading(true);
+    const newAttachments = [];
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('category', 'Job Request');
+      try {
+        const res = await fetch('/api/documents', { method: 'POST', body: fd });
+        const doc = await res.json();
+        if (doc.id) newAttachments.push({ id: doc.id, name: doc.name });
+      } catch(e) { console.error('Upload failed:', e); }
+    }
+    setAttachments(prev => [...prev, ...newAttachments]);
+    setUploading(false);
+  };
+
+  const removeAttachment = (docId) => { setAttachments(prev => prev.filter(a => a.id !== docId)); };
 
   const getCustEntries = () => (form.customerIds || []).map(x => typeof x === 'string' ? { id: x, jobNotes: '' } : x);
 
@@ -1045,7 +1066,7 @@ function Pickups({data}) {
   const newCount = active.filter(p => p.status === 'new').length;
   const assignedCount = active.filter(p => p.status === 'assigned').length;
 
-  const openAdd = () => { setEditId(null); setForm(emptyForm); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
+  const openAdd = () => { setEditId(null); setForm(emptyForm); setAttachments([]); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
   const openEdit = (p) => {
     setEditId(p.id);
     const custIds = p.customerIds || (p.customerId ? [{ id: p.customerId, jobNotes: (p.wasteDescription || '') + (p.containerInfo ? ' | ' + p.containerInfo : ''), timeWindow: p.requestedTimeWindow || '' }] : []);
@@ -1060,6 +1081,7 @@ function Pickups({data}) {
       priority: p.priority || 'routine',
       salesPerson: p.salesPerson || ''
     });
+    setAttachments(p.attachments || []);
     setCustSearch('');
     setCustDropOpen(false);
     setShowForm(true);
@@ -1069,7 +1091,7 @@ function Pickups({data}) {
     if (getCustEntries().length === 0) { alert('Please add at least one customer'); return; }
     const entries = getCustEntries();
     const firstCust = entries.length > 0 ? (data.customers || []).find(c => c.id === entries[0].id) : null;
-    const payload = { ...form, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '' };
+    const payload = { ...form, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '', attachments: attachments };
     if (editId) { await api('PUT', '/pickups/' + editId, payload); }
     else { await api('POST', '/pickups', payload); }
     setShowForm(false); setEditId(null); setForm(emptyForm);
@@ -1172,6 +1194,18 @@ function Pickups({data}) {
               {pickup.notes && (
                 <div style={{ marginTop: 6, padding: '6px 10px', background: '#fffbeb', borderRadius: 4, fontSize: 12, color: '#92400e' }}>
                   <strong>Notes: </strong>{pickup.notes}
+                </div>
+              )}
+
+              {/* Attachments */}
+              {pickup.attachments && pickup.attachments.length > 0 && (
+                <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <strong style={{ fontSize: 12 }}>Files:</strong>
+                  {pickup.attachments.map(a => (
+                    <a key={a.id} href={'/api/documents/' + a.id + '/view'} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontSize: 11, color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}>
+                      {a.name.toLowerCase().endsWith('.pdf') ? '\u{1F4C4}' : '\u{1F4CE}'} {a.name}
+                    </a>
+                  ))}
                 </div>
               )}
 
@@ -1299,10 +1333,19 @@ function Pickups({data}) {
           </select></div>
         <div className="mrow"><label>Salesperson</label>
           <input value={form.salesPerson||''} onChange={e=>setForm({...form,salesPerson:e.target.value})} placeholder="Salesperson name"/></div>
-        <div className="mrow"><label>Status</label>
-          <select value={form.status||'Scheduled'} onChange={e=>setForm({...form,status:e.target.value})}>
-            <option>Scheduled</option><option>Tentative</option><option>Confirmed</option><option>Off</option><option>OOO</option>
-          </select></div>
+        <div className="mrow"><label>Attachments</label>
+          <div>
+            <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={e=>{if(e.target.files.length>0){uploadFiles(Array.from(e.target.files));e.target.value='';}}} style={{fontSize:12}}/>
+            {uploading&&<span style={{color:'#3b82f6',fontSize:12,marginLeft:8}}>Uploading...</span>}
+            {attachments.length>0&&<div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+              {attachments.map(a=>(
+                <div key={a.id} style={{display:'flex',alignItems:'center',gap:8,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:4,padding:'4px 8px',fontSize:12}}>
+                  <a href={'/api/documents/'+a.id+'/view'} target="_blank" rel="noopener" style={{color:'#2563eb',fontWeight:600,flex:1}}>{a.name}</a>
+                  <span onClick={()=>removeAttachment(a.id)} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14}}>&times;</span>
+                </div>
+              ))}
+            </div>}
+          </div></div>
         <div className="mrow"><label>Notes</label>
           <textarea value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} rows={3} placeholder="Special instructions, reference numbers, etc."/></div>
         <div className="mactions">
