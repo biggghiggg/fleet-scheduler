@@ -1237,15 +1237,37 @@ function Pickups({data}) {
                 </div>
               </div>
 
-              {/* Card body */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px 16px', fontSize: 13 }}>
-                <div><strong>Customer(s): </strong>{(()=>{ const ids = pickup.customerIds || []; if (ids.length > 0) { return ids.map(x => { const cid = typeof x === 'string' ? x : x.id; const c = (data.customers || []).find(cx => cx.id === cid); return c ? c.name : cid; }).join(', '); } return pickup.customerName || '-'; })()}</div>
+              {/* Card body - summary row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px 16px', fontSize: 13, marginBottom: 8 }}>
                 <div><strong>Date: </strong>{(pickup.date || pickup.requestedDate) ? new Date((pickup.date || pickup.requestedDate) + 'T12:00:00').toLocaleDateString() : 'TBD'}</div>
                 {(pickup.timeWindow || pickup.requestedTimeWindow) && <div><strong>Time Window: </strong>{pickup.timeWindow || pickup.requestedTimeWindow}</div>}
                 <div><strong>Truck/Trailer Type: </strong>{pickup.truckTrailerType || '-'}</div>
                 <div><strong>Salesperson: </strong>{pickup.salesPerson || '-'}</div>
                 {pickup.assignedDriverName && <div><strong>Driver: </strong><span style={{ color: '#7c3aed', fontWeight: 'bold' }}>{pickup.assignedDriverName}</span>{pickup.assignedDate ? ' (' + new Date(pickup.assignedDate + 'T12:00:00').toLocaleDateString() + ')' : ''}</div>}
               </div>
+
+              {/* Customer detail cards */}
+              {(()=>{ const ids = pickup.customerIds || []; if (ids.length > 0) { return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {ids.map((entry, idx) => { const cid = typeof entry === 'string' ? entry : entry.id; const c = (data.customers || []).find(cx => cx.id === cid); if (!c) return null; const eq = entry.equipment || []; const pl = entry.placards || []; return (
+                    <div key={cid} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: 10, fontSize: 12 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--primary)', marginBottom: 4 }}>{c.name}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '4px 16px' }}>
+                        {c.address && <div><strong>Address: </strong>{c.address}{c.city ? ', ' + c.city : ''}{c.state ? ' ' + c.state : ''} {c.zip || ''}</div>}
+                        {c.phone && <div><strong>Phone: </strong>{c.phone}</div>}
+                        {c.contact && <div><strong>Contact: </strong>{c.contact}</div>}
+                        {(c.pricing || c.notes) && <div><strong>Pricing/Notes: </strong>{c.pricing || c.notes}</div>}
+                        {entry.timeWindow && <div><strong>Time Window: </strong>{entry.timeWindow}</div>}
+                      </div>
+                      {eq.length > 0 && <div style={{ marginTop: 4 }}><strong>Equipment: </strong>{eq.join(', ')}</div>}
+                      {pl.length > 0 && <div style={{ marginTop: 4 }}><strong>Placards: </strong><span style={{ color: '#b45309' }}>{pl.join(', ')}</span></div>}
+                      {entry.jobNotes && <div style={{ marginTop: 4, padding: '4px 8px', background: '#eff6ff', borderRadius: 4, border: '1px solid #bfdbfe' }}><strong>Job Notes: </strong>{entry.jobNotes}</div>}
+                    </div>
+                  );})}
+                </div>
+              ); } else if (pickup.customerName) { return (
+                <div style={{ fontSize: 13 }}><strong>Customer: </strong>{pickup.customerName}</div>
+              ); } return null; })()}
 
               {/* Notes */}
               {pickup.notes && (
