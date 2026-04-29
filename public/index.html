@@ -1207,8 +1207,8 @@ function Pickups({data}) {
     )}
 
     {/* New/Edit Job Request Modal */}
-    {showForm&&(<div className="overlay" onClick={()=>{setShowForm(false);setEditId(null);}}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
+    {showForm&&(<div className="overlay">
+      <div className="modal">
         <h2>{editId?'Edit Job Request':'New Job Request'}</h2>
         <div className="mrow"><label>Date</label>
           <input type="date" value={form.date||''} onChange={e=>setForm({...form,date:e.target.value})}/>
