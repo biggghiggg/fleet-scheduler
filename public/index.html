@@ -1009,8 +1009,11 @@ function Pickups({data}) {
   const [custSearch, setCustSearch] = useState('');
   const [custDropOpen, setCustDropOpen] = useState(false);
 
-  const empty = { customerName: '', customerId: '', customerAddress: '', customerPhone: '', customerContact: '', contactName: '', contactPhone: '', wasteDescription: '', containerInfo: '', requestedDate: '', requestedTimeWindow: '', priority: 'routine', notes: '', salesPerson: '' };
-  const [form, setForm] = useState(empty);
+  const emptyForm = { date: '', driverId: '', location: '', customerIds: [], truckId: '', trailerId: '', timeWindow: '', equipment: [], notes: '', status: 'Scheduled', priority: 'routine', salesPerson: '' };
+  const [form, setForm] = useState(emptyForm);
+  const [showPlacards, setShowPlacards] = useState(null);
+
+  const getCustEntries = () => (form.customerIds || []).map(x => typeof x === 'string' ? { id: x, jobNotes: '' } : x);
 
   const pickups = data.pickups || [];
   const customers = (data.customers || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -1024,7 +1027,7 @@ function Pickups({data}) {
     const s = search.toLowerCase();
     display = display.filter(p =>
       (p.customerName || '').toLowerCase().includes(s) ||
-      (p.wasteDescription || '').toLowerCase().includes(s) ||
+      (p.location || '').toLowerCase().includes(s) ||
       (p.salesPerson || '').toLowerCase().includes(s) ||
       (p.assignedDriverName || '').toLowerCase().includes(s) ||
       (p.notes || '').toLowerCase().includes(s)
@@ -1036,27 +1039,43 @@ function Pickups({data}) {
   display = display.slice().sort((a, b) => {
     const pa = priOrd[a.priority] ?? 2, pb = priOrd[b.priority] ?? 2;
     if (pa !== pb) return pa - pb;
-    return (a.requestedDate || '').localeCompare(b.requestedDate || '');
+    return (a.date || a.requestedDate || '').localeCompare(b.date || b.requestedDate || '');
   });
 
   const newCount = active.filter(p => p.status === 'new').length;
   const assignedCount = active.filter(p => p.status === 'assigned').length;
 
-  const openAdd = () => { setEditId(null); setForm(empty); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
-  const openEdit = (p) => { setEditId(p.id); setForm({ customerName: p.customerName || '', customerId: p.customerId || '', customerAddress: p.customerAddress || '', customerPhone: p.customerPhone || '', customerContact: p.customerContact || '', contactName: p.contactName || '', contactPhone: p.contactPhone || '', wasteDescription: p.wasteDescription || '', containerInfo: p.containerInfo || '', requestedDate: p.requestedDate || '', requestedTimeWindow: p.requestedTimeWindow || '', priority: p.priority || 'routine', notes: p.notes || '', salesPerson: p.salesPerson || '' }); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
-
-  const selectCustomer = (c) => {
-    setForm(f => ({ ...f, customerId: c.id, customerName: c.name || '', customerAddress: [c.address, c.city, c.state, c.zip].filter(Boolean).join(', '), customerPhone: c.phone || '', customerContact: c.contact || '', contactName: f.contactName || c.contact || '', contactPhone: f.contactPhone || c.phone || '' }));
+  const openAdd = () => { setEditId(null); setForm(emptyForm); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
+  const openEdit = (p) => {
+    setEditId(p.id);
+    const custIds = p.customerIds || (p.customerId ? [{ id: p.customerId, jobNotes: (p.wasteDescription || '') + (p.containerInfo ? ' | ' + p.containerInfo : ''), timeWindow: p.requestedTimeWindow || '' }] : []);
+    setForm({
+      date: p.date || p.requestedDate || '',
+      driverId: p.driverId || p.assignedDriverId || '',
+      location: p.location || p.customerName || '',
+      customerIds: custIds,
+      truckId: p.truckId || '',
+      trailerId: p.trailerId || '',
+      timeWindow: p.timeWindow || p.requestedTimeWindow || '',
+      equipment: p.equipment || [],
+      notes: p.notes || '',
+      status: p.status === 'new' || p.status === 'assigned' || p.status === 'archived' ? (p.jobStatus || 'Scheduled') : (p.status || 'Scheduled'),
+      priority: p.priority || 'routine',
+      salesPerson: p.salesPerson || ''
+    });
     setCustSearch('');
     setCustDropOpen(false);
+    setShowForm(true);
   };
 
   const save = async () => {
-    if (!form.customerName) { alert('Please select a customer/generator'); return; }
-    if (!form.wasteDescription) { alert('Please enter waste description'); return; }
-    if (editId) { await api('PUT', '/pickups/' + editId, form); }
-    else { await api('POST', '/pickups', form); }
-    setShowForm(false); setEditId(null); setForm(empty);
+    if (getCustEntries().length === 0 && !form.location) { alert('Please add a customer or enter a location'); return; }
+    const entries = getCustEntries();
+    const firstCust = entries.length > 0 ? (data.customers || []).find(c => c.id === entries[0].id) : null;
+    const payload = { ...form, customerName: firstCust ? firstCust.name : form.location, customerId: firstCust ? firstCust.id : '' };
+    if (editId) { await api('PUT', '/pickups/' + editId, payload); }
+    else { await api('POST', '/pickups', payload); }
+    setShowForm(false); setEditId(null); setForm(emptyForm);
   };
 
   const doAssign = async (pickupId) => {
@@ -1085,9 +1104,6 @@ function Pickups({data}) {
     const l = { 'new': 'NEW', assigned: 'ASSIGNED', archived: 'ARCHIVED' };
     return <span style={{ background: c[st] || '#6b7280', color: '#fff', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 'bold', marginLeft: 6 }}>{l[st] || st}</span>;
   };
-
-  // Customer search filtering
-  const filteredCustomers = custSearch.trim() ? customers.filter(c => (c.name || '').toLowerCase().includes(custSearch.toLowerCase())) : customers;
 
   return (<div>
     {/* Header */}
@@ -1147,12 +1163,12 @@ function Pickups({data}) {
 
               {/* Card body */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px 16px', fontSize: 13 }}>
-                <div><strong>Waste: </strong>{pickup.wasteDescription || '-'}</div>
-                <div><strong>Containers: </strong>{pickup.containerInfo || '-'}</div>
-                <div><strong>Pickup Date: </strong>{pickup.requestedDate ? new Date(pickup.requestedDate + 'T12:00:00').toLocaleDateString() : 'TBD'}</div>
-                {pickup.requestedTimeWindow && <div><strong>Time: </strong>{pickup.requestedTimeWindow}</div>}
-                <div><strong>Address: </strong>{pickup.customerAddress || '-'}</div>
-                <div><strong>Contact: </strong>{(pickup.contactName || '-') + (pickup.contactPhone ? ' (' + pickup.contactPhone + ')' : '')}</div>
+                <div><strong>Location: </strong>{pickup.location || pickup.customerName || '-'}</div>
+                <div><strong>Customer(s): </strong>{(()=>{ const ids = pickup.customerIds || []; if (ids.length > 0) { return ids.map(x => { const cid = typeof x === 'string' ? x : x.id; const c = (data.customers || []).find(cx => cx.id === cid); return c ? c.name : cid; }).join(', '); } return pickup.customerName || '-'; })()}</div>
+                <div><strong>Date: </strong>{(pickup.date || pickup.requestedDate) ? new Date((pickup.date || pickup.requestedDate) + 'T12:00:00').toLocaleDateString() : 'TBD'}</div>
+                {(pickup.timeWindow || pickup.requestedTimeWindow) && <div><strong>Time Window: </strong>{pickup.timeWindow || pickup.requestedTimeWindow}</div>}
+                <div><strong>Truck: </strong>{(()=>{ if (!pickup.truckId) return '-'; const t = data.trucks.find(x => x.id === pickup.truckId); return t ? t.name : '-'; })()}</div>
+                <div><strong>Trailer: </strong>{(()=>{ if (!pickup.trailerId) return '-'; const t = data.trailers.find(x => x.id === pickup.trailerId); return t ? t.name : '-'; })()}</div>
                 <div><strong>Salesperson: </strong>{pickup.salesPerson || '-'}</div>
                 {pickup.assignedDriverName && <div><strong>Driver: </strong><span style={{ color: '#7c3aed', fontWeight: 'bold' }}>{pickup.assignedDriverName}</span>{pickup.assignedDate ? ' (' + new Date(pickup.assignedDate + 'T12:00:00').toLocaleDateString() + ')' : ''}</div>}
               </div>
@@ -1196,91 +1212,127 @@ function Pickups({data}) {
     )}
 
     {/* New/Edit Job Request Modal */}
-    {showForm && (
-      <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
-        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 620, width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
-          <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>{editId ? 'Edit Job Request' : 'New Job Request'}</h3>
-
-          {/* Customer/Generator selection with search */}
-          <div style={{ marginBottom: 12, position: 'relative' }}>
-            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Customer / Generator *</label>
-            <input type="text" placeholder="Search customers..." value={custSearch || form.customerName} onChange={e => { setCustSearch(e.target.value); setCustDropOpen(true); setForm(f => ({ ...f, customerName: e.target.value, customerId: '' })); }} onFocus={() => setCustDropOpen(true)} style={{ width: '100%' }} />
-            {custDropOpen && filteredCustomers.length > 0 && (
-              <div style={{ position: 'absolute', zIndex: 50, background: 'var(--bg-white)', border: '1px solid var(--border)', borderRadius: 6, maxHeight: 200, overflowY: 'auto', width: '100%', boxShadow: 'var(--shadow-lg)' }}>
-                {filteredCustomers.slice(0, 20).map(c => (
-                  <div key={c.id} onClick={() => selectCustomer(c)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
-                    <strong>{c.name}</strong>
-                    {c.city && <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: 12 }}>{c.city}{c.state ? ', ' + c.state : ''}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {form.customerAddress && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{form.customerAddress}{form.customerPhone ? ' | ' + form.customerPhone : ''}</div>}
+    {showForm&&(<div className="overlay" onClick={()=>{setShowForm(false);setEditId(null);}}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h2>{editId?'Edit Job Request':'New Job Request'}</h2>
+        <div className="mrow"><label>Date</label>
+          <input type="date" value={form.date||''} onChange={e=>setForm({...form,date:e.target.value})}/>
+        </div>
+        <div className="mrow"><label>Person</label>
+          <select value={form.driverId||''} onChange={e=>setForm({...form,driverId:e.target.value})}>
+            <option value="">-- None (Assign Later) --</option>
+            {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
+          </select></div>
+        <div className="mrow"><label>Location / Job</label>
+          <select value={(data.locations||[]).includes(form.location)?form.location:'__custom'} onChange={e=>{
+            if(e.target.value==='__custom') setForm({...form,location:''});
+            else setForm({...form,location:e.target.value});
+          }}>
+            <option value="">-- Select Location --</option>
+            {(data.locations||[]).map(l=><option key={l} value={l}>{l}</option>)}
+            <option value="__custom">Other (type custom)...</option>
+          </select>
+          {(!(data.locations||[]).includes(form.location))&&(
+            <input value={form.location} onChange={e=>setForm({...form,location:e.target.value})} placeholder="Type custom location" style={{marginTop:4}}/>
+          )}</div>
+        <div className="mrow"><label>Customer(s)</label>
+          <div style={{position:'relative'}}>
+            <input value={custSearch} onChange={e=>{setCustSearch(e.target.value);setCustDropOpen(true);}} onFocus={()=>setCustDropOpen(true)} placeholder="Search customers..." style={{width:'100%'}}/>
+            {custDropOpen&&(()=>{
+              const allCust=(data.customers||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+              const entries=getCustEntries();
+              const selectedIds=entries.map(x=>x.id);
+              const filtered=custSearch?allCust.filter(c=>(c.name||'').toLowerCase().includes(custSearch.toLowerCase())):allCust;
+              return filtered.length>0?<div style={{position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'1px solid #ccc',borderRadius:6,maxHeight:200,overflowY:'auto',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,.15)'}}>
+                {filtered.map(c=><div key={c.id} onClick={()=>{if(!selectedIds.includes(c.id)){setForm({...form,customerIds:[...entries,{id:c.id,jobNotes:''}]});}setCustSearch('');setCustDropOpen(false);}} style={{padding:'8px 12px',cursor:'pointer',fontSize:13,background:selectedIds.includes(c.id)?'#dbeafe':'#fff',borderBottom:'1px solid #f0f0f0'}} onMouseEnter={e=>e.target.style.background='#eff6ff'} onMouseLeave={e=>e.target.style.background=selectedIds.includes(c.id)?'#dbeafe':'#fff'}>
+                  <strong>{c.name}</strong>{c.city?<span style={{color:'#666',marginLeft:6,fontSize:12}}>{c.city}{c.state?', '+c.state:''}</span>:null}
+                  {selectedIds.includes(c.id)&&<span style={{float:'right',color:'#2563eb',fontSize:11}}>selected</span>}
+                </div>)}
+              </div>:null;
+            })()}
           </div>
-
-          {/* Contact info */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Site Contact Name</label>
-              <input value={form.contactName} onChange={e => setForm(f => ({ ...f, contactName: e.target.value }))} />
+          {getCustEntries().length>0&&<div style={{marginTop:6}}>{getCustEntries().map((entry,idx)=>{const c=(data.customers||[]).find(x=>x.id===entry.id);const ep=entry.placards||[];const eeq=entry.equipment||[];return c?<div key={entry.id} style={{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:10,marginBottom:6,fontSize:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <strong style={{fontSize:13}}>{c.name}</strong>
+              <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setForm({...form,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
             </div>
-            <div>
-              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Site Contact Phone</label>
-              <input value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: e.target.value }))} />
+            {c.address&&<div><strong>Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
+            {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
+            {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
+            <div style={{marginTop:6}}><label style={{fontSize:11,fontWeight:700,color:'#333'}}>Time Window:</label>
+              <input value={entry.timeWindow||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,timeWindow:e.target.value}:x);setForm({...form,customerIds:updated});}} placeholder="e.g. 8:00 AM, Be onsite by 10 AM" style={{width:'100%',marginTop:2,fontSize:12,padding:4,borderRadius:4,border:'1px solid #ccc'}}/></div>
+            <div style={{marginTop:4}}><label style={{fontSize:11,fontWeight:700,color:'#333'}}>Equipment:</label>
+              <div style={{marginTop:2}}>{data.equipment.filter(eq=>eq!=='Placards').map(eq=>(<span key={eq} style={{display:'inline-block',marginRight:10,marginBottom:3}}>
+                <label style={{fontSize:11,cursor:'pointer'}}>
+                <input type="checkbox" checked={eeq.includes(eq)} style={{marginRight:3,width:'auto'}}
+                  onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,equipment:e.target.checked?[...eeq,eq]:eeq.filter(z=>z!==eq)}:x);setForm({...form,customerIds:updated});}}/>
+                {eq}</label></span>))}</div></div>
+            <div style={{marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <button onClick={()=>setShowPlacards(entry.id)} style={{background:'#d97706',color:'#fff',border:'none',padding:'3px 10px',borderRadius:4,fontSize:11,cursor:'pointer',fontWeight:600}}>Placards ({ep.length})</button>
+              {ep.length>0&&ep.map(p=><span key={p} style={{display:'inline-block',background:'#fef3c7',border:'1px solid #d97706',borderRadius:4,padding:'1px 6px',fontSize:10,fontWeight:600}}>{p}</span>)}
             </div>
-          </div>
-
-          {/* Waste info */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Waste Description *</label>
-            <textarea value={form.wasteDescription} onChange={e => setForm(f => ({ ...f, wasteDescription: e.target.value }))} rows={2} />
-          </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Container Info (qty, size, type)</label>
-            <input value={form.containerInfo} onChange={e => setForm(f => ({ ...f, containerInfo: e.target.value }))} placeholder="e.g. 4 x 55 gal drums" />
-          </div>
-
-          {/* Date, time, priority */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Requested Date</label>
-              <input type="date" value={form.requestedDate} onChange={e => setForm(f => ({ ...f, requestedDate: e.target.value }))} />
+            <div style={{marginTop:6}}><label style={{fontSize:12,fontWeight:700,color:'#1d4ed8'}}>Job Notes for {c.name}:</label>
+              <textarea value={entry.jobNotes||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,jobNotes:e.target.value}:x);setForm({...form,customerIds:updated});}} rows={2} placeholder="Special instructions, requirements for this customer..." style={{width:'100%',marginTop:3,fontSize:12,padding:6,borderRadius:4,border:'1px solid #93c5fd'}}/></div>
+          </div>:null;})}</div>}
+        </div>
+        <div className="mrow"><label>Truck</label>
+          <select value={form.truckId||''} onChange={e=>setForm({...form,truckId:e.target.value})}>
+            <option value="">-- None --</option>
+            {data.trucks.filter(t=>t.status==='Active').map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
+          </select></div>
+        <div className="mrow"><label>Trailer</label>
+          <select value={form.trailerId||''} onChange={e=>setForm({...form,trailerId:e.target.value})}>
+            <option value="">-- None --</option>
+            {data.trailers.map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
+          </select></div>
+        {showPlacards&&(()=>{const pcid=showPlacards;const pEntry=getCustEntries().find(x=>x.id===pcid);const pCust=(data.customers||[]).find(x=>x.id===pcid);const curPl=pEntry?pEntry.placards||[]:[];
+          const togglePl=(p)=>{const updated=getCustEntries().map(x=>x.id===pcid?{...x,placards:curPl.includes(p)?curPl.filter(z=>z!==p):[...curPl,p]}:x);setForm({...form,customerIds:updated});};
+          return <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowPlacards(null)}>
+          <div style={{background:'#fff',borderRadius:12,padding:20,width:600,maxWidth:'95vw',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 8px 30px rgba(0,0,0,.3)'}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+              <h3 style={{fontSize:16,fontWeight:700}}>Placards for {pCust?pCust.name:''}</h3>
+              <button className="bc" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setShowPlacards(null)}>Done</button>
             </div>
-            <div>
-              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Time Window</label>
-              <input value={form.requestedTimeWindow} onChange={e => setForm(f => ({ ...f, requestedTimeWindow: e.target.value }))} placeholder="e.g. 8am-12pm" />
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#b45309',marginBottom:4,borderBottom:'2px solid #d97706',paddingBottom:3}}>Hazard Class Placards (no UN number)</div>
+              <div>{HAZARD_CLASSES.map(hc=>(<div key={hc} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
+                <label style={{fontSize:12,cursor:'pointer',fontWeight:curPl.includes(hc)?600:400}}>
+                  <input type="checkbox" checked={curPl.includes(hc)} style={{marginRight:3,width:'auto'}}
+                    onChange={()=>togglePl(hc)}/>
+                  {hc}
+                </label></div>))}</div>
             </div>
-            <div>
-              <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Priority</label>
-              <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-                <option value="routine">Routine</option>
-                <option value="urgent">Urgent</option>
-                <option value="emergency">Emergency</option>
-              </select>
-            </div>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--text-muted)',marginBottom:8,marginTop:8}}>&#9660; 4-Digit UN Number Placards</div>
+            {PLACARD_LIST.map(grp=>(<div key={grp.cat} style={{marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:700,color:'var(--primary)',marginBottom:4,borderBottom:'1px solid var(--border)',paddingBottom:3}}>{grp.cat}</div>
+              <div>{grp.items.map(p=>(<div key={p} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
+                <label style={{fontSize:12,cursor:'pointer',fontWeight:curPl.includes(p)?600:400}}>
+                  <input type="checkbox" checked={curPl.includes(p)} style={{marginRight:3,width:'auto'}}
+                    onChange={()=>togglePl(p)}/>
+                  {p}
+                </label></div>))}</div>
+            </div>))}
           </div>
-
-          {/* Salesperson */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Salesperson</label>
-            <input value={form.salesPerson} onChange={e => setForm(f => ({ ...f, salesPerson: e.target.value }))} />
-          </div>
-
-          {/* Notes */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>Notes / Special Instructions</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Anything the scheduler or driver needs to know..." />
-          </div>
-
-          {/* Buttons */}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button onClick={() => { setShowForm(false); setEditId(null); }} className="bc" style={{ background: '#94a3b8', color: '#fff', padding: '8px 20px' }}>Cancel</button>
-            <button onClick={save} className="bp" style={{ background: 'var(--success)', color: '#fff', padding: '8px 20px', fontWeight: 700 }}>{editId ? 'Update Job Request' : 'Create Job Request'}</button>
-          </div>
+        </div>;})()}
+        <div className="mrow"><label>Priority</label>
+          <select value={form.priority||'routine'} onChange={e=>setForm({...form,priority:e.target.value})}>
+            <option value="routine">Routine</option><option value="urgent">Urgent</option><option value="emergency">Emergency</option>
+          </select></div>
+        <div className="mrow"><label>Salesperson</label>
+          <input value={form.salesPerson||''} onChange={e=>setForm({...form,salesPerson:e.target.value})} placeholder="Salesperson name"/></div>
+        <div className="mrow"><label>Status</label>
+          <select value={form.status||'Scheduled'} onChange={e=>setForm({...form,status:e.target.value})}>
+            <option>Scheduled</option><option>Tentative</option><option>Confirmed</option><option>Off</option><option>OOO</option>
+          </select></div>
+        <div className="mrow"><label>Notes</label>
+          <textarea value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} rows={3} placeholder="Special instructions, reference numbers, etc."/></div>
+        <div className="mactions">
+          <button className="bc" onClick={()=>{setShowForm(false);setEditId(null);}}>Cancel</button>
+          <button className="bp" onClick={save}>{editId?'Update Job Request':'Create Job Request'}</button>
         </div>
       </div>
-    )}
+    </div>)}
   </div>);
 }
 
