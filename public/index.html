@@ -717,9 +717,18 @@ function Customers({data}){
   const [importPreview,setImportPreview]=useState(null);
 
   const matchCol=(headers,options)=>{
-    for(let i=0;i<headers.length;i++){
-      const h=headers[i].toLowerCase().replace(/[^a-z0-9]/g,'');
-      for(const opt of options){if(h.includes(opt))return i;}
+    // Two-pass: first try exact-start matches (prefer shipping over billing), then substring
+    for(const opt of options){
+      for(let i=0;i<headers.length;i++){
+        const h=headers[i].toLowerCase().replace(/[^a-z0-9]/g,'');
+        if(h===opt||h.startsWith(opt))return i;
+      }
+    }
+    for(const opt of options){
+      for(let i=0;i<headers.length;i++){
+        const h=headers[i].toLowerCase().replace(/[^a-z0-9]/g,'');
+        if(h.includes(opt))return i;
+      }
     }
     return -1;
   };
