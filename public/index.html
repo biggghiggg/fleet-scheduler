@@ -1287,7 +1287,7 @@ function Pickups({data}) {
                       </div>
                       {eq.length > 0 && <div style={{ marginTop: 4 }}><strong>Equipment: </strong>{eq.join(', ')}</div>}
                       {pl.length > 0 && <div style={{ marginTop: 4 }}><strong>Placards: </strong><span style={{ color: '#b45309' }}>{pl.join(', ')}</span></div>}
-                      {entry.jobNotes && <div style={{ marginTop: 4, padding: '4px 8px', background: '#eff6ff', borderRadius: 4, border: '1px solid #bfdbfe' }}><strong>Job Notes: </strong>{entry.jobNotes}</div>}
+                      {entry.jobNotes && <div style={{ marginTop: 4, padding: '4px 8px', background: '#eff6ff', borderRadius: 4, border: '1px solid #bfdbfe', whiteSpace: 'pre-wrap' }}><strong>Job Notes: </strong>{entry.jobNotes}</div>}
                     </div>
                   );})}
                 </div>
@@ -1297,7 +1297,7 @@ function Pickups({data}) {
 
               {/* Notes */}
               {pickup.notes && (
-                <div style={{ marginTop: 6, padding: '6px 10px', background: '#fffbeb', borderRadius: 4, fontSize: 12, color: '#92400e' }}>
+                <div style={{ marginTop: 6, padding: '6px 10px', background: '#fffbeb', borderRadius: 4, fontSize: 12, color: '#92400e', whiteSpace: 'pre-wrap' }}>
                   <strong>Notes: </strong>{pickup.notes}
                 </div>
               )}
