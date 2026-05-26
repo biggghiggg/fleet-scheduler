@@ -275,11 +275,23 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
   const [showPlacards,setShowPlacards]=useState(null); /* null or customer id */
   const [custSearch,setCustSearch]=useState('');
   const [custDropOpen,setCustDropOpen]=useState(false);
-  const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
+  const [pinPrompt,setPinPrompt]=useState(null); /* null or {action: function, pin: ''} */
+  const [pinError,setPinError]=useState('');
+
+  const checkPin=(pin)=>{return data.drivers.some(d=>d.pin&&d.pin===pin);};
+
+  const requirePin=(actionFn)=>{setPinPrompt({action:actionFn,pin:''});setPinError('');};
+  const submitPin=()=>{
+    if(!pinPrompt)return;
+    if(checkPin(pinPrompt.pin)){pinPrompt.action();setPinPrompt(null);setPinError('');}
+    else{setPinError('Invalid PIN');}
+  };
+
+  const openAdd=(did,date)=>{requirePin(()=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}});};
   const getCustEntries=()=>(modal.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
   const copyJob=()=>{if(!modal)return;const c={location:modal.location,customerIds:getCustEntries().map(x=>({...x})),truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
   const clearClip=()=>{setClip(null);if(show)show('Clipboard cleared.');};
-  const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);};
+  const openEdit=(job,e)=>{e.stopPropagation();requirePin(()=>{setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);});};
   const save=async()=>{if(eid){if(!confirm('Are you sure you want to update this job?'))return;await api('PUT','/jobs/'+eid,modal);}else{await api('POST','/jobs',modal);}setModal(null);setEid(null);};
   const del=async(id,e)=>{if(e)e.stopPropagation();await api('DELETE','/jobs/'+id);};
   const moveDriver=async(idx,dir)=>{
@@ -352,6 +364,22 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       </div>);
     })}
 
+    {pinPrompt&&(<div className="overlay">
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:340,textAlign:'center'}}>
+        <h2 style={{marginBottom:4}}>Enter PIN</h2>
+        <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:16}}>Enter your 4-digit PIN to continue</p>
+        <input type="password" maxLength={4} value={pinPrompt.pin} autoFocus
+          onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,4);setPinPrompt({...pinPrompt,pin:v});setPinError('');}}
+          onKeyDown={e=>{if(e.key==='Enter')submitPin();if(e.key==='Escape'){setPinPrompt(null);setPinError('');}}}
+          style={{fontSize:28,textAlign:'center',letterSpacing:12,width:140,padding:'8px 12px',border:'2px solid '+(pinError?'#dc2626':'var(--border)'),borderRadius:8}}
+          placeholder="••••"/>
+        {pinError&&<div style={{color:'#dc2626',fontSize:13,marginTop:8,fontWeight:600}}>{pinError}</div>}
+        <div style={{marginTop:16,display:'flex',gap:8,justifyContent:'center'}}>
+          <button className="bc" onClick={()=>{setPinPrompt(null);setPinError('');}}>Cancel</button>
+          <button className="bp" onClick={submitPin}>Submit</button>
+        </div>
+      </div>
+    </div>)}
     {modal&&(<div className="overlay" onClick={()=>{setModal(null);setEid(null);}}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <h2>{eid?'Edit Job':'Add Job'}</h2>
@@ -395,7 +423,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
               <strong style={{fontSize:13}}>{c.name}</strong>
               <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setModal({...modal,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
             </div>
-            {c.address&&<div><strong>Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {c.address&&<div><strong>Pickup Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
             {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
             {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
             {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
@@ -517,6 +545,12 @@ function Roster({data}){
           <select value={d.role} onChange={e=>api('PUT','/drivers/'+d.id,{role:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:4}}>
             <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Sales/Driver</option>
           </select>
+          <div style={{marginTop:4,display:'flex',alignItems:'center',gap:4}}>
+            <label style={{fontSize:11,fontWeight:600,color:'#6b7280'}}>PIN:</label>
+            <input type="password" maxLength={4} value={d.pin||''} placeholder="----"
+              onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,4);api('PUT','/drivers/'+d.id,{pin:v});}}
+              style={{width:60,padding:'2px 6px',fontSize:12,textAlign:'center',letterSpacing:4,border:'1px solid var(--border)',borderRadius:4}}/>
+          </div>
         </div>
         <div className="acts"><button style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>remove(d)}>Remove</button></div>
       </div>))}
@@ -683,9 +717,18 @@ function Customers({data}){
   const [importPreview,setImportPreview]=useState(null);
 
   const matchCol=(headers,options)=>{
-    for(let i=0;i<headers.length;i++){
-      const h=headers[i].toLowerCase().replace(/[^a-z0-9]/g,'');
-      for(const opt of options){if(h.includes(opt))return i;}
+    // Two-pass: first try exact-start matches (prefer shipping over billing), then substring
+    for(const opt of options){
+      for(let i=0;i<headers.length;i++){
+        const h=headers[i].toLowerCase().replace(/[^a-z0-9]/g,'');
+        if(h===opt||h.startsWith(opt))return i;
+      }
+    }
+    for(const opt of options){
+      for(let i=0;i<headers.length;i++){
+        const h=headers[i].toLowerCase().replace(/[^a-z0-9]/g,'');
+        if(h.includes(opt))return i;
+      }
     }
     return -1;
   };
@@ -714,10 +757,10 @@ function Customers({data}){
       const rows=allRows.slice(headerRow+1);
 
       const nameIdx=matchCol(headers,['customerfullname','customername','customer','company','name','companyname','displayname','fullname']);
-      const addrIdx=matchCol(headers,['billaddress','billingaddress','billingstreet','billstreet','street','address','shippingstreet','address1','shipaddress']);
-      const cityIdx=matchCol(headers,['city','billingcity','shippingcity']);
-      const stateIdx=matchCol(headers,['state','province','billingstate','shippingstate']);
-      const zipIdx=matchCol(headers,['zip','postal','billingzip','shippingzip','zipcode','postalcode']);
+      const addrIdx=matchCol(headers,['shippingstreet','shipaddress','shippingaddress','shipstreet','street','address','address1','billaddress','billingaddress','billingstreet','billstreet']);
+      const cityIdx=matchCol(headers,['shippingcity','city','billingcity']);
+      const stateIdx=matchCol(headers,['shippingstate','state','province','billingstate']);
+      const zipIdx=matchCol(headers,['shippingzip','zip','postal','billingzip','zipcode','postalcode']);
       const phoneIdx=matchCol(headers,['phone','phonenumbers','telephone','mainphone','workphone','primaryphone']);
       const emailIdx=matchCol(headers,['email','emailaddress','mainemail']);
       const contactIdx=matchCol(headers,['contact','contactname','firstname','primarycontact']);
@@ -780,13 +823,17 @@ function Customers({data}){
     if(importRef.current)importRef.current.value='';
   };
 
+  const [updateExisting,setUpdateExisting]=useState(true);
   const doImport=async()=>{
     if(!importPreview||!importPreview.length)return;
     setImporting(true);
     try{
-      const r=await fetch('/api/customers/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customers:importPreview})});
+      const r=await fetch('/api/customers/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customers:importPreview,updateExisting})});
       const result=await r.json();
-      alert('Imported '+result.imported+' customers!');
+      const msgs=[];
+      if(result.imported)msgs.push(result.imported+' new customers added');
+      if(result.updated)msgs.push(result.updated+' existing customers updated');
+      alert(msgs.length?msgs.join(', ')+'!':'No changes made.');
       setImportPreview(null);
     }catch(err){alert('Import error: '+err.message);}
     setImporting(false);
@@ -813,8 +860,12 @@ function Customers({data}){
 
     {importPreview&&<div style={{background:'#fffbeb',border:'2px solid #d97706',borderRadius:10,padding:16,marginBottom:16}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div><strong style={{fontSize:15}}>Preview: {importPreview.length} customers found</strong><div style={{fontSize:12,color:'#92400e'}}>Review below, then click Import to add them all.</div></div>
-        <div style={{display:'flex',gap:8}}>
+        <div><strong style={{fontSize:15}}>Preview: {importPreview.length} customers found</strong><div style={{fontSize:12,color:'#92400e'}}>Review below, then click Import.</div></div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <label style={{fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:4,background:'#fff',padding:'4px 10px',borderRadius:6,border:'1px solid #d97706'}}>
+            <input type="checkbox" checked={updateExisting} onChange={e=>setUpdateExisting(e.target.checked)} style={{width:'auto'}}/>
+            Update existing customers
+          </label>
           <button className="bc" onClick={()=>setImportPreview(null)}>Cancel</button>
           <button className="bp" onClick={doImport} style={{background:'#16a34a'}}>Import {importPreview.length} Customers</button>
         </div>
@@ -859,7 +910,7 @@ function Customers({data}){
             </div>
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:16,marginTop:8,fontSize:13}}>
-            {(c.address||c.city)&&<div style={{color:'#555'}}>{[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ')}</div>}
+            {(c.address||c.city)&&<div style={{color:'#555'}}>Pickup: {[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ')}</div>}
             {c.phone&&<div style={{color:'#555'}}>Phone: {c.phone}</div>}
             {c.email&&<div style={{color:'#555'}}>Email: {c.email}</div>}
           </div>
@@ -876,8 +927,8 @@ function Customers({data}){
           <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. Brenntag Fresno"/></div>
         <div className="mrow"><label>Contact Person</label>
           <input value={form.contact} onChange={e=>setForm({...form,contact:e.target.value})} placeholder="e.g. John Smith"/></div>
-        <div className="mrow"><label>Address</label>
-          <input value={form.address} onChange={e=>setForm({...form,address:e.target.value})} placeholder="Street address"/></div>
+        <div className="mrow"><label style={{fontWeight:700,color:'#1B3A5C'}}>Pickup Address</label>
+          <input value={form.address} onChange={e=>setForm({...form,address:e.target.value})} placeholder="Pickup street address"/></div>
         <div style={{display:'flex',gap:8}}>
           <div className="mrow" style={{flex:2}}><label>City</label>
             <input value={form.city} onChange={e=>setForm({...form,city:e.target.value})} placeholder="City"/></div>
@@ -1009,9 +1060,52 @@ function Pickups({data}) {
   const [custSearch, setCustSearch] = useState('');
   const [custDropOpen, setCustDropOpen] = useState(false);
 
-  const emptyForm = { date: '', customerIds: [], truckTrailerType: '', timeWindow: '', equipment: [], notes: '', status: 'Scheduled', priority: 'routine', salesPerson: '' };
+  const emptyForm = { date: '', customerIds: [], truckTrailerType: '', timeWindow: '', equipment: [], notes: '', status: 'Scheduled', salesPerson: '' };
   const [form, setForm] = useState(emptyForm);
   const [showPlacards, setShowPlacards] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFiles = async (files) => {
+    setUploading(true);
+    const newAttachments = [];
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('category', 'Job Request');
+      try {
+        const res = await fetch('/api/documents', { method: 'POST', body: fd });
+        const doc = await res.json();
+        if (doc.id) newAttachments.push({ id: doc.id, name: doc.name });
+      } catch(e) { console.error('Upload failed:', e); }
+    }
+    setAttachments(prev => [...prev, ...newAttachments]);
+    setUploading(false);
+  };
+
+  const removeAttachment = (docId) => { setAttachments(prev => prev.filter(a => a.id !== docId)); };
+
+  const [pinPrompt, setPinPrompt] = useState(null); /* null or {pickupId, pin} */
+  const [pinError, setPinError] = useState('');
+
+  const checkPin = (pin) => data.drivers.some(d => d.pin && d.pin === pin);
+
+  const startAssign = (pickupId, requestedDate) => {
+    setPinPrompt({ pickupId, requestedDate: requestedDate || '', pin: '' });
+    setPinError('');
+  };
+
+  const submitAssignPin = () => {
+    if (!pinPrompt) return;
+    if (checkPin(pinPrompt.pin)) {
+      setAssigningId(pinPrompt.pickupId);
+      setAssignDate(pinPrompt.requestedDate);
+      setPinPrompt(null);
+      setPinError('');
+    } else {
+      setPinError('Invalid PIN');
+    }
+  };
 
   const getCustEntries = () => (form.customerIds || []).map(x => typeof x === 'string' ? { id: x, jobNotes: '' } : x);
 
@@ -1022,7 +1116,6 @@ function Pickups({data}) {
   const archived = pickups.filter(p => p.status === 'archived');
   let display = viewMode === 'active' ? active : archived;
 
-  if (filterPri) display = display.filter(p => p.priority === filterPri);
   if (search) {
     const s = search.toLowerCase();
     display = display.filter(p =>
@@ -1034,18 +1127,25 @@ function Pickups({data}) {
     );
   }
 
-  // Sort: emergency > urgent > routine, then by date
-  const priOrd = { emergency: 0, urgent: 1, routine: 2 };
+  // Sort by date
   display = display.slice().sort((a, b) => {
-    const pa = priOrd[a.priority] ?? 2, pb = priOrd[b.priority] ?? 2;
-    if (pa !== pb) return pa - pb;
     return (a.date || a.requestedDate || '').localeCompare(b.date || b.requestedDate || '');
   });
 
   const newCount = active.filter(p => p.status === 'new').length;
   const assignedCount = active.filter(p => p.status === 'assigned').length;
 
-  const openAdd = () => { setEditId(null); setForm(emptyForm); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
+  const SALESPEOPLE = ['Frank Kendrick', 'Keith Higgins', 'Marshall Holmes', 'Mike Hetrick', 'Robert Benitez'];
+  const grouped = {};
+  SALESPEOPLE.forEach(sp => { grouped[sp] = []; });
+  grouped['Other'] = [];
+  display.forEach(p => {
+    const sp = p.salesPerson || '';
+    if (SALESPEOPLE.includes(sp)) { grouped[sp].push(p); }
+    else { grouped['Other'].push(p); }
+  });
+
+  const openAdd = () => { setEditId(null); setForm(emptyForm); setAttachments([]); setCustSearch(''); setCustDropOpen(false); setShowForm(true); };
   const openEdit = (p) => {
     setEditId(p.id);
     const custIds = p.customerIds || (p.customerId ? [{ id: p.customerId, jobNotes: (p.wasteDescription || '') + (p.containerInfo ? ' | ' + p.containerInfo : ''), timeWindow: p.requestedTimeWindow || '' }] : []);
@@ -1057,9 +1157,9 @@ function Pickups({data}) {
       equipment: p.equipment || [],
       notes: p.notes || '',
       status: p.status === 'new' || p.status === 'assigned' || p.status === 'archived' ? (p.jobStatus || 'Scheduled') : (p.status || 'Scheduled'),
-      priority: p.priority || 'routine',
       salesPerson: p.salesPerson || ''
     });
+    setAttachments(p.attachments || []);
     setCustSearch('');
     setCustDropOpen(false);
     setShowForm(true);
@@ -1069,7 +1169,8 @@ function Pickups({data}) {
     if (getCustEntries().length === 0) { alert('Please add at least one customer'); return; }
     const entries = getCustEntries();
     const firstCust = entries.length > 0 ? (data.customers || []).find(c => c.id === entries[0].id) : null;
-    const payload = { ...form, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '' };
+    const { status, ...formWithoutStatus } = form;
+    const payload = { ...formWithoutStatus, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '', attachments: attachments };
     if (editId) { await api('PUT', '/pickups/' + editId, payload); }
     else { await api('POST', '/pickups', payload); }
     setShowForm(false); setEditId(null); setForm(emptyForm);
@@ -1090,11 +1191,6 @@ function Pickups({data}) {
   const doUnarchive = async (id) => { await api('PUT', '/pickups/' + id + '/unarchive'); };
   const doDelete = async (id) => { if (!confirm('Delete this job request?')) return; await api('DELETE', '/pickups/' + id); };
 
-  const priBadge = (pri) => {
-    const c = { emergency: '#dc2626', urgent: '#f59e0b', routine: '#10b981' };
-    const l = { emergency: 'EMERGENCY', urgent: 'URGENT', routine: 'Routine' };
-    return <span style={{ background: c[pri] || '#6b7280', color: '#fff', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 'bold' }}>{l[pri] || pri}</span>;
-  };
 
   const stBadge = (st) => {
     const c = { 'new': '#3b82f6', assigned: '#8b5cf6', archived: '#6b7280' };
@@ -1124,16 +1220,26 @@ function Pickups({data}) {
       </div>
     </div>
 
-    {/* Job Request cards */}
+    {/* Job Request cards grouped by salesperson */}
     {display.length === 0 ? (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
         {viewMode === 'active' ? 'No active job requests. Click "+ New Job Request" to create one.' : 'No archived jobs.'}
       </div>
     ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {display.map(pickup => {
-          const isAssigning = assigningId === pickup.id;
-          const borderColor = pickup.priority === 'emergency' ? '#dc2626' : pickup.priority === 'urgent' ? '#f59e0b' : '#10b981';
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {[...SALESPEOPLE, 'Other'].map(sp => {
+          const items = grouped[sp];
+          if (items.length === 0) return null;
+          return (
+            <div key={sp}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, borderBottom: '2px solid var(--primary)', paddingBottom: 6 }}>
+                <h3 style={{ margin: 0, fontSize: 16, color: 'var(--primary)' }}>{sp}</h3>
+                <span style={{ background: '#e0e7ff', color: '#4338ca', borderRadius: 12, padding: '2px 10px', fontSize: 11, fontWeight: 'bold' }}>{items.length}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {items.map(pickup => {
+                  const isAssigning = assigningId === pickup.id;
+          const borderColor = '#10b981';
           return (
             <div key={pickup.id} style={{ background: 'var(--bg-white)', border: '1px solid var(--border)', borderLeft: '4px solid ' + borderColor, borderRadius: 8, padding: 14, boxShadow: 'var(--shadow)' }}>
               {/* Card header */}
@@ -1141,11 +1247,10 @@ function Pickups({data}) {
                 <div>
                   <span style={{ fontWeight: 'bold', fontSize: 15 }}>{pickup.customerName || 'Unknown'}</span>
                   {stBadge(pickup.status)}
-                  {priBadge(pickup.priority)}
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {viewMode === 'active' && pickup.status === 'new' && (
-                    <button onClick={() => { setAssigningId(pickup.id); setAssignDate(pickup.requestedDate || ''); }} style={{ background: '#8b5cf6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Assign Driver</button>
+                    <button onClick={() => startAssign(pickup.id, pickup.date || pickup.requestedDate)} style={{ background: '#8b5cf6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Assign Driver</button>
                   )}
                   {viewMode === 'active' && pickup.status === 'assigned' && (
                     <button onClick={() => doArchive(pickup.id)} style={{ background: '#6b7280', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Complete &amp; Archive</button>
@@ -1158,9 +1263,8 @@ function Pickups({data}) {
                 </div>
               </div>
 
-              {/* Card body */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px 16px', fontSize: 13 }}>
-                <div><strong>Customer(s): </strong>{(()=>{ const ids = pickup.customerIds || []; if (ids.length > 0) { return ids.map(x => { const cid = typeof x === 'string' ? x : x.id; const c = (data.customers || []).find(cx => cx.id === cid); return c ? c.name : cid; }).join(', '); } return pickup.customerName || '-'; })()}</div>
+              {/* Card body - summary row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px 16px', fontSize: 13, marginBottom: 8 }}>
                 <div><strong>Date: </strong>{(pickup.date || pickup.requestedDate) ? new Date((pickup.date || pickup.requestedDate) + 'T12:00:00').toLocaleDateString() : 'TBD'}</div>
                 {(pickup.timeWindow || pickup.requestedTimeWindow) && <div><strong>Time Window: </strong>{pickup.timeWindow || pickup.requestedTimeWindow}</div>}
                 <div><strong>Truck/Trailer Type: </strong>{pickup.truckTrailerType || '-'}</div>
@@ -1168,10 +1272,45 @@ function Pickups({data}) {
                 {pickup.assignedDriverName && <div><strong>Driver: </strong><span style={{ color: '#7c3aed', fontWeight: 'bold' }}>{pickup.assignedDriverName}</span>{pickup.assignedDate ? ' (' + new Date(pickup.assignedDate + 'T12:00:00').toLocaleDateString() + ')' : ''}</div>}
               </div>
 
+              {/* Customer detail cards */}
+              {(()=>{ const ids = pickup.customerIds || []; if (ids.length > 0) { return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {ids.map((entry, idx) => { const cid = typeof entry === 'string' ? entry : entry.id; const c = (data.customers || []).find(cx => cx.id === cid); if (!c) return null; const eq = entry.equipment || []; const pl = entry.placards || []; return (
+                    <div key={cid} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: 10, fontSize: 12 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--primary)', marginBottom: 4 }}>{c.name}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '4px 16px' }}>
+                        {c.address && <div><strong>Pickup Address: </strong>{c.address}{c.city ? ', ' + c.city : ''}{c.state ? ' ' + c.state : ''} {c.zip || ''}</div>}
+                        {c.phone && <div><strong>Phone: </strong>{c.phone}</div>}
+                        {c.contact && <div><strong>Contact: </strong>{c.contact}</div>}
+                        {(c.pricing || c.notes) && <div><strong>Pricing/Notes: </strong>{c.pricing || c.notes}</div>}
+                        {entry.timeWindow && <div><strong>Time Window: </strong>{entry.timeWindow}</div>}
+                      </div>
+                      {eq.length > 0 && <div style={{ marginTop: 4 }}><strong>Equipment: </strong>{eq.join(', ')}</div>}
+                      {pl.length > 0 && <div style={{ marginTop: 4 }}><strong>Placards: </strong><span style={{ color: '#b45309' }}>{pl.join(', ')}</span></div>}
+                      {entry.jobNotes && <div style={{ marginTop: 4, padding: '4px 8px', background: '#eff6ff', borderRadius: 4, border: '1px solid #bfdbfe', whiteSpace: 'pre-wrap' }}><strong>Job Notes: </strong>{entry.jobNotes}</div>}
+                    </div>
+                  );})}
+                </div>
+              ); } else if (pickup.customerName) { return (
+                <div style={{ fontSize: 13 }}><strong>Customer: </strong>{pickup.customerName}</div>
+              ); } return null; })()}
+
               {/* Notes */}
               {pickup.notes && (
-                <div style={{ marginTop: 6, padding: '6px 10px', background: '#fffbeb', borderRadius: 4, fontSize: 12, color: '#92400e' }}>
+                <div style={{ marginTop: 6, padding: '6px 10px', background: '#fffbeb', borderRadius: 4, fontSize: 12, color: '#92400e', whiteSpace: 'pre-wrap' }}>
                   <strong>Notes: </strong>{pickup.notes}
+                </div>
+              )}
+
+              {/* Attachments */}
+              {pickup.attachments && pickup.attachments.length > 0 && (
+                <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <strong style={{ fontSize: 12 }}>Files:</strong>
+                  {pickup.attachments.map(a => (
+                    <a key={a.id} href={'/api/documents/' + a.id + '/view'} target="_blank" rel="noopener" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontSize: 11, color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}>
+                      {a.name.toLowerCase().endsWith('.pdf') ? '\u{1F4C4}' : '\u{1F4CE}'} {a.name}
+                    </a>
+                  ))}
                 </div>
               )}
 
@@ -1203,12 +1342,36 @@ function Pickups({data}) {
             </div>
           );
         })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {/* PIN Prompt for Assign */}
+    {pinPrompt && (
+      <div className="overlay">
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+          <h2 style={{ marginBottom: 4 }}>Enter PIN</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Enter your 4-digit PIN to assign this job</p>
+          <input type="password" maxLength={4} value={pinPrompt.pin} autoFocus
+            onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); setPinPrompt({ ...pinPrompt, pin: v }); setPinError(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') submitAssignPin(); if (e.key === 'Escape') { setPinPrompt(null); setPinError(''); } }}
+            style={{ fontSize: 28, textAlign: 'center', letterSpacing: 12, width: 140, padding: '8px 12px', border: '2px solid ' + (pinError ? '#dc2626' : 'var(--border)'), borderRadius: 8 }}
+            placeholder="••••" />
+          {pinError && <div style={{ color: '#dc2626', fontSize: 13, marginTop: 8, fontWeight: 600 }}>{pinError}</div>}
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="bc" onClick={() => { setPinPrompt(null); setPinError(''); }}>Cancel</button>
+            <button className="bp" onClick={submitAssignPin}>Submit</button>
+          </div>
+        </div>
       </div>
     )}
 
     {/* New/Edit Job Request Modal */}
-    {showForm&&(<div className="overlay" onClick={()=>{setShowForm(false);setEditId(null);}}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
+    {showForm&&(<div className="overlay">
+      <div className="modal">
         <h2>{editId?'Edit Job Request':'New Job Request'}</h2>
         <div className="mrow"><label>Date</label>
           <input type="date" value={form.date||''} onChange={e=>setForm({...form,date:e.target.value})}/>
@@ -1234,7 +1397,7 @@ function Pickups({data}) {
               <strong style={{fontSize:13}}>{c.name}</strong>
               <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setForm({...form,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
             </div>
-            {c.address&&<div><strong>Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {c.address&&<div><strong>Pickup Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
             {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
             {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
             {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
@@ -1293,16 +1456,28 @@ function Pickups({data}) {
             </div>))}
           </div>
         </div>;})()}
-        <div className="mrow"><label>Priority</label>
-          <select value={form.priority||'routine'} onChange={e=>setForm({...form,priority:e.target.value})}>
-            <option value="routine">Routine</option><option value="urgent">Urgent</option><option value="emergency">Emergency</option>
-          </select></div>
         <div className="mrow"><label>Salesperson</label>
-          <input value={form.salesPerson||''} onChange={e=>setForm({...form,salesPerson:e.target.value})} placeholder="Salesperson name"/></div>
-        <div className="mrow"><label>Status</label>
-          <select value={form.status||'Scheduled'} onChange={e=>setForm({...form,status:e.target.value})}>
-            <option>Scheduled</option><option>Tentative</option><option>Confirmed</option><option>Off</option><option>OOO</option>
+          <select value={form.salesPerson||''} onChange={e=>setForm({...form,salesPerson:e.target.value})}>
+            <option value="">-- Select Salesperson --</option>
+            <option value="Frank Kendrick">Frank Kendrick</option>
+            <option value="Keith Higgins">Keith Higgins</option>
+            <option value="Marshall Holmes">Marshall Holmes</option>
+            <option value="Mike Hetrick">Mike Hetrick</option>
+            <option value="Robert Benitez">Robert Benitez</option>
           </select></div>
+        <div className="mrow"><label>Attachments</label>
+          <div>
+            <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={e=>{if(e.target.files.length>0){uploadFiles(Array.from(e.target.files));e.target.value='';}}} style={{fontSize:12}}/>
+            {uploading&&<span style={{color:'#3b82f6',fontSize:12,marginLeft:8}}>Uploading...</span>}
+            {attachments.length>0&&<div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+              {attachments.map(a=>(
+                <div key={a.id} style={{display:'flex',alignItems:'center',gap:8,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:4,padding:'4px 8px',fontSize:12}}>
+                  <a href={'/api/documents/'+a.id+'/view'} target="_blank" rel="noopener" style={{color:'#2563eb',fontWeight:600,flex:1}}>{a.name}</a>
+                  <span onClick={()=>removeAttachment(a.id)} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14}}>&times;</span>
+                </div>
+              ))}
+            </div>}
+          </div></div>
         <div className="mrow"><label>Notes</label>
           <textarea value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} rows={3} placeholder="Special instructions, reference numbers, etc."/></div>
         <div className="mactions">
