@@ -796,17 +796,23 @@ function CapitolCalendar({data}) {
                   <span style={{ fontWeight: 700, fontSize: 13, color: isToday ? '#d97706' : 'var(--text)', background: isToday ? '#fef3c7' : 'transparent', borderRadius: 12, padding: '1px 6px' }}>{day}</span>
                   {jobs.length > 0 && <span style={{ background: '#3b82f6', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 9, fontWeight: 700 }}>{jobs.length}</span>}
                 </div>
-                {jobs.map(p => (
+                {jobs.map(p => {
+                  const pIds = p.customerIds || [];
+                  const firstEntry = pIds[0];
+                  const firstCid = firstEntry ? (typeof firstEntry === 'string' ? firstEntry : firstEntry.id) : (p.customerId || null);
+                  const pCust = firstCid ? (data.customers || []).find(cx => cx.id === firstCid) : null;
+                  const cityName = pCust ? (pCust.city || '') : '';
+                  return (
                   <div key={p.id} onClick={e => { e.stopPropagation(); openEdit(p); }} style={{ background: p.status === 'assigned' ? '#f3e8ff' : '#eff6ff', border: '1px solid ' + (p.status === 'assigned' ? '#c4b5fd' : '#bfdbfe'), borderRadius: 4, padding: '3px 5px', marginBottom: 3, cursor: 'pointer', fontSize: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ fontSize: 10 }}>{p.truckTrailerType || 'Job'}</strong>
-                      {stBadge(p.status)}
-                    </div>
+                    {cityName && <div style={{ fontWeight: 700, fontSize: 10, color: '#1B3A5C' }}>{cityName}</div>}
+                    {p.truckTrailerType && <div style={{ fontSize: 10, color: '#374151' }}>{p.truckTrailerType}</div>}
+                    {stBadge(p.status)}
                     {p.salesPerson && <div style={{ color: '#6b7280', fontSize: 9 }}>{p.salesPerson}</div>}
                     {p.notes && <div style={{ color: '#374151', fontSize: 9, whiteSpace: 'pre-wrap', marginTop: 2 }}>{p.notes.length > 60 ? p.notes.slice(0, 60) + '...' : p.notes}</div>}
                     {p.attachments && p.attachments.length > 0 && <div style={{ color: '#2563eb', fontSize: 9 }}>{p.attachments.length} file(s)</div>}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
