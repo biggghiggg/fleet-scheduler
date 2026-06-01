@@ -238,7 +238,7 @@ function App(){
         </div>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['roster','People'],['fleet','Trucks & Trailers'],['routes','Route View'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['capitol','Capitol Calendar'],['roster','People'],['fleet','Trucks & Trailers'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
@@ -247,7 +247,7 @@ function App(){
         {tab==='pickups'&&<Pickups data={data}/>}
         {tab==='roster'&&<Roster data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
-        {tab==='routes'&&<Routes data={data} dates={dates} ws={ws} prev={prev} next={next} now={now}/>}
+        {tab==='capitol'&&<CapitolCalendar data={data}/>}
         {tab==='customers'&&<Customers data={data}/>}
         {tab==='docs'&&<Documents/>}
       </div>
@@ -661,36 +661,290 @@ function Fleet({data}){
   </div>);
 }
 
-function Routes({data,dates,ws,prev,next,now}){
-  const end=new Date(ws);end.setDate(end.getDate()+6);
-  const today=dk(new Date());
-  const driverJobs=(driverId,date)=>{
-    const k=dk(date);
-    return data.jobs.filter(j=>j.driverId===driverId&&j.date===k&&j.location).map(j=>({
-      loc:j.location,
-      truck:data.trucks.find(t=>t.id===j.truckId)?.name
-    }));
+function CapitolCalendar({data}) {
+  const CAPITOL_NAME = 'Capitol Environmental';
+  const capitolCust = (data.customers || []).find(c => (c.name || '').toLowerCase().includes('capitol environmental'));
+  const capitolId = capitolCust ? capitolCust.id : null;
+
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [custSearch, setCustSearch] = useState('');
+  const [custDropOpen, setCustDropOpen] = useState(false);
+  const [showPlacards, setShowPlacards] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  const emptyForm = { date: '', customerIds: [], truckTrailerType: '', timeWindow: '', equipment: [], notes: '', status: 'Scheduled', salesPerson: '' };
+  const [form, setForm] = useState(emptyForm);
+
+  const uploadFiles = async (files) => {
+    setUploading(true);
+    const newAttachments = [];
+    for (const file of files) {
+      const fd = new FormData(); fd.append('file', file); fd.append('category', 'Job Request');
+      try { const res = await fetch('/api/documents', { method: 'POST', body: fd }); const doc = await res.json(); if (doc.id) newAttachments.push({ id: doc.id, name: doc.name }); } catch(e) { console.error('Upload failed:', e); }
+    }
+    setAttachments(prev => [...prev, ...newAttachments]);
+    setUploading(false);
   };
-  return(<div>
-    <div className="week-nav">
-      <button onClick={prev}>&#9664; Prev</button>
-      <button onClick={now} style={{background:'#16a34a'}}>Today</button>
-      <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
-      <button onClick={next}>Next &#9654;</button>
+  const removeAttachment = (docId) => { setAttachments(prev => prev.filter(a => a.id !== docId)); };
+
+  const getCustEntries = () => (form.customerIds || []).map(x => typeof x === 'string' ? { id: x, jobNotes: '' } : x);
+
+  // Calendar math
+  const year = calMonth.getFullYear();
+  const month = calMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = calMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const todayStr = dk(new Date());
+
+  const prevMonth = () => setCalMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCalMonth(new Date(year, month + 1, 1));
+  const goToday = () => setCalMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+
+  // Filter pickups for Capitol Environmental
+  const allPickups = (data.pickups || []).filter(p => {
+    if (p.status === 'archived') return false;
+    const ids = p.customerIds || [];
+    if (ids.length > 0) return ids.some(e => (typeof e === 'string' ? e : e.id) === capitolId);
+    return (p.customerName || '').toLowerCase().includes('capitol environmental');
+  });
+
+  const getJobsForDate = (dateStr) => allPickups.filter(p => (p.date || p.requestedDate || '') === dateStr);
+
+  // Build calendar grid
+  const weeks = [];
+  let dayNum = 1;
+  for (let w = 0; w < 6; w++) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      if ((w === 0 && d < firstDay) || dayNum > daysInMonth) { week.push(null); }
+      else { week.push(dayNum); dayNum++; }
+    }
+    weeks.push(week);
+    if (dayNum > daysInMonth) break;
+  }
+
+  const openAddForDate = (day) => {
+    setEditId(null);
+    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    const initEntries = capitolId ? [{ id: capitolId, jobNotes: '', timeWindow: '', equipment: [], placards: [] }] : [];
+    setForm({ ...emptyForm, date: dateStr, customerIds: initEntries });
+    setAttachments([]);
+    setCustSearch(''); setCustDropOpen(false);
+    setShowForm(true);
+  };
+
+  const openEdit = (p) => {
+    setEditId(p.id);
+    const custIds = p.customerIds || (p.customerId ? [{ id: p.customerId, jobNotes: (p.wasteDescription || '') + (p.containerInfo ? ' | ' + p.containerInfo : ''), timeWindow: p.requestedTimeWindow || '' }] : []);
+    setForm({ date: p.date || p.requestedDate || '', customerIds: custIds, truckTrailerType: p.truckTrailerType || '', timeWindow: p.timeWindow || p.requestedTimeWindow || '', equipment: p.equipment || [], notes: p.notes || '', status: p.status === 'new' || p.status === 'assigned' || p.status === 'archived' ? (p.jobStatus || 'Scheduled') : (p.status || 'Scheduled'), salesPerson: p.salesPerson || '' });
+    setAttachments(p.attachments || []);
+    setCustSearch(''); setCustDropOpen(false);
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    if (getCustEntries().length === 0) { alert('Please add at least one customer'); return; }
+    const entries = getCustEntries();
+    const firstCust = entries.length > 0 ? (data.customers || []).find(c => c.id === entries[0].id) : null;
+    const { status, ...formWithoutStatus } = form;
+    const payload = { ...formWithoutStatus, customerName: firstCust ? firstCust.name : '', customerId: firstCust ? firstCust.id : '', location: firstCust ? firstCust.name : '', attachments: attachments };
+    if (editId) { await api('PUT', '/pickups/' + editId, payload); }
+    else { await api('POST', '/pickups', payload); }
+    setShowForm(false); setEditId(null); setForm(emptyForm);
+  };
+
+  const stBadge = (st) => {
+    const c = { 'new': '#3b82f6', assigned: '#8b5cf6', archived: '#6b7280' };
+    const l = { 'new': 'NEW', assigned: 'ASSIGNED', archived: 'ARCHIVED' };
+    return <span style={{ background: c[st] || '#6b7280', color: '#fff', padding: '2px 6px', borderRadius: 10, fontSize: 9, fontWeight: 'bold', marginLeft: 4 }}>{l[st] || st}</span>;
+  };
+
+  const DAYNAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  return (<div>
+    {/* Month navigation */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button onClick={prevMonth} style={{ padding: '6px 14px' }}>&#9664; Prev</button>
+        <button onClick={goToday} style={{ background: '#16a34a', color: '#fff', padding: '6px 14px' }}>Today</button>
+        <button onClick={nextMonth} style={{ padding: '6px 14px' }}>Next &#9654;</button>
+      </div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>{monthName}</h2>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Capitol Environmental Jobs</div>
     </div>
-    <div className="grid"><table><thead><tr><th>Person</th>
-      {dates.map((d,i)=>(<th key={i} style={dk(d)===today?{background:'#fffbeb'}:{}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{d.getMonth()+1}/{d.getDate()}</span></th>))}
-    </tr></thead><tbody>
-      {data.drivers.map(driver=>(<tr key={driver.id}>
-        <td><div>{driver.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:400}}>{driver.role}</div></div></td>
-        {dates.map((date,i)=>{
-          const jobs=driverJobs(driver.id,date);const ist=dk(date)===today;
-          return(<td key={i}><div className={'cell'+(ist?' today':'')} style={{minHeight:40}}>
-            {jobs.map((item,j)=>(<div key={j} className="rtag" style={{marginBottom:3,display:'block'}}>{item.loc}{item.truck?' ('+item.truck+')':''}</div>))}
-          </div></td>);
-        })}
-      </tr>))}
-    </tbody></table></div>
+
+    {/* Calendar grid */}
+    <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--primary)' }}>
+        {DAYNAMES.map(d => <div key={d} style={{ padding: '8px 4px', textAlign: 'center', color: '#fff', fontWeight: 700, fontSize: 13 }}>{d}</div>)}
+      </div>
+      {weeks.map((week, wi) => (
+        <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minHeight: 120 }}>
+          {week.map((day, di) => {
+            if (!day) return <div key={di} style={{ background: '#f8fafc', borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}/>;
+            const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            const jobs = getJobsForDate(dateStr);
+            const isToday = dateStr === todayStr;
+            return (
+              <div key={di} style={{ borderRight: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb', padding: 4, background: isToday ? '#fffbeb' : '#fff', verticalAlign: 'top', fontSize: 11, overflow: 'auto', cursor: 'pointer', position: 'relative' }} onClick={() => openAddForDate(day)}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: isToday ? '#d97706' : 'var(--text)', background: isToday ? '#fef3c7' : 'transparent', borderRadius: 12, padding: '1px 6px' }}>{day}</span>
+                  {jobs.length > 0 && <span style={{ background: '#3b82f6', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 9, fontWeight: 700 }}>{jobs.length}</span>}
+                </div>
+                {jobs.map(p => (
+                  <div key={p.id} onClick={e => { e.stopPropagation(); openEdit(p); }} style={{ background: p.status === 'assigned' ? '#f3e8ff' : '#eff6ff', border: '1px solid ' + (p.status === 'assigned' ? '#c4b5fd' : '#bfdbfe'), borderRadius: 4, padding: '3px 5px', marginBottom: 3, cursor: 'pointer', fontSize: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: 10 }}>{p.truckTrailerType || 'Job'}</strong>
+                      {stBadge(p.status)}
+                    </div>
+                    {p.salesPerson && <div style={{ color: '#6b7280', fontSize: 9 }}>{p.salesPerson}</div>}
+                    {p.notes && <div style={{ color: '#374151', fontSize: 9, whiteSpace: 'pre-wrap', marginTop: 2 }}>{p.notes.length > 60 ? p.notes.slice(0, 60) + '...' : p.notes}</div>}
+                    {p.attachments && p.attachments.length > 0 && <div style={{ color: '#2563eb', fontSize: 9 }}>{p.attachments.length} file(s)</div>}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+
+    {/* Expanded day detail */}
+    {selectedDate && (() => {
+      const jobs = getJobsForDate(selectedDate);
+      return jobs.length > 0 ? <div style={{ marginTop: 16, padding: 16, background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8 }}>
+        <h3 style={{ fontSize: 15, marginBottom: 10 }}>Jobs for {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3>
+        {jobs.map(p => <div key={p.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+          <div style={{ fontWeight: 700 }}>{p.customerName || 'Capitol Environmental'} {stBadge(p.status)}</div>
+          {p.truckTrailerType && <div style={{ fontSize: 12 }}>Truck/Trailer: {p.truckTrailerType}</div>}
+          {p.salesPerson && <div style={{ fontSize: 12 }}>Salesperson: {p.salesPerson}</div>}
+          {p.notes && <div style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>Notes: {p.notes}</div>}
+        </div>)}
+      </div> : null;
+    })()}
+
+    {/* New/Edit Job Request Modal - same as Pickups */}
+    {showForm&&(<div className="overlay">
+      <div className="modal">
+        <h2>{editId?'Edit Capitol Job':'New Capitol Job'}</h2>
+        <div className="mrow"><label>Date</label>
+          <input type="date" value={form.date||''} onChange={e=>setForm({...form,date:e.target.value})}/>
+        </div>
+        <div className="mrow"><label>Customer(s)</label>
+          <div style={{position:'relative'}}>
+            <input value={custSearch} onChange={e=>{setCustSearch(e.target.value);setCustDropOpen(true);}} onFocus={()=>setCustDropOpen(true)} placeholder="Search customers..." style={{width:'100%'}}/>
+            {custDropOpen&&(()=>{
+              const allCust=(data.customers||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+              const entries=getCustEntries();
+              const selectedIds=entries.map(x=>x.id);
+              const filtered=custSearch?allCust.filter(c=>(c.name||'').toLowerCase().includes(custSearch.toLowerCase())):allCust;
+              return filtered.length>0?<div style={{position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'1px solid #ccc',borderRadius:6,maxHeight:200,overflowY:'auto',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,.15)'}}>
+                {filtered.map(c=><div key={c.id} onClick={()=>{if(!selectedIds.includes(c.id)){setForm({...form,customerIds:[...entries,{id:c.id,jobNotes:''}]});}setCustSearch('');setCustDropOpen(false);}} style={{padding:'8px 12px',cursor:'pointer',fontSize:13,background:selectedIds.includes(c.id)?'#dbeafe':'#fff',borderBottom:'1px solid #f0f0f0'}} onMouseEnter={e=>e.target.style.background='#eff6ff'} onMouseLeave={e=>e.target.style.background=selectedIds.includes(c.id)?'#dbeafe':'#fff'}>
+                  <strong>{c.name}</strong>{c.city?<span style={{color:'#666',marginLeft:6,fontSize:12}}>{c.city}{c.state?', '+c.state:''}</span>:null}
+                  {selectedIds.includes(c.id)&&<span style={{float:'right',color:'#2563eb',fontSize:11}}>selected</span>}
+                </div>)}
+              </div>:null;
+            })()}
+          </div>
+          {getCustEntries().length>0&&<div style={{marginTop:6}}>{getCustEntries().map((entry,idx)=>{const c=(data.customers||[]).find(x=>x.id===entry.id);const ep=entry.placards||[];const eeq=entry.equipment||[];return c?<div key={entry.id} style={{background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:10,marginBottom:6,fontSize:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <strong style={{fontSize:13}}>{c.name}</strong>
+              <span onClick={()=>{const updated=getCustEntries().filter(x=>x.id!==entry.id);setForm({...form,customerIds:updated});}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14,padding:'0 4px'}}>&times;</span>
+            </div>
+            {c.address&&<div><strong>Pickup Address:</strong> {c.address}{c.city?', '+c.city:''}{c.state?' '+c.state:''} {c.zip}</div>}
+            {c.phone&&<div><strong>Phone:</strong> {c.phone}</div>}
+            {c.contact&&<div><strong>Contact:</strong> {c.contact}</div>}
+            {(c.pricing||c.notes)&&<div><strong>Pricing/Notes:</strong> {c.pricing||c.notes}</div>}
+            <div style={{marginTop:6}}><label style={{fontSize:11,fontWeight:700,color:'#333'}}>Time Window:</label>
+              <input value={entry.timeWindow||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,timeWindow:e.target.value}:x);setForm({...form,customerIds:updated});}} placeholder="e.g. 8:00 AM, Be onsite by 10 AM" style={{width:'100%',marginTop:2,fontSize:12,padding:4,borderRadius:4,border:'1px solid #ccc'}}/></div>
+            <div style={{marginTop:4}}><label style={{fontSize:11,fontWeight:700,color:'#333'}}>Equipment:</label>
+              <div style={{marginTop:2}}>{data.equipment.filter(eq=>eq!=='Placards').map(eq=>(<span key={eq} style={{display:'inline-block',marginRight:10,marginBottom:3}}>
+                <label style={{fontSize:11,cursor:'pointer'}}>
+                <input type="checkbox" checked={eeq.includes(eq)} style={{marginRight:3,width:'auto'}}
+                  onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,equipment:e.target.checked?[...eeq,eq]:eeq.filter(z=>z!==eq)}:x);setForm({...form,customerIds:updated});}}/>
+                {eq}</label></span>))}</div></div>
+            <div style={{marginTop:4,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <button onClick={()=>setShowPlacards(entry.id)} style={{background:'#d97706',color:'#fff',border:'none',padding:'3px 10px',borderRadius:4,fontSize:11,cursor:'pointer',fontWeight:600}}>Placards ({ep.length})</button>
+              {ep.length>0&&ep.map(p=><span key={p} style={{display:'inline-block',background:'#fef3c7',border:'1px solid #d97706',borderRadius:4,padding:'1px 6px',fontSize:10,fontWeight:600}}>{p}</span>)}
+            </div>
+            <div style={{marginTop:6}}><label style={{fontSize:12,fontWeight:700,color:'#1d4ed8'}}>Job Notes for {c.name}:</label>
+              <textarea value={entry.jobNotes||''} onChange={e=>{const updated=getCustEntries().map(x=>x.id===entry.id?{...x,jobNotes:e.target.value}:x);setForm({...form,customerIds:updated});}} rows={2} placeholder="Special instructions, requirements for this customer..." style={{width:'100%',marginTop:3,fontSize:12,padding:6,borderRadius:4,border:'1px solid #93c5fd'}}/></div>
+          </div>:null;})}</div>}
+        </div>
+        <div className="mrow"><label>Truck/Trailer Type</label>
+          <select value={form.truckTrailerType||''} onChange={e=>setForm({...form,truckTrailerType:e.target.value})}>
+            <option value="">-- Select --</option>
+            <option value="26 Foot Trailer">26 Foot Trailer</option>
+            <option value="53 Foot Trailer">53 Foot Trailer</option>
+            <option value="Box Truck">Box Truck</option>
+            <option value="Flatbed">Flatbed</option>
+            <option value="Roll Off Trailer">Roll Off Trailer</option>
+            <option value="Vacuum Trailer">Vacuum Trailer</option>
+          </select></div>
+        {showPlacards&&(()=>{const pcid=showPlacards;const pEntry=getCustEntries().find(x=>x.id===pcid);const pCust=(data.customers||[]).find(x=>x.id===pcid);const curPl=pEntry?pEntry.placards||[]:[];
+          const togglePl=(p)=>{const updated=getCustEntries().map(x=>x.id===pcid?{...x,placards:curPl.includes(p)?curPl.filter(z=>z!==p):[...curPl,p]}:x);setForm({...form,customerIds:updated});};
+          return <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowPlacards(null)}>
+          <div style={{background:'#fff',borderRadius:12,padding:20,width:600,maxWidth:'95vw',maxHeight:'80vh',overflowY:'auto',boxShadow:'0 8px 30px rgba(0,0,0,.3)'}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+              <h3 style={{fontSize:16,fontWeight:700}}>Placards for {pCust?pCust.name:''}</h3>
+              <button className="bc" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setShowPlacards(null)}>Done</button>
+            </div>
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#b45309',marginBottom:4,borderBottom:'2px solid #d97706',paddingBottom:3}}>Hazard Class Placards (no UN number)</div>
+              <div>{HAZARD_CLASSES.map(hc=>(<div key={hc} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
+                <label style={{fontSize:12,cursor:'pointer',fontWeight:curPl.includes(hc)?600:400}}>
+                  <input type="checkbox" checked={curPl.includes(hc)} style={{marginRight:3,width:'auto'}}
+                    onChange={()=>togglePl(hc)}/>
+                  {hc}
+                </label></div>))}</div>
+            </div>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--text-muted)',marginBottom:8,marginTop:8}}>&#9660; 4-Digit UN Number Placards</div>
+            {PLACARD_LIST.map(grp=>(<div key={grp.cat} style={{marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:700,color:'var(--primary)',marginBottom:4,borderBottom:'1px solid var(--border)',paddingBottom:3}}>{grp.cat}</div>
+              <div>{grp.items.map(p=>(<div key={p} style={{display:'inline-block',marginRight:10,marginBottom:4}}>
+                <label style={{fontSize:12,cursor:'pointer',fontWeight:curPl.includes(p)?600:400}}>
+                  <input type="checkbox" checked={curPl.includes(p)} style={{marginRight:3,width:'auto'}}
+                    onChange={()=>togglePl(p)}/>
+                  {p}
+                </label></div>))}</div>
+            </div>))}
+          </div>
+        </div>;})()}
+        <div className="mrow"><label>Salesperson</label>
+          <select value={form.salesPerson||''} onChange={e=>setForm({...form,salesPerson:e.target.value})}>
+            <option value="">-- Select Salesperson --</option>
+            <option value="Frank Kendrick">Frank Kendrick</option>
+            <option value="Keith Higgins">Keith Higgins</option>
+            <option value="Marshall Holmes">Marshall Holmes</option>
+            <option value="Mike Hetrick">Mike Hetrick</option>
+            <option value="Robert Benitez">Robert Benitez</option>
+          </select></div>
+        <div className="mrow"><label>Attachments</label>
+          <div>
+            <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={e=>{if(e.target.files.length>0){uploadFiles(Array.from(e.target.files));e.target.value='';}}} style={{fontSize:12}}/>
+            {uploading&&<span style={{color:'#3b82f6',fontSize:12,marginLeft:8}}>Uploading...</span>}
+            {attachments.length>0&&<div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+              {attachments.map(a=>(
+                <div key={a.id} style={{display:'flex',alignItems:'center',gap:8,background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:4,padding:'4px 8px',fontSize:12}}>
+                  <a href={'/api/documents/'+a.id+'/view'} target="_blank" rel="noopener" style={{color:'#2563eb',fontWeight:600,flex:1}}>{a.name}</a>
+                  <span onClick={()=>removeAttachment(a.id)} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,fontSize:14}}>&times;</span>
+                </div>
+              ))}
+            </div>}
+          </div></div>
+        <div className="mrow"><label>Notes</label>
+          <textarea value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} rows={3} placeholder="Special instructions, reference numbers, etc."/></div>
+        <div className="mactions">
+          <button className="bc" onClick={()=>{setShowForm(false);setEditId(null);}}>Cancel</button>
+          <button className="bp" onClick={save}>{editId?'Update Job':'Create Job'}</button>
+        </div>
+      </div>
+    </div>)}
   </div>);
 }
 
