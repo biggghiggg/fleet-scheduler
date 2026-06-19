@@ -56,6 +56,7 @@ const defaultData = {
   customers: [],
   bins: [],
   vendors: [],
+  unbilled: [],
   equipment: ['Liftgate','Drum Dolly','Placards','PPE','Bins','Totes'],
   locations: ['EWS','Brenntag Fresno','Brenntag Richmond','Coast','GQ','Avenal','Lost Hills','Madera','Thatcher','Bolthouse','Leprinos','Eagle Quick Lube','Faraday','PAC','PRR','Local Route','Parc/Atlas/High Bar','F&T Farms']
 };
@@ -90,6 +91,7 @@ if (!data.customers) { data.customers = []; saveData(data); }
 if (!data.pickups) { data.pickups = []; saveData(data); }
 if (!data.bins) { data.bins = []; saveData(data); }
 if (!data.vendors) { data.vendors = []; saveData(data); }
+if (!data.unbilled) { data.unbilled = []; saveData(data); }
 console.log('DATA_DIR = ' + DATA_DIR);
 console.log('DATA_FILE = ' + DATA_FILE);
 console.log('RAILWAY_VOLUME_MOUNT_PATH = ' + (process.env.RAILWAY_VOLUME_MOUNT_PATH || 'NOT SET'));
@@ -627,6 +629,34 @@ app.put('/api/bins/:id', function(req, res) {
 
 app.delete('/api/bins/:id', function(req, res) {
   data.bins = (data.bins || []).filter(function(b) { return b.id !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ok:true});
+});
+
+// UNACCOUNTED BINS - vendor-billed bins not in tracking (reconciliation watchlist)
+app.get('/api/unbilled', function(req, res) { res.json(data.unbilled || []); });
+
+app.post('/api/unbilled', function(req, res) {
+  var u = Object.assign({}, req.body, {
+    id: 'ub' + Date.now() + Math.random().toString(36).slice(2),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  data.unbilled.push(u);
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json(u);
+});
+
+app.put('/api/unbilled/:id', function(req, res) {
+  var idx = data.unbilled.findIndex(function(u) { return u.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.unbilled[idx], req.body, { updatedAt: new Date().toISOString() });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json(data.unbilled[idx]);
+});
+
+app.delete('/api/unbilled/:id', function(req, res) {
+  data.unbilled = (data.unbilled || []).filter(function(u) { return u.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true});
 });
