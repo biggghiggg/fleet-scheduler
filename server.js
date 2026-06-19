@@ -833,46 +833,140 @@ function parseSDS(text) {
   // Section 3: Composition
   var sec3 = getSection(3);
   if (sec3) {
-    // Look for CAS numbers and chemical names
-    var casPattern = /(\d{2,7}-\d{2}-\d)/g;
-    var casMatch;
-    var casNumbers = [];
-    while ((casMatch = casPattern.exec(sec3)) !== null) {
-      casNumbers.push({ cas: casMatch[1], index: casMatch.index });
+    var lines = sec3.split('\n');
+
+    // Helper: find percentage pattern in a string
+    function findPct(s) {
+      // Range: "10 - 20 %" or "10-20%" or "10 – 20 %"
+      var range = s.match(/(\d+\.?\d*)\s*[-–—]\s*(\d+\.?\d*)\s*(%|wt\s*%|wt\.?\s*%|vol\s*%|w\/w|percent)/i);
+      if (range) return range[0].trim();
+      // Single with sign: "<5%" or ">30%" or "≤10%"
+      var single = s.match(/[<>≤≥~≈]?\s*(\d+\.?\d*)\s*(%|wt\s*%|wt\.?\s*%|vol\s*%|w\/w|percent)/i);
+      if (single) return single[0].trim();
+      // Just a number after lots of whitespace (table column), only if it looks like a concentration
+      var numOnly = s.match(/\s{3,}(\d{1,3}\.?\d*)\s*$/);
+      if (numOnly && parseFloat(numOnly[1]) <= 100) return numOnly[1] + '%';
+      return '';
     }
 
-    // For each CAS, try to find chemical name and percentage
-    var lines = sec3.split('\n');
+    // Helper: find percentage in nearby lines (look ahead 1-2 lines for table-style layouts)
+    function findPctNearby(lineIdx) {
+      // Check current line
+      var pct = findPct(lines[lineIdx] || '');
+      if (pct) return pct;
+      // Check next 1-2 lines (some SDSs split CAS and % across lines)
+      for (var ahead = 1; ahead <= 2 && (lineIdx + ahead) < lines.length; ahead++) {
+        var nextLine = (lines[lineIdx + ahead] || '').trim();
+        // Stop if next line has a CAS (it's a new chemical) or is a section header
+        if (nextLine.match(/\d{2,7}-\d{2}-\d/) || nextLine.match(/^SECTION\s/i)) break;
+        pct = findPct(nextLine);
+        if (pct) return pct;
+        // Check if the line is just a number (table cell on its own line)
+        var justNum = nextLine.match(/^[<>≤≥~]?\s*(\d{1,3}\.?\d*)\s*[-–—]?\s*(\d{1,3}\.?\d*)?\s*(%|wt|vol|w\/w|percent)?$/i);
+        if (justNum && parseFloat(justNum[1]) <= 100) {
+          return nextLine.replace(/\s+/g, '') + (justNum[3] ? '' : '%');
+        }
+      }
+      return '';
+    }
+
+    // Helper: clean up chemical name
+    function cleanChemName(raw) {
+      return raw
+        .replace(/[-–—|,;:\s]+$/, '')
+        .replace(/^[-–—|,;:\s]+/, '')
+        .replace(/^\d+\.?\s*/, '')  // Remove leading list numbers
+        .replace(/\bCAS\s*(No\.?|Number|#)?\s*:?\s*$/i, '')
+        .trim();
+    }
+
+    // Strategy 1: Parse lines with CAS numbers
     for (var li = 0; li < lines.length; li++) {
       var line = lines[li].trim();
       if (!line) continue;
       var lineCas = line.match(/(\d{2,7}-\d{2}-\d)/);
-      if (lineCas) {
-        var pctMatch = line.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)\s*%/) || line.match(/[<>≤≥]?\s*(\d+\.?\d*)\s*%/);
-        var pct = pctMatch ? pctMatch[0] : '';
-        // Chemical name is typically before the CAS number
-        var beforeCas = line.substring(0, line.indexOf(lineCas[1])).trim();
-        // Clean up common prefixes/suffixes
-        beforeCas = beforeCas.replace(/[-–|,\s]+$/, '').trim();
-        if (!beforeCas) {
-          // Check previous line for name
-          if (li > 0) beforeCas = lines[li-1].trim().replace(/[-–|,\s]+$/, '').trim();
+      if (!lineCas) continue;
+
+      var cas = lineCas[1];
+      var casIdx = line.indexOf(cas);
+      var pct = '';
+
+      // Look for percentage on this line AFTER the CAS number first
+      var afterCas = line.substring(casIdx + cas.length);
+      pct = findPct(afterCas);
+
+      // If not found after CAS, try the whole line
+      if (!pct) pct = findPct(line);
+
+      // If still not found, look at nearby lines (table layouts)
+      if (!pct) pct = findPctNearby(li);
+
+      // Get chemical name: text before CAS on the same line
+      var beforeCas = line.substring(0, casIdx).trim();
+      beforeCas = cleanChemName(beforeCas);
+
+      if (!beforeCas || beforeCas.length <= 2) {
+        // Try previous non-empty line for name
+        for (var back = li - 1; back >= 0 && back >= li - 3; back--) {
+          var prevLine = (lines[back] || '').trim();
+          if (!prevLine || prevLine.match(/\d{2,7}-\d{2}-\d/) || prevLine.match(/^SECTION\s/i)) continue;
+          // Skip if it's just numbers/percentages
+          if (prevLine.match(/^\d+\.?\d*\s*[-–]?\s*\d*\.?\d*\s*%?$/)) continue;
+          beforeCas = cleanChemName(prevLine);
+          if (beforeCas.length > 2) break;
         }
-        if (beforeCas && beforeCas.length > 2 && beforeCas.length < 100) {
-          result.chemicals.push({ name: beforeCas, cas: lineCas[1], percentage: pct });
+      }
+
+      // Remove the percentage text from the name if it accidentally got included
+      if (pct && beforeCas.indexOf(pct) >= 0) {
+        beforeCas = cleanChemName(beforeCas.replace(pct, ''));
+      }
+
+      if (beforeCas && beforeCas.length > 1 && beforeCas.length < 120) {
+        // Avoid duplicate CAS entries
+        var dupCheck = result.chemicals.some(function(c) { return c.cas === cas; });
+        if (!dupCheck) {
+          result.chemicals.push({ name: beforeCas, cas: cas, percentage: pct });
         }
       }
     }
 
-    // If no CAS-based parsing worked, try percentage-based
+    // Strategy 2: If no CAS-based results, try percentage-based parsing
     if (result.chemicals.length === 0) {
       for (var li = 0; li < lines.length; li++) {
         var line = lines[li].trim();
-        var pctMatch = line.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)\s*%/) || line.match(/(\d+\.?\d*)\s*%/);
-        if (pctMatch && line.length > 5) {
-          var name = line.replace(pctMatch[0], '').replace(/[-–|,\s]+$/, '').replace(/^[-–|,\s]+/, '').trim();
-          if (name.length > 2 && name.length < 80) {
-            result.chemicals.push({ name: name, cas: '', percentage: pctMatch[0] });
+        if (!line || line.length < 5) continue;
+        var pct = findPct(line);
+        if (pct) {
+          var name = line.replace(pct, '').replace(/[-–|,;\s]+$/, '').replace(/^[-–|,;\s]+/, '').trim();
+          // Remove CAS if present
+          var casInLine = name.match(/\d{2,7}-\d{2}-\d/);
+          var cas = casInLine ? casInLine[0] : '';
+          if (cas) name = name.replace(cas, '').replace(/[-–|,;\s]+$/, '').replace(/^[-–|,;\s]+/, '').trim();
+          if (name.length > 1 && name.length < 120) {
+            result.chemicals.push({ name: name, cas: cas, percentage: pct });
+          }
+        }
+      }
+    }
+
+    // Strategy 3: If still nothing, try to parse table-style with multiple spaces as column separators
+    if (result.chemicals.length === 0) {
+      for (var li = 0; li < lines.length; li++) {
+        var line = lines[li].trim();
+        if (!line) continue;
+        // Split by 2+ whitespace characters (table columns)
+        var cols = line.split(/\s{2,}/).filter(function(c) { return c.trim(); });
+        if (cols.length >= 2) {
+          var nameCol = '', casCol = '', pctCol = '';
+          for (var ci = 0; ci < cols.length; ci++) {
+            var col = cols[ci].trim();
+            if (col.match(/^\d{2,7}-\d{2}-\d$/)) casCol = col;
+            else if (col.match(/\d+\.?\d*\s*[-–]?\s*\d*\.?\d*\s*(%|wt|vol|percent)/i) || col.match(/^[<>≤≥]?\d{1,3}\.?\d*$/)) pctCol = col.match(/%/) ? col : col + '%';
+            else if (col.length > 2 && !col.match(/^(SECTION|COMPOSITION|CAS|Chemical|Ingredient|Name|Concentration|Weight|Content)/i)) nameCol = col;
+          }
+          if (nameCol && (casCol || pctCol)) {
+            result.chemicals.push({ name: nameCol, cas: casCol, percentage: pctCol });
           }
         }
       }
