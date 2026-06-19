@@ -1664,9 +1664,34 @@ function WasteProfiles({data}) {
   const [expandedId, setExpandedId] = useState(null);
 
   const emptyForm = {
-    name: '', customer: '', chemicals: [], unNumber: '', properShippingName: '',
-    hazardClass: '', packingGroup: '', epaWasteCodes: [], caWasteCodes: [],
-    flashPoint: '', pH: '', physicalState: '', color: '', odor: '',
+    // Profile identification
+    name: '', customer: '',
+    // A - Generator Information
+    generatorStatus: '', epaId: '', stateId: '', naicsCodes: '',
+    facilityAddress: '', technicalContact: '', generatorPhone: '', generatorFax: '',
+    // B - Shipping Information
+    properShippingName: '', hazardClass: '', unNumber: '', packingGroup: '',
+    rq: '', containerType: '', containerOther: '', frequency: '', frequencyOther: '',
+    shipmentSize: '', shipmentQuantity: '', wasteImport: '',
+    // C - General Material & Regulatory Info
+    commonName: '', processGenerating: '', physicalDescription: '',
+    odor: '', physicalState: '', color: '', liquidPhases: '',
+    knowledgeSource: '', ldrRestricted: '', ldrType: '', cerclaRegulated: '',
+    uhcAboveTreatmentStd: '', stateExempt: '', exemptReference: '',
+    epaWasteCodes: [], caWasteCodes: [], sourceCode: '', formCode: '',
+    // D - Composition
+    chemicals: [],
+    // E - Characteristics
+    charOxidizer: '', charExplosive: '', charOrganicPeroxide: '', charShockSensitive: '',
+    charTires: '', charPyrophoric: '', charCompressedGas: '', charHalogenatedOrganics: '',
+    charReactiveSulfides: '', charReactiveSulfidesPpm: '',
+    charReactiveCyanides: '', charReactiveCyanidesPpm: '',
+    charWaterAirReactive: '', charThermallyUnstable: '', charTscaPCB: '',
+    charMedicalInfectious: '', charRadioactive: '', charHSM: '',
+    charIncidentalLiquids: '', charPaintFilterSolid: '',
+    pHMin: '', pHMax: '', pHTypical: '', pHCategory: '',
+    flashPointF: '', flashPointBelow140: false, oilBearing: '',
+    // Auto-generated / SDS data
     profileNotes: '', sdsFiles: [], suggestedPercentages: '',
     toxicity: [], reactivityFlags: [], incompatibles: '', stabilityNotes: '',
     estimatedFlashPoint: '', estimatedPH: '', uhcMatches: []
@@ -1694,30 +1719,69 @@ function WasteProfiles({data}) {
       const r = await fetch('/api/sds/parse', { method: 'POST', body: fd });
       const result = await r.json();
       if (result.merged) {
+        var m = result.merged;
+        // Map chemicals from SDS format to composition table format
+        var mappedChemicals = (m.chemicals || []).map(function(c) {
+          return { name: c.name || '', cas: c.cas || '', units: '%', tclp: false, totals: false, typical: c.percentage || '', min: '', max: '' };
+        });
+        // Map flash point
+        var fpVal = m.flashPoint || '';
+        var fpNum = parseFloat(String(fpVal).replace(/[^0-9.\-]/g, ''));
+        var fpBelow140 = !isNaN(fpNum) && fpNum < 140;
+        // Map pH
+        var phVal = m.pH || '';
+        var phNum = parseFloat(phVal);
+        var phCat = '';
+        if (!isNaN(phNum)) {
+          if (phNum <= 2) phCat = '<=2';
+          else if (phNum >= 12.5) phCat = '>=12.5';
+          else phCat = '2<12.5';
+        }
+        // Map reactivity flags to characteristic fields
+        var flags = m.reactivityFlags || [];
+        var charOx = '', charExp = '', charShock = '', charWater = '', charPyro = '', charTherm = '';
+        flags.forEach(function(f) {
+          var fl = f.toLowerCase();
+          if (fl.indexOf('oxidizer') >= 0) charOx = 'Yes';
+          if (fl.indexOf('explosive') >= 0 || fl.indexOf('shock') >= 0) { charExp = 'Yes'; charShock = 'Yes'; }
+          if (fl.indexOf('water-reactive') >= 0) charWater = 'Yes';
+          if (fl.indexOf('air-reactive') >= 0 || fl.indexOf('pyrophoric') >= 0) charPyro = 'Yes';
+          if (fl.indexOf('polymerize') >= 0) charTherm = 'Yes';
+        });
+        // Determine if LDR restricted based on D-codes
+        var epaCodes = m.epaWasteCodes || [];
+        var hasD = epaCodes.some(function(c) { return c.charAt(0) === 'D'; });
         // Pre-fill form with parsed data
         setForm({
           ...emptyForm,
-          chemicals: result.merged.chemicals || [],
-          unNumber: result.merged.unNumber || '',
-          properShippingName: result.merged.properShippingName || '',
-          hazardClass: result.merged.hazardClass || '',
-          packingGroup: result.merged.packingGroup || '',
-          epaWasteCodes: result.merged.epaWasteCodes || [],
-          caWasteCodes: result.merged.caWasteCodes || [],
-          flashPoint: result.merged.flashPoint || '',
-          pH: result.merged.pH || '',
-          physicalState: result.merged.physicalState || '',
-          color: result.merged.color || '',
-          odor: result.merged.odor || '',
-          sdsFiles: result.merged.sdsFiles || [],
+          chemicals: mappedChemicals,
+          unNumber: m.unNumber || '',
+          properShippingName: m.properShippingName || '',
+          hazardClass: m.hazardClass || '',
+          packingGroup: m.packingGroup || '',
+          epaWasteCodes: epaCodes,
+          caWasteCodes: m.caWasteCodes || [],
+          flashPointF: fpVal,
+          flashPointBelow140: fpBelow140,
+          pHTypical: phVal,
+          pHCategory: phCat,
+          physicalState: m.physicalState || '',
+          color: m.color || '',
+          odor: m.odor || '',
+          knowledgeSource: 'MSDS',
+          ldrRestricted: hasD ? 'Yes' : '',
+          uhcAboveTreatmentStd: (m.uhcMatches || []).length > 0 ? 'Yes' : '',
+          charOxidizer: charOx, charExplosive: charExp, charShockSensitive: charShock,
+          charWaterAirReactive: charWater, charPyrophoric: charPyro, charThermallyUnstable: charTherm,
+          sdsFiles: m.sdsFiles || [],
           profileNotes: '',
-          toxicity: result.merged.toxicity || [],
-          reactivityFlags: result.merged.reactivityFlags || [],
-          incompatibles: result.merged.incompatibles || '',
-          stabilityNotes: result.merged.stabilityNotes || '',
-          estimatedFlashPoint: result.merged.estimatedFlashPoint || '',
-          estimatedPH: result.merged.estimatedPH || '',
-          uhcMatches: result.merged.uhcMatches || []
+          toxicity: m.toxicity || [],
+          reactivityFlags: flags,
+          incompatibles: m.incompatibles || '',
+          stabilityNotes: m.stabilityNotes || '',
+          estimatedFlashPoint: m.estimatedFlashPoint || '',
+          estimatedPH: m.estimatedPH || '',
+          uhcMatches: m.uhcMatches || []
         });
         setEditId(null);
         setShowForm(true);
@@ -1743,12 +1807,45 @@ function WasteProfiles({data}) {
     setEditId(p.id);
     setForm({
       name: p.name || '', customer: p.customer || '',
-      chemicals: p.chemicals || [], unNumber: p.unNumber || '',
-      properShippingName: p.properShippingName || '',
-      hazardClass: p.hazardClass || '', packingGroup: p.packingGroup || '',
+      // A
+      generatorStatus: p.generatorStatus || '', epaId: p.epaId || '', stateId: p.stateId || '',
+      naicsCodes: p.naicsCodes || '', facilityAddress: p.facilityAddress || '',
+      technicalContact: p.technicalContact || '', generatorPhone: p.generatorPhone || '',
+      generatorFax: p.generatorFax || '',
+      // B
+      properShippingName: p.properShippingName || '', hazardClass: p.hazardClass || '',
+      unNumber: p.unNumber || '', packingGroup: p.packingGroup || '',
+      rq: p.rq || '', containerType: p.containerType || '', containerOther: p.containerOther || '',
+      frequency: p.frequency || '', frequencyOther: p.frequencyOther || '',
+      shipmentSize: p.shipmentSize || '', shipmentQuantity: p.shipmentQuantity || '',
+      wasteImport: p.wasteImport || '',
+      // C
+      commonName: p.commonName || '', processGenerating: p.processGenerating || '',
+      physicalDescription: p.physicalDescription || '',
+      odor: p.odor || '', physicalState: p.physicalState || '', color: p.color || '',
+      liquidPhases: p.liquidPhases || '', knowledgeSource: p.knowledgeSource || '',
+      ldrRestricted: p.ldrRestricted || '', ldrType: p.ldrType || '',
+      cerclaRegulated: p.cerclaRegulated || '', uhcAboveTreatmentStd: p.uhcAboveTreatmentStd || '',
+      stateExempt: p.stateExempt || '', exemptReference: p.exemptReference || '',
       epaWasteCodes: p.epaWasteCodes || [], caWasteCodes: p.caWasteCodes || [],
-      flashPoint: p.flashPoint || '', pH: p.pH || '',
-      physicalState: p.physicalState || '', color: p.color || '', odor: p.odor || '',
+      sourceCode: p.sourceCode || '', formCode: p.formCode || '',
+      // D
+      chemicals: p.chemicals || [],
+      // E
+      charOxidizer: p.charOxidizer || '', charExplosive: p.charExplosive || '',
+      charOrganicPeroxide: p.charOrganicPeroxide || '', charShockSensitive: p.charShockSensitive || '',
+      charTires: p.charTires || '', charPyrophoric: p.charPyrophoric || '',
+      charCompressedGas: p.charCompressedGas || '', charHalogenatedOrganics: p.charHalogenatedOrganics || '',
+      charReactiveSulfides: p.charReactiveSulfides || '', charReactiveSulfidesPpm: p.charReactiveSulfidesPpm || '',
+      charReactiveCyanides: p.charReactiveCyanides || '', charReactiveCyanidesPpm: p.charReactiveCyanidesPpm || '',
+      charWaterAirReactive: p.charWaterAirReactive || '', charThermallyUnstable: p.charThermallyUnstable || '',
+      charTscaPCB: p.charTscaPCB || '', charMedicalInfectious: p.charMedicalInfectious || '',
+      charRadioactive: p.charRadioactive || '', charHSM: p.charHSM || '',
+      charIncidentalLiquids: p.charIncidentalLiquids || '', charPaintFilterSolid: p.charPaintFilterSolid || '',
+      pHMin: p.pHMin || '', pHMax: p.pHMax || '', pHTypical: p.pHTypical || '',
+      pHCategory: p.pHCategory || '', flashPointF: p.flashPointF || '',
+      flashPointBelow140: p.flashPointBelow140 || false, oilBearing: p.oilBearing || '',
+      // Auto-generated
       profileNotes: p.profileNotes || '', sdsFiles: p.sdsFiles || [],
       suggestedPercentages: p.suggestedPercentages || '',
       toxicity: p.toxicity || [], reactivityFlags: p.reactivityFlags || [],
@@ -1771,7 +1868,7 @@ function WasteProfiles({data}) {
 
   // Add/remove chemicals
   const addChemical = () => {
-    setForm({ ...form, chemicals: [...form.chemicals, { name: '', cas: '', percentage: '' }] });
+    setForm({ ...form, chemicals: [...form.chemicals, { name: '', cas: '', units: '%', tclp: false, totals: false, typical: '', min: '', max: '' }] });
   };
   const updateChemical = (idx, field, value) => {
     const updated = form.chemicals.map((c, i) => i === idx ? { ...c, [field]: value } : c);
@@ -1864,6 +1961,8 @@ function WasteProfiles({data}) {
                 {p.hazardClass && <span style={{ background: '#fee2e2', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#b91c1c' }}>Class {p.hazardClass}</span>}
                 {p.packingGroup && <span style={{ background: '#e0e7ff', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#3730a3' }}>PG {p.packingGroup}</span>}
                 {p.properShippingName && <span style={{ color: '#555' }}>{p.properShippingName}</span>}
+                {p.generatorStatus && <span style={{ background: '#f3e8ff', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#6b21a8', fontSize: 12 }}>{p.generatorStatus}</span>}
+                {p.flashPointF && <span style={{ background: '#fff7ed', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#9a3412', fontSize: 12 }}>FP: {p.flashPointF}</span>}
                 {(p.reactivityFlags || []).length > 0 && <span style={{ background: '#fee2e2', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#991b1b', fontSize: 12 }}>Reactive</span>}
                 {(p.uhcMatches || []).length > 0 && <span style={{ background: '#dbeafe', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#1e40af', fontSize: 12 }}>{p.uhcMatches.length} UHC{p.uhcMatches.length !== 1 ? 's' : ''}</span>}
               </div>
@@ -1882,13 +1981,65 @@ function WasteProfiles({data}) {
           {/* Expanded view */}
           {expandedId === p.id && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              {/* Generator Info */}
+              {(p.epaId || p.stateId || p.generatorStatus || p.facilityAddress || p.technicalContact) && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#374151', marginBottom: 4 }}>Generator Information</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '4px 16px', fontSize: 13 }}>
+                    {p.generatorStatus && <div><strong>Status:</strong> {p.generatorStatus}</div>}
+                    {p.epaId && <div><strong>EPA ID:</strong> {p.epaId}</div>}
+                    {p.stateId && <div><strong>State ID:</strong> {p.stateId}</div>}
+                    {p.facilityAddress && <div><strong>Facility:</strong> {p.facilityAddress}</div>}
+                    {p.technicalContact && <div><strong>Contact:</strong> {p.technicalContact}</div>}
+                  </div>
+                </div>
+              )}
+              {/* Shipping Info */}
+              {(p.containerType || p.frequency || p.wasteImport) && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#374151', marginBottom: 4 }}>Shipping Information</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '4px 16px', fontSize: 13 }}>
+                    {p.containerType && <div><strong>Container:</strong> {p.containerType}{p.containerOther ? ' - ' + p.containerOther : ''}</div>}
+                    {p.frequency && <div><strong>Frequency:</strong> {p.frequency}{p.frequencyOther ? ' - ' + p.frequencyOther : ''}</div>}
+                    {p.shipmentSize && <div><strong>Shipment Size:</strong> {p.shipmentSize}</div>}
+                    {p.shipmentQuantity && <div><strong>Quantity:</strong> {p.shipmentQuantity}</div>}
+                    {p.wasteImport && <div><strong>Waste Import:</strong> {p.wasteImport}</div>}
+                  </div>
+                </div>
+              )}
+              {/* Material Info */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 13, marginBottom: 12 }}>
-                {p.flashPoint && <div><strong>Flash Point:</strong> {p.flashPoint}</div>}
-                {p.pH && <div><strong>pH:</strong> {p.pH}</div>}
+                {p.flashPointF && <div><strong>Flash Point:</strong> {p.flashPointF}{p.flashPointBelow140 ? ' (<140°F)' : ''}</div>}
+                {p.pHTypical && <div><strong>pH:</strong> {p.pHTypical}{p.pHMin && p.pHMax ? ' (range ' + p.pHMin + '-' + p.pHMax + ')' : ''}</div>}
                 {p.physicalState && <div><strong>Physical State:</strong> {p.physicalState}</div>}
                 {p.color && <div><strong>Color:</strong> {p.color}</div>}
                 {p.odor && <div><strong>Odor:</strong> {p.odor}</div>}
+                {p.commonName && <div><strong>Common Name:</strong> {p.commonName}</div>}
+                {p.knowledgeSource && <div><strong>Knowledge Source:</strong> {p.knowledgeSource}</div>}
+                {p.ldrRestricted && <div><strong>LDR Restricted:</strong> {p.ldrRestricted}{p.ldrType ? ' (' + p.ldrType + ')' : ''}</div>}
               </div>
+              {/* Characteristics grid */}
+              {(function() {
+                var chars = [
+                  ['Oxidizer', p.charOxidizer], ['Explosive', p.charExplosive],
+                  ['Organic Peroxide', p.charOrganicPeroxide], ['Shock Sensitive', p.charShockSensitive],
+                  ['Tires', p.charTires], ['Pyrophoric', p.charPyrophoric],
+                  ['Compressed Gas', p.charCompressedGas], ['Halogenated Organics', p.charHalogenatedOrganics],
+                  ['Reactive Sulfides', p.charReactiveSulfides], ['Reactive Cyanides', p.charReactiveCyanides],
+                  ['Water/Air Reactive', p.charWaterAirReactive], ['Thermally Unstable', p.charThermallyUnstable],
+                  ['TSCA PCB', p.charTscaPCB], ['Medical/Infectious', p.charMedicalInfectious],
+                  ['Radioactive', p.charRadioactive], ['HSM', p.charHSM]
+                ].filter(function(x) { return x[1]; });
+                if (chars.length === 0) return null;
+                return React.createElement('div', { style: { marginBottom: 8 } },
+                  React.createElement('div', { style: { fontWeight: 700, fontSize: 12, color: '#374151', marginBottom: 4 } }, 'Characteristics'),
+                  React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4 } },
+                    chars.map(function(x, i) {
+                      return React.createElement('span', { key: i, style: { background: x[1] === 'Yes' ? '#fee2e2' : '#f3f4f6', color: x[1] === 'Yes' ? '#991b1b' : '#374151', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 } }, x[0] + ': ' + x[1]);
+                    })
+                  )
+                );
+              })()}
               {/* Mixture Estimates in expanded view */}
               {(p.estimatedFlashPoint || p.estimatedPH) && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 13, marginBottom: 8 }}>
@@ -1924,16 +2075,19 @@ function WasteProfiles({data}) {
 
               {p.chemicals && p.chemicals.length > 0 && (
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: 'var(--primary)' }}>Chemical Composition</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: 'var(--primary)' }}>Composition</div>
                   <div className="rtable">
                     <table>
-                      <thead><tr><th>Chemical Name</th><th>CAS Number</th><th>Percentage</th></tr></thead>
+                      <thead><tr><th>Constituent</th><th>CAS #</th><th>Units</th><th>Typical</th><th>Min</th><th>Max</th></tr></thead>
                       <tbody>
                         {p.chemicals.map((c, i) => (
                           <tr key={i}>
                             <td style={{ fontWeight: 600 }}>{c.name}</td>
                             <td>{c.cas || '—'}</td>
-                            <td>{c.percentage || '—'}</td>
+                            <td>{c.units || '%'}</td>
+                            <td>{c.typical || c.percentage || '—'}</td>
+                            <td>{c.min || '—'}</td>
+                            <td>{c.max || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1960,122 +2114,377 @@ function WasteProfiles({data}) {
     {/* New/Edit Profile Modal */}
     {showForm && (
       <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
-        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 700, maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 750, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
           <h2>{editId ? 'Edit Profile' : 'New Waste Profile'}</h2>
 
-          {/* Profile name and customer */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="mrow"><label>Profile Name *</label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Used Motor Oil, Waste Acetone" autoFocus /></div>
-            <div className="mrow"><label>Customer</label>
-              <input list="profile-cust-list" value={form.customer} onChange={e => setForm({ ...form, customer: e.target.value })} placeholder="Link to customer (optional)" />
+          {/* ===== SECTION A: GENERATOR INFORMATION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,borderBottom:'2px solid #374151'}}>A. GENERATOR INFORMATION</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Profile Name *</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Used Motor Oil, Waste Acetone" style={{fontSize:12}} autoFocus /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Generator (Customer)</label>
+              <input list="profile-cust-list" value={form.customer} onChange={e => setForm({ ...form, customer: e.target.value })} placeholder="Link to customer" style={{fontSize:12}} />
               <datalist id="profile-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist></div>
           </div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Facility Address</label>
+            <input value={form.facilityAddress} onChange={e => setForm({ ...form, facilityAddress: e.target.value })} placeholder="Street, City, State, ZIP" style={{fontSize:12}} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Technical Contact</label>
+              <input value={form.technicalContact} onChange={e => setForm({ ...form, technicalContact: e.target.value })} placeholder="Contact name" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Phone</label>
+              <input value={form.generatorPhone} onChange={e => setForm({ ...form, generatorPhone: e.target.value })} placeholder="(xxx) xxx-xxxx" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Fax</label>
+              <input value={form.generatorFax} onChange={e => setForm({ ...form, generatorFax: e.target.value })} placeholder="(xxx) xxx-xxxx" style={{fontSize:12}} /></div>
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Generator Status</label>
+            <div style={{display:'flex',gap:16}}>
+              {['CESQG','SQG','LQG'].map(function(s) { return (
+                <label key={s} style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                  <input type="radio" name="generatorStatus" value={s} checked={form.generatorStatus===s} onChange={e=>setForm({...form,generatorStatus:e.target.value})}/>{s}
+                </label>
+              ); })}
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>EPA ID #</label>
+              <input value={form.epaId} onChange={e => setForm({ ...form, epaId: e.target.value })} placeholder="e.g. CAD123456789" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>State ID #</label>
+              <input value={form.stateId} onChange={e => setForm({ ...form, stateId: e.target.value })} placeholder="State ID" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>NAICS Codes</label>
+              <input value={form.naicsCodes} onChange={e => setForm({ ...form, naicsCodes: e.target.value })} placeholder="e.g. 562211" style={{fontSize:12}} /></div>
+          </div>
 
-          {/* Transport info */}
-          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#1e40af', marginBottom: 8 }}>DOT Transport Information</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="mrow" style={{ marginBottom: 0 }}><label>UN Number</label>
-                <input value={form.unNumber} onChange={e => setForm({ ...form, unNumber: e.target.value })} placeholder="e.g. UN1993" /></div>
-              <div className="mrow" style={{ marginBottom: 0 }}><label>Proper Shipping Name</label>
-                <input value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste flammable liquid, n.o.s." /></div>
-              <div className="mrow" style={{ marginBottom: 0 }}><label>Hazard Class</label>
-                <select value={form.hazardClass} onChange={e => setForm({ ...form, hazardClass: e.target.value })}>
-                  <option value="">-- Select --</option>
-                  {Object.entries(HC_MAP).map(([k, v]) => <option key={k} value={k}>{k} - {v}</option>)}
-                </select></div>
-              <div className="mrow" style={{ marginBottom: 0 }}><label>Packing Group</label>
-                <select value={form.packingGroup} onChange={e => setForm({ ...form, packingGroup: e.target.value })}>
-                  <option value="">-- Select --</option>
-                  <option value="I">I - Great Danger</option>
-                  <option value="II">II - Medium Danger</option>
-                  <option value="III">III - Minor Danger</option>
-                </select></div>
+          {/* ===== SECTION B: SHIPPING INFORMATION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>B. SHIPPING INFORMATION</div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>US DOT Proper Shipping Name</label>
+            <input value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste flammable liquid, n.o.s." style={{fontSize:12}} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Hazard Class</label>
+              <select value={form.hazardClass} onChange={e => setForm({ ...form, hazardClass: e.target.value })} style={{fontSize:12}}>
+                <option value="">-- Select --</option>
+                {Object.entries(HC_MAP).map(([k, v]) => <option key={k} value={k}>{k} - {v}</option>)}
+              </select></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>UN/NA #</label>
+              <input value={form.unNumber} onChange={e => setForm({ ...form, unNumber: e.target.value })} placeholder="e.g. UN1993" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Packaging Group</label>
+              <select value={form.packingGroup} onChange={e => setForm({ ...form, packingGroup: e.target.value })} style={{fontSize:12}}>
+                <option value="">-- Select --</option>
+                <option value="I">I</option><option value="II">II</option><option value="III">III</option>
+              </select></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>RQ</label>
+              <input value={form.rq} onChange={e => setForm({ ...form, rq: e.target.value })} placeholder="RQ" style={{fontSize:12}} /></div>
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Container Type</label>
+            <select value={form.containerType} onChange={e => setForm({ ...form, containerType: e.target.value })} style={{fontSize:12,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:'auto',minWidth:160}}>
+              <option value="">-- Select --</option>
+              <option value="Bulk">Bulk</option><option value="Totes">Totes</option><option value="Pallet">Pallet</option>
+              <option value="Boxes">Boxes</option><option value="Drums">Drums</option><option value="Other">Other</option>
+            </select>
+            {form.containerType === 'Other' && <input value={form.containerOther} onChange={e => setForm({ ...form, containerOther: e.target.value })} placeholder="Specify container type" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Frequency</label>
+            <select value={form.frequency} onChange={e => setForm({ ...form, frequency: e.target.value })} style={{fontSize:12,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:'auto',minWidth:160}}>
+              <option value="">-- Select --</option>
+              <option value="Year">Year</option><option value="Quarterly">Quarterly</option><option value="Monthly">Monthly</option>
+              <option value="1 time">1 time</option><option value="Other">Other</option>
+            </select>
+            {form.frequency === 'Other' && <input value={form.frequencyOther} onChange={e => setForm({ ...form, frequencyOther: e.target.value })} placeholder="Specify frequency" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Shipment Size</label>
+              <input value={form.shipmentSize} onChange={e => setForm({ ...form, shipmentSize: e.target.value })} placeholder="e.g. 55 gal" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Quantity</label>
+              <input value={form.shipmentQuantity} onChange={e => setForm({ ...form, shipmentQuantity: e.target.value })} placeholder="# of containers" style={{fontSize:12}} /></div>
+            <div style={{marginBottom:0}}>
+              <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Waste Import?</label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                <input type="radio" name="wasteImport" value="Yes" checked={form.wasteImport==='Yes'} onChange={e=>setForm({...form,wasteImport:e.target.value})}/>Yes
+              </label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginLeft:8}}>
+                <input type="radio" name="wasteImport" value="No" checked={form.wasteImport==='No'} onChange={e=>setForm({...form,wasteImport:e.target.value})}/>No
+              </label>
             </div>
           </div>
 
-          {/* Physical properties */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div className="mrow" style={{ marginBottom: 0 }}><label>Flash Point</label>
-              <input value={form.flashPoint} onChange={e => setForm({ ...form, flashPoint: e.target.value })} placeholder="e.g. 140°F" /></div>
-            <div className="mrow" style={{ marginBottom: 0 }}><label>pH</label>
-              <input value={form.pH} onChange={e => setForm({ ...form, pH: e.target.value })} placeholder="e.g. 7" /></div>
-            <div className="mrow" style={{ marginBottom: 0 }}><label>Physical State</label>
-              <select value={form.physicalState} onChange={e => setForm({ ...form, physicalState: e.target.value })}>
+          {/* ===== SECTION C: GENERAL MATERIAL & REGULATORY INFORMATION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>C. GENERAL MATERIAL &amp; REGULATORY INFORMATION</div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Common Name</label>
+            <input value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} placeholder="Common name of waste material" style={{fontSize:12}} /></div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Process Generating Waste</label>
+            <textarea value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} rows={2} placeholder="Describe the process that generates this waste" style={{fontSize:12}} /></div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Describe Physical Appearance</label>
+            <input value={form.physicalDescription} onChange={e => setForm({ ...form, physicalDescription: e.target.value })} placeholder="Physical description of waste" style={{fontSize:12}} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Odor</label>
+              <select value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} style={{fontSize:12}}>
                 <option value="">-- Select --</option>
-                <option>Liquid</option><option>Solid</option><option>Gas</option><option>Sludge</option><option>Powder</option>
+                <option value="None">None</option><option value="Slight">Slight</option><option value="Strong">Strong</option>
+              </select></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Physical State</label>
+              <select value={form.physicalState} onChange={e => setForm({ ...form, physicalState: e.target.value })} style={{fontSize:12}}>
+                <option value="">-- Select --</option>
+                <option value="Liquid">Liquid</option><option value="Sludge-Slurry">Sludge-Slurry</option><option value="Solid">Solid</option>
+              </select></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Color</label>
+              <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="e.g. Clear, Amber" style={{fontSize:12}} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Liquid Phases</label>
+              <select value={form.liquidPhases} onChange={e => setForm({ ...form, liquidPhases: e.target.value })} style={{fontSize:12}}>
+                <option value="">-- Select --</option>
+                <option value="Single">Single</option><option value="Double Layer">Double Layer</option><option value="Multi-layer">Multi-layer</option>
+              </select></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Knowledge Source</label>
+              <select value={form.knowledgeSource} onChange={e => setForm({ ...form, knowledgeSource: e.target.value })} style={{fontSize:12}}>
+                <option value="">-- Select --</option>
+                <option value="Lab analysis">Lab analysis</option><option value="MSDS">MSDS</option><option value="Process knowledge">Process knowledge</option>
               </select></div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div className="mrow" style={{ marginBottom: 0 }}><label>Color</label>
-              <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="e.g. Clear, Amber" /></div>
-            <div className="mrow" style={{ marginBottom: 0 }}><label>Odor</label>
-              <input value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} placeholder="e.g. Petroleum, Solvent" /></div>
+          <div style={{display:'flex',gap:24,flexWrap:'wrap',marginBottom:8,alignItems:'flex-start'}}>
+            <div>
+              <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>LDR Restricted?</label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                <input type="radio" name="ldrRestricted" value="Yes" checked={form.ldrRestricted==='Yes'} onChange={e=>setForm({...form,ldrRestricted:e.target.value})}/>Yes
+              </label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginLeft:8}}>
+                <input type="radio" name="ldrRestricted" value="No" checked={form.ldrRestricted==='No'} onChange={e=>setForm({...form,ldrRestricted:e.target.value})}/>No
+              </label>
+            </div>
+            {form.ldrRestricted === 'Yes' && (
+              <div>
+                <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>LDR Type</label>
+                {['Wastewater','Non-wastewater','Debris'].map(function(t) { return (
+                  <label key={t} style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginRight:10}}>
+                    <input type="radio" name="ldrType" value={t} checked={form.ldrType===t} onChange={e=>setForm({...form,ldrType:e.target.value})}/>{t}
+                  </label>
+                ); })}
+              </div>
+            )}
           </div>
-
-          {/* Waste Codes */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#166534', marginBottom: 6 }}>EPA / RCRA Waste Codes</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 8 }}>
+            <div>
+              <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>CERCLA Regulated?</label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                <input type="radio" name="cerclaRegulated" value="Yes" checked={form.cerclaRegulated==='Yes'} onChange={e=>setForm({...form,cerclaRegulated:e.target.value})}/>Yes
+              </label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginLeft:8}}>
+                <input type="radio" name="cerclaRegulated" value="No" checked={form.cerclaRegulated==='No'} onChange={e=>setForm({...form,cerclaRegulated:e.target.value})}/>No
+              </label>
+            </div>
+            <div>
+              <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>UHC Above Treatment Std?</label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                <input type="radio" name="uhcAboveTreatmentStd" value="Yes" checked={form.uhcAboveTreatmentStd==='Yes'} onChange={e=>setForm({...form,uhcAboveTreatmentStd:e.target.value})}/>Yes
+              </label>
+              <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginLeft:8}}>
+                <input type="radio" name="uhcAboveTreatmentStd" value="No" checked={form.uhcAboveTreatmentStd==='No'} onChange={e=>setForm({...form,uhcAboveTreatmentStd:e.target.value})}/>No
+              </label>
+            </div>
+          </div>
+          {/* Waste Codes - two columns */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: '#166534', marginBottom: 4 }}>RCRA Waste Codes (EPA)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
                 {form.epaWasteCodes.map(c => (
-                  <span key={c} style={{ background: '#dcfce7', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span key={c} style={{ background: '#dcfce7', padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
                     {c}<span onClick={() => removeEpaCode(c)} style={{ cursor: 'pointer', color: '#b91c1c', fontWeight: 700 }}>&times;</span>
                   </span>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
-                <input value={newEpaCode} onChange={e => setNewEpaCode(e.target.value)} placeholder="e.g. D001" style={{ flex: 1, fontSize: 12, padding: '4px 8px' }} onKeyDown={e => { if (e.key === 'Enter') addEpaCode(); }} />
-                <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={addEpaCode}>Add</button>
+                <input value={newEpaCode} onChange={e => setNewEpaCode(e.target.value)} placeholder="e.g. D001" style={{ flex: 1, fontSize: 11, padding: '3px 6px' }} onKeyDown={e => { if (e.key === 'Enter') addEpaCode(); }} />
+                <button className="bp" style={{ fontSize: 10, padding: '3px 8px' }} onClick={addEpaCode}>Add</button>
               </div>
             </div>
-            <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#854d0e', marginBottom: 6 }}>California Waste Codes</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+            <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: '#854d0e', marginBottom: 4 }}>State Waste Codes (CA)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
                 {form.caWasteCodes.map(c => (
-                  <span key={c} style={{ background: '#fef9c3', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span key={c} style={{ background: '#fef9c3', padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
                     CA-{c}<span onClick={() => removeCaCode(c)} style={{ cursor: 'pointer', color: '#b91c1c', fontWeight: 700 }}>&times;</span>
                   </span>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
-                <input value={newCaCode} onChange={e => setNewCaCode(e.target.value)} placeholder="e.g. 131" style={{ flex: 1, fontSize: 12, padding: '4px 8px' }} onKeyDown={e => { if (e.key === 'Enter') addCaCode(); }} />
-                <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={addCaCode}>Add</button>
+                <input value={newCaCode} onChange={e => setNewCaCode(e.target.value)} placeholder="e.g. 131" style={{ flex: 1, fontSize: 11, padding: '3px 6px' }} onKeyDown={e => { if (e.key === 'Enter') addCaCode(); }} />
+                <button className="bp" style={{ fontSize: 10, padding: '3px 8px' }} onClick={addCaCode}>Add</button>
               </div>
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Source Code</label>
+              <input value={form.sourceCode} onChange={e => setForm({ ...form, sourceCode: e.target.value })} placeholder="Source code" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Form Code</label>
+              <input value={form.formCode} onChange={e => setForm({ ...form, formCode: e.target.value })} placeholder="Form code" style={{fontSize:12}} /></div>
+          </div>
 
-          {/* Chemical Composition Table */}
+          {/* ===== SECTION D: COMPOSITION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>D. COMPOSITION</div>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary)' }}>Chemical Composition</div>
-              <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={addChemical}>+ Add Chemical</button>
-            </div>
             {form.chemicals.length > 0 ? (
               <div className="rtable">
                 <table>
-                  <thead><tr><th>Chemical Name</th><th>CAS Number</th><th>Percentage</th><th style={{ width: 40 }}></th></tr></thead>
+                  <thead><tr>
+                    <th style={{fontSize:11}}>Constituent</th><th style={{fontSize:11}}>CAS #</th>
+                    <th style={{fontSize:11,width:70}}>Units</th><th style={{fontSize:11,width:40}}>TCLP</th>
+                    <th style={{fontSize:11,width:44}}>Totals</th><th style={{fontSize:11,width:60}}>Typical</th>
+                    <th style={{fontSize:11,width:50}}>Min</th><th style={{fontSize:11,width:50}}>Max</th>
+                    <th style={{width:24}}></th>
+                  </tr></thead>
                   <tbody>
                     {form.chemicals.map((c, i) => (
                       <tr key={i}>
-                        <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Chemical name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 12, width: '100%' }} /></td>
-                        <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 12, width: '100%' }} /></td>
-                        <td><input value={c.percentage} onChange={e => updateChemical(i, 'percentage', e.target.value)} placeholder="e.g. 10-20%" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 12, width: '100%' }} /></td>
-                        <td><span onClick={() => removeChemical(i)} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 700, fontSize: 14 }}>&times;</span></td>
+                        <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><select value={c.units || '%'} onChange={e => updateChemical(i, 'units', e.target.value)} style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 2px', fontSize: 10, width: '100%' }}>
+                          <option value="%">%</option><option value="ppm">ppm</option><option value="mg/kg">mg/kg</option><option value="mg/L">mg/L</option>
+                        </select></td>
+                        <td style={{textAlign:'center'}}><input type="checkbox" checked={!!c.tclp} onChange={e => updateChemical(i, 'tclp', e.target.checked)} /></td>
+                        <td style={{textAlign:'center'}}><input type="checkbox" checked={!!c.totals} onChange={e => updateChemical(i, 'totals', e.target.checked)} /></td>
+                        <td><input value={c.typical || ''} onChange={e => updateChemical(i, 'typical', e.target.value)} placeholder="Typ" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><input value={c.min || ''} onChange={e => updateChemical(i, 'min', e.target.value)} placeholder="Min" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><input value={c.max || ''} onChange={e => updateChemical(i, 'max', e.target.value)} placeholder="Max" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><span onClick={() => removeChemical(i)} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 700, fontSize: 13 }}>&times;</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: '#f8fafc', borderRadius: 6 }}>No chemicals added. Upload an SDS to auto-extract or click "+ Add Chemical".</div>
+              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: '#f8fafc', borderRadius: 6 }}>No constituents added. Upload an SDS to auto-extract or click the button below.</div>
             )}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6}}>
+              <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={addChemical}>+ Add Constituent</button>
+              <div style={{fontSize:11,color:'var(--text-muted)'}}>Range total should be &ge; 100%</div>
+            </div>
           </div>
 
+          {/* ===== SECTION E: CHARACTERISTICS ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>E. CHARACTERISTICS</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 20px',marginBottom:10}}>
+            {/* Left column: items 1-8 */}
+            {[
+              ['charOxidizer','1. Oxidizer'],['charExplosive','2. Explosive'],
+              ['charOrganicPeroxide','3. Organic peroxide'],['charShockSensitive','4. Shock sensitive'],
+              ['charTires','5. Tires'],['charPyrophoric','6. Pyrophoric'],
+              ['charCompressedGas','7. Compressed gas'],['charHalogenatedOrganics','8. Halogenated organics']
+            ].map(function(pair) { return (
+              <div key={pair[0]} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid #f3f4f6'}}>
+                <span style={{fontSize:12}}>{pair[1]}</span>
+                <span>
+                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
+                    <input type="radio" name={pair[0]} value="Yes" checked={form[pair[0]]==='Yes'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>Y
+                  </label>
+                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer',marginLeft:6}}>
+                    <input type="radio" name={pair[0]} value="No" checked={form[pair[0]]==='No'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>N
+                  </label>
+                </span>
+              </div>
+            ); })}
+            {/* Right column: items 9-16 */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid #f3f4f6'}}>
+              <span style={{fontSize:12}}>9. Reactive sulfides</span>
+              <span style={{display:'flex',alignItems:'center',gap:4}}>
+                <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
+                  <input type="radio" name="charReactiveSulfides" value="Yes" checked={form.charReactiveSulfides==='Yes'} onChange={e=>setForm({...form,charReactiveSulfides:e.target.value})}/>Y
+                </label>
+                <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer',marginLeft:4}}>
+                  <input type="radio" name="charReactiveSulfides" value="No" checked={form.charReactiveSulfides==='No'} onChange={e=>setForm({...form,charReactiveSulfides:e.target.value})}/>N
+                </label>
+                <input value={form.charReactiveSulfidesPpm} onChange={e=>setForm({...form,charReactiveSulfidesPpm:e.target.value})} placeholder="ppm" style={{width:50,fontSize:10,padding:'2px 4px',borderRadius:3,border:'1px solid var(--border)',marginLeft:4}} />
+              </span>
+            </div>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid #f3f4f6'}}>
+              <span style={{fontSize:12}}>10. Reactive cyanides</span>
+              <span style={{display:'flex',alignItems:'center',gap:4}}>
+                <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
+                  <input type="radio" name="charReactiveCyanides" value="Yes" checked={form.charReactiveCyanides==='Yes'} onChange={e=>setForm({...form,charReactiveCyanides:e.target.value})}/>Y
+                </label>
+                <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer',marginLeft:4}}>
+                  <input type="radio" name="charReactiveCyanides" value="No" checked={form.charReactiveCyanides==='No'} onChange={e=>setForm({...form,charReactiveCyanides:e.target.value})}/>N
+                </label>
+                <input value={form.charReactiveCyanidesPpm} onChange={e=>setForm({...form,charReactiveCyanidesPpm:e.target.value})} placeholder="ppm" style={{width:50,fontSize:10,padding:'2px 4px',borderRadius:3,border:'1px solid var(--border)',marginLeft:4}} />
+              </span>
+            </div>
+            {[
+              ['charWaterAirReactive','11. Water/air reactive'],['charThermallyUnstable','12. Thermally unstable'],
+              ['charTscaPCB','13. TSCA regulated PCB'],['charMedicalInfectious','14. Medical/infectious'],
+              ['charRadioactive','15. Radioactive'],['charHSM','16. Hazardous Secondary Material']
+            ].map(function(pair) { return (
+              <div key={pair[0]} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid #f3f4f6'}}>
+                <span style={{fontSize:12}}>{pair[1]}</span>
+                <span>
+                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
+                    <input type="radio" name={pair[0]} value="Yes" checked={form[pair[0]]==='Yes'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>Y
+                  </label>
+                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer',marginLeft:6}}>
+                    <input type="radio" name={pair[0]} value="No" checked={form[pair[0]]==='No'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>N
+                  </label>
+                </span>
+              </div>
+            ); })}
+          </div>
+          {/* Paint filter, pH, Flash Point, Oil bearing */}
+          <div style={{marginBottom:8,padding:'6px 0',borderBottom:'1px solid #e5e7eb'}}>
+            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Paint Filter Test (solid)</label>
+            <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+              <input type="radio" name="charPaintFilterSolid" value="Yes" checked={form.charPaintFilterSolid==='Yes'} onChange={e=>setForm({...form,charPaintFilterSolid:e.target.value})}/>Yes (solid)
+            </label>
+            <label style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginLeft:8}}>
+              <input type="radio" name="charPaintFilterSolid" value="No" checked={form.charPaintFilterSolid==='No'} onChange={e=>setForm({...form,charPaintFilterSolid:e.target.value})}/>No (not solid)
+            </label>
+          </div>
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'flex-end',marginBottom:8}}>
+            <div>
+              <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>pH</label>
+              <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>
+                <span>Range</span>
+                <input value={form.pHMin} onChange={e=>setForm({...form,pHMin:e.target.value})} placeholder="min" style={{width:45,fontSize:11,padding:'2px 4px',borderRadius:3,border:'1px solid var(--border)'}} />
+                <span>to</span>
+                <input value={form.pHMax} onChange={e=>setForm({...form,pHMax:e.target.value})} placeholder="max" style={{width:45,fontSize:11,padding:'2px 4px',borderRadius:3,border:'1px solid var(--border)'}} />
+                <span style={{marginLeft:6}}>Typical</span>
+                <input value={form.pHTypical} onChange={e=>setForm({...form,pHTypical:e.target.value})} placeholder="typ" style={{width:45,fontSize:11,padding:'2px 4px',borderRadius:3,border:'1px solid var(--border)'}} />
+              </div>
+            </div>
+            <div>
+              <div style={{display:'flex',gap:6,fontSize:11}}>
+                {[{v:'<=2',l:'≤2'},{v:'2<12.5',l:'2<12.5'},{v:'>=12.5',l:'≥12.5'}].map(function(opt) { return (
+                  <label key={opt.v} style={{display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
+                    <input type="radio" name="pHCategory" value={opt.v} checked={form.pHCategory===opt.v} onChange={e=>setForm({...form,pHCategory:e.target.value})}/>{opt.l}
+                  </label>
+                ); })}
+              </div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-end',marginBottom:8}}>
+            <div className="mrow" style={{marginBottom:0,flex:'0 0 auto'}}>
+              <label style={{fontSize:13}}>Flash Point</label>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <input value={form.flashPointF} onChange={e=>setForm({...form,flashPointF:e.target.value})} placeholder="°F" style={{width:70,fontSize:12,padding:'3px 6px',borderRadius:4,border:'1px solid var(--border)'}} />
+                <span style={{fontSize:12}}>°F</span>
+                <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginLeft:6}}>
+                  <input type="checkbox" checked={form.flashPointBelow140} onChange={e=>setForm({...form,flashPointBelow140:e.target.checked})}/>&lt;140 °F
+                </label>
+              </div>
+            </div>
+            <div>
+              <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Oil Bearing</label>
+              {['N/A','Yes','No'].map(function(v) { return (
+                <label key={v} style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer',marginRight:10}}>
+                  <input type="radio" name="oilBearing" value={v} checked={form.oilBearing===v} onChange={e=>setForm({...form,oilBearing:e.target.value})}/>{v}
+                </label>
+              ); })}
+            </div>
+          </div>
+
+          {/* ===== AUTO-GENERATED SDS DATA (after Section E) ===== */}
           {/* Mixture Estimates */}
           {(form.estimatedFlashPoint || form.estimatedPH) && (
-            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 12, marginBottom: 12, marginTop: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 8 }}>Estimated Mixture Characteristics</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
                 {form.estimatedFlashPoint && <div><strong>Est. Flash Point:</strong> {form.estimatedFlashPoint}</div>}
@@ -2088,7 +2497,7 @@ function WasteProfiles({data}) {
           {/* Reactivity & Hazard Flags */}
           {(form.reactivityFlags.length > 0 || form.incompatibles || form.stabilityNotes) && (
             <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#b91c1c', marginBottom: 8 }}>Reactivity & Hazard Flags</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#b91c1c', marginBottom: 8 }}>Reactivity &amp; Hazard Flags</div>
               {form.reactivityFlags.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                   {form.reactivityFlags.map((f, i) => (
