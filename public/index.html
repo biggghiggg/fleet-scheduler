@@ -886,7 +886,7 @@ function CapitolCalendar({data}) {
 /* ============ CUSTOMERS ============ */
 function Bins({data}){
   const BIN_SIZES=['20 yard','40 yard'];
-  const empty={binNumber:'',binSize:'20 yard',vendor:'',customer:'',driver:'',dateDropped:'',datePickedUp:'',dateReturnedToVendor:'',dailyRate:'',haulFee:'',vendorDayRate:'',vendorHaulCost:'',notes:''};
+  const empty={binNumber:'',binSize:'20 yard',vendor:'',customer:'',driver:'',dateDropped:'',datePickedUp:'',dateToInventory:'',dateReturnedToVendor:'',dailyRate:'',haulFee:'',vendorDayRate:'',vendorHaulCost:'',notes:''};
   const [showForm,setShowForm]=useState(false);
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState(empty);
@@ -905,11 +905,11 @@ function Bins({data}){
   /* parse YYYY-MM-DD at local noon to avoid timezone drift */
   const pd=(s)=>{if(!s)return null;const p=s.split('-');if(p.length!==3)return null;return new Date(+p[0],+p[1]-1,+p[2],12,0,0);};
   const daysBetween=(a,b)=>Math.round((b-a)/86400000)+1; /* inclusive */
-  const binStatus=(b)=>b.dateReturnedToVendor?'Returned to vendor':(b.datePickedUp?'Picked up':'At customer');
-  const statusColor=(s)=>s==='At customer'?{bg:'#fef3c7',fg:'#92400e'}:s==='Picked up'?{bg:'#dbeafe',fg:'#1e40af'}:{bg:'#dcfce7',fg:'#166534'};
+  const binStatus=(b)=>b.dateReturnedToVendor?'Returned to vendor':(b.dateToInventory?'In inventory':(b.datePickedUp?'Picked up':'At customer'));
+  const statusColor=(s)=>s==='At customer'?{bg:'#fef3c7',fg:'#92400e'}:s==='Picked up'?{bg:'#dbeafe',fg:'#1e40af'}:s==='In inventory'?{bg:'#e0e7ff',fg:'#3730a3'}:{bg:'#dcfce7',fg:'#166534'};
 
   const openAdd=()=>{setEditId(null);setForm({...empty});setShowForm(true);};
-  const openEdit=(b)=>{setEditId(b.id);setForm({binNumber:b.binNumber||'',binSize:b.binSize||'20 yard',vendor:b.vendor||'',customer:b.customer||'',driver:b.driver||'',dateDropped:b.dateDropped||'',datePickedUp:b.datePickedUp||'',dateReturnedToVendor:b.dateReturnedToVendor||'',dailyRate:b.dailyRate||'',haulFee:b.haulFee||'',vendorDayRate:b.vendorDayRate||'',vendorHaulCost:b.vendorHaulCost||'',notes:b.notes||''});setShowForm(true);};
+  const openEdit=(b)=>{setEditId(b.id);setForm({binNumber:b.binNumber||'',binSize:b.binSize||'20 yard',vendor:b.vendor||'',customer:b.customer||'',driver:b.driver||'',dateDropped:b.dateDropped||'',datePickedUp:b.datePickedUp||'',dateToInventory:b.dateToInventory||'',dateReturnedToVendor:b.dateReturnedToVendor||'',dailyRate:b.dailyRate||'',haulFee:b.haulFee||'',vendorDayRate:b.vendorDayRate||'',vendorHaulCost:b.vendorHaulCost||'',notes:b.notes||''});setShowForm(true);};
   const save=async()=>{
     if(!form.binNumber.trim()){alert('Bin number is required');return;}
     if(!form.dateDropped){alert('Date dropped is required');return;}
@@ -919,7 +919,8 @@ function Bins({data}){
     setShowForm(false);setEditId(null);setForm(empty);
   };
   const del=async(b)=>{if(!confirm('Delete bin '+b.binNumber+' / '+(b.customer||'no customer')+'?'))return;await api('DELETE','/bins/'+b.id);};
-  const quickReturn=async(b)=>{const d=prompt('Date returned to vendor (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;await api('PUT','/bins/'+b.id,{dateReturnedToVendor:d});};
+  const quickReturn=async(b)=>{const d=prompt('Date returned to vendor (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;const patch={dateReturnedToVendor:d};if(!b.datePickedUp)patch.datePickedUp=d;await api('PUT','/bins/'+b.id,patch);};
+  const quickInventory=async(b)=>{const d=prompt('Date put into our inventory / yard (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;const patch={dateToInventory:d};if(!b.datePickedUp)patch.datePickedUp=d;await api('PUT','/bins/'+b.id,patch);};
   const quickPickup=async(b)=>{const d=prompt('Date picked up from customer (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;await api('PUT','/bins/'+b.id,{datePickedUp:d});};
 
   /* filtered table view */
@@ -931,64 +932,91 @@ function Bins({data}){
   }).sort((a,b)=>(b.dateDropped||'').localeCompare(a.dateDropped||''));
 
   /* ---- monthly billing report ---- */
+  const IDLE_LABEL='— In inventory (cost only) —';
   const report=useMemo(()=>{
     const parts=reportMonth.split('-');
-    if(parts.length!==2)return{groups:[],grandTotal:0,monthLabel:''};
+    if(parts.length!==2)return{groups:[],grandTotal:0,grandCost:0,grandMargin:0,monthLabel:''};
     const yr=+parts[0],mo=+parts[1]-1;
     const first=new Date(yr,mo,1,12,0,0);
     const last=new Date(yr,mo+1,0,12,0,0);
     const now=new Date();now.setHours(12,0,0,0);
     const monthLabel=first.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+    /* chain placements of the same physical bin so vendor cost isn't double-counted */
+    const dropsByBin={};
+    bins.forEach(b=>{const d=pd(b.dateDropped);if(!d)return;(dropsByBin[b.binNumber]=dropsByBin[b.binNumber]||[]).push(d.getTime());});
+    Object.values(dropsByBin).forEach(a=>a.sort((x,y)=>x-y));
     const byCust={};
     bins.forEach(b=>{
       const drop=pd(b.dateDropped);if(!drop)return;
-      let endRaw=pd(b.datePickedUp)||now;          /* still on site -> through today */
-      if(drop>last)return;                          /* dropped after this month */
-      if(endRaw<first)return;                        /* ended before this month */
-      const ps=drop>first?drop:first;
-      const pe=endRaw<last?endRaw:last;
-      let days=pe>=ps?daysBetween(ps,pe):0;
       const dailyRate=parseFloat(b.dailyRate)||0;
       const haulFee=parseFloat(b.haulFee)||0;
       const vendorDayRate=parseFloat(b.vendorDayRate)||0;
       const vendorHaulCost=parseFloat(b.vendorHaulCost)||0;
       const haulApplies=drop>=first&&drop<=last;     /* delivery billed in month dropped */
-      const lineTotal=days*dailyRate+(haulApplies?haulFee:0);
-      const vendorCost=days*vendorDayRate+(haulApplies?vendorHaulCost:0);
+      /* ---- customer revenue: days the bin sat at the customer (drop -> pickup / today) ---- */
+      let custDays=0;
+      const custEnd=pd(b.datePickedUp)||now;
+      if(drop<=last&&custEnd>=first){
+        const ps=drop>first?drop:first;const pe=custEnd<last?custEnd:last;
+        custDays=pe>=ps?daysBetween(ps,pe):0;
+      }
+      const lineTotal=custDays*dailyRate+(haulApplies?haulFee:0);
+      /* ---- vendor cost: we pay from drop until the bin goes back to the vendor,
+              including time it sits in our inventory. Bounded by the bin's next
+              placement so the same physical bin is never double-charged. ---- */
+      let vEnd;
+      if(b.dateReturnedToVendor){vEnd=pd(b.dateReturnedToVendor);}
+      else{
+        const arr=dropsByBin[b.binNumber]||[];
+        const nextTs=arr.find(t=>t>drop.getTime());
+        vEnd=nextTs?new Date(nextTs-86400000):now;   /* day before next placement, else today */
+      }
+      let vendorDays=0;
+      if(vEnd&&drop<=last&&vEnd>=first){
+        const vps=drop>first?drop:first;const vpe=vEnd<last?vEnd:last;
+        vendorDays=vpe>=vps?daysBetween(vps,vpe):0;
+      }
+      const vendorCost=vendorDays*vendorDayRate+(haulApplies?vendorHaulCost:0);
       const margin=lineTotal-vendorCost;
-      if(days<=0&&!haulApplies)return;               /* nothing to bill this month */
-      if(lineTotal===0&&vendorCost===0&&!haulApplies&&dailyRate===0)return;
-      const cust=b.customer||'(no customer)';
-      if(!byCust[cust])byCust[cust]={customer:cust,rows:[],subtotal:0,vendorCost:0,margin:0};
-      byCust[cust].rows.push({binNumber:b.binNumber,binSize:b.binSize,vendor:b.vendor,dateDropped:b.dateDropped,datePickedUp:b.datePickedUp,days,dailyRate,haulFee:haulApplies?haulFee:0,lineTotal,vendorCost,margin});
-      byCust[cust].subtotal+=lineTotal;
-      byCust[cust].vendorCost+=vendorCost;
-      byCust[cust].margin+=margin;
+      const billable=lineTotal>0||custDays>0;
+      if(!billable&&vendorCost===0)return;           /* nothing to show this month */
+      const grp=billable?(b.customer||'(no customer)'):IDLE_LABEL;
+      if(!byCust[grp])byCust[grp]={customer:grp,rows:[],subtotal:0,vendorCost:0,margin:0,idle:!billable};
+      byCust[grp].rows.push({binNumber:b.binNumber,binSize:b.binSize,vendor:b.vendor,dateDropped:b.dateDropped,datePickedUp:b.datePickedUp,days:custDays,dailyRate,haulFee:haulApplies?haulFee:0,lineTotal,vendorDays,vendorCost,margin,billable});
+      byCust[grp].subtotal+=lineTotal;
+      byCust[grp].vendorCost+=vendorCost;
+      byCust[grp].margin+=margin;
     });
-    const groups=Object.values(byCust).sort((a,b)=>a.customer.localeCompare(b.customer));
+    const groups=Object.values(byCust).sort((a,b)=>{
+      if(a.idle!==b.idle)return a.idle?1:-1;         /* idle bucket sorts last */
+      return a.customer.localeCompare(b.customer);
+    });
     const grandTotal=groups.reduce((s,g)=>s+g.subtotal,0);
     const grandCost=groups.reduce((s,g)=>s+g.vendorCost,0);
-    const grandMargin=groups.reduce((s,g)=>s+g.margin,0);
+    const grandMargin=grandTotal-grandCost;
     return{groups,grandTotal,grandCost,grandMargin,monthLabel};
   },[bins,reportMonth]);
 
   const money=(n)=>'$'+(Number(n)||0).toFixed(2);
+  const visibleGroups=showMargin?report.groups:report.groups.filter(g=>!g.idle);
+  const billableGroups=report.groups.filter(g=>!g.idle);
 
   const printReport=()=>{
     const f=document.createElement('form');f.method='POST';f.action='/print-bin-report';f.target='_blank';
     const inp=document.createElement('input');inp.type='hidden';inp.name='reportData';
-    inp.value=JSON.stringify({monthLabel:report.monthLabel,groups:report.groups,grandTotal:report.grandTotal});
+    inp.value=JSON.stringify({monthLabel:report.monthLabel,groups:billableGroups,grandTotal:report.grandTotal});
     f.appendChild(inp);document.body.appendChild(f);f.submit();document.body.removeChild(f);
   };
   const exportExcel=()=>{
-    const head=['Customer','Bin #','Size','Vendor','Dropped','Picked Up','Days','Day Rate','Haul Fee','Line Total'];
-    if(showMargin)head.push('Vendor Cost','Margin');
+    const grps=showMargin?report.groups:billableGroups;
+    const head=['Customer','Bin #','Size','Vendor','Dropped','Picked Up','Cust Days','Day Rate','Haul Fee','Line Total'];
+    if(showMargin)head.push('Vendor Days','Vendor Cost','Margin');
     const rows=[head];
-    report.groups.forEach(g=>{
-      g.rows.forEach(r=>{const row=[g.customer,r.binNumber,r.binSize,r.vendor,r.dateDropped,r.datePickedUp||'On site',r.days,r.dailyRate,r.haulFee,r.lineTotal];if(showMargin)row.push(r.vendorCost,r.margin);rows.push(row);});
-      const sub=['',' ','','','','','','','Subtotal',g.subtotal];if(showMargin)sub.push(g.vendorCost,g.margin);rows.push(sub);
+    grps.forEach(g=>{
+      g.rows.forEach(r=>{const row=[g.customer,r.binNumber,r.binSize,r.vendor,r.dateDropped,r.datePickedUp||'On site',r.days,r.dailyRate,r.haulFee,r.lineTotal];if(showMargin)row.push(r.vendorDays,r.vendorCost,r.margin);rows.push(row);});
+      const sub=['',' ','','','','','','','Subtotal',g.subtotal];if(showMargin)sub.push('',g.vendorCost,g.margin);rows.push(sub);
     });
-    const gt=['','','','','','','','','GRAND TOTAL',report.grandTotal];if(showMargin)gt.push(report.grandCost,report.grandMargin);rows.push(gt);
+    const gt=['','','','','','','','','GRAND TOTAL',report.grandTotal];if(showMargin)gt.push('',report.grandCost,report.grandMargin);rows.push(gt);
     const ws=XLSX.utils.aoa_to_sheet(rows);
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Bin Billing');
     XLSX.writeFile(wb,'Bin-Billing-'+reportMonth+(showMargin?'-internal':'')+'.xlsx');
@@ -1007,6 +1035,7 @@ function Bins({data}){
         <option value="all">All statuses</option>
         <option value="At customer">At customer</option>
         <option value="Picked up">Picked up</option>
+        <option value="In inventory">In inventory</option>
         <option value="Returned to vendor">Returned to vendor</option>
       </select>
     </div>
@@ -1014,7 +1043,7 @@ function Bins({data}){
     <div className="rtable">
       <table>
         <thead><tr>
-          <th>Bin #</th><th>Size</th><th>Customer</th><th>Vendor</th><th>Driver</th><th>Dropped</th><th>Picked Up</th><th>Returned</th><th>Status</th><th>Rates</th><th></th>
+          <th>Bin #</th><th>Size</th><th>Customer</th><th>Vendor</th><th>Driver</th><th>Dropped</th><th>Picked Up</th><th>Vendor / Inv</th><th>Status</th><th>Rates</th><th></th>
         </tr></thead>
         <tbody>
           {filtered.length===0&&<tr><td colSpan={11} style={{textAlign:'center',color:'var(--text-muted)',padding:24}}>No bins logged yet. Click "+ Log Bin Movement" to start.</td></tr>}
@@ -1026,12 +1055,13 @@ function Bins({data}){
             <td>{b.driver||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
             <td>{b.dateDropped||'—'}</td>
             <td>{b.datePickedUp||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
-            <td>{b.dateReturnedToVendor||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td>{b.dateReturnedToVendor?b.dateReturnedToVendor:(b.dateToInventory?<span style={{color:'#3730a3'}}>Inv {b.dateToInventory}</span>:<span style={{color:'#bbb'}}>&mdash;</span>)}</td>
             <td><span style={{background:sc.bg,color:sc.fg,padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>{s}</span></td>
             <td style={{fontSize:11,whiteSpace:'nowrap'}}>{money(b.dailyRate)}/day{(parseFloat(b.haulFee)||0)>0?' + '+money(b.haulFee)+' haul':''}</td>
             <td style={{whiteSpace:'nowrap'}}>
               {!b.datePickedUp&&<button className="ebtn" onClick={()=>quickPickup(b)}>Pick up</button>}
-              {b.datePickedUp&&!b.dateReturnedToVendor&&<button className="ebtn" onClick={()=>quickReturn(b)}>Return</button>}
+              {b.datePickedUp&&!b.dateReturnedToVendor&&!b.dateToInventory&&<button className="ebtn" onClick={()=>quickInventory(b)}>To Inventory</button>}
+              {b.datePickedUp&&!b.dateReturnedToVendor&&<button className="ebtn" onClick={()=>quickReturn(b)}>To Vendor</button>}
               <button className="ebtn" onClick={()=>openEdit(b)}>Edit</button>
               <button className="ebtn" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>del(b)}>Del</button>
             </td>
@@ -1045,30 +1075,30 @@ function Bins({data}){
     <div className="addrow" style={{alignItems:'center'}}>
       <label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',width:'auto'}}>Billing month:</label>
       <input type="month" value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{maxWidth:180}}/>
-      <button className="bp" onClick={printReport} disabled={report.groups.length===0}>Print / PDF</button>
-      <button onClick={exportExcel} disabled={report.groups.length===0} style={{background:'#16a34a',color:'#fff',fontWeight:600,padding:'8px 16px'}}>Export to Excel</button>
+      <button className="bp" onClick={printReport} disabled={billableGroups.length===0}>Print / PDF</button>
+      <button onClick={exportExcel} disabled={visibleGroups.length===0} style={{background:'#16a34a',color:'#fff',fontWeight:600,padding:'8px 16px'}}>Export to Excel</button>
       <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:600,color:'var(--text-muted)',width:'auto',cursor:'pointer',whiteSpace:'nowrap'}}>
         <input type="checkbox" checked={showMargin} onChange={e=>setShowMargin(e.target.checked)} style={{width:'auto'}}/>Show margin (internal)
       </label>
     </div>
-    <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:10}}>Bills each customer for days the bin was on site during {report.monthLabel||'the selected month'} (day rate &times; days), plus the haul fee in the month the bin was dropped. Bins still on site count through today.{showMargin?' Vendor cost & margin shown for your eyes only — the printed customer bill never includes them.':''}</div>
+    <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:10}}>Bills each customer for days the bin was on site during {report.monthLabel||'the selected month'} (day rate &times; days), plus the haul fee in the month the bin was dropped. Bins still on site count through today.{showMargin?' Vendor cost covers the whole time we hold the bin — including days it sits in our inventory — from drop until it goes back to the vendor. Cost & margin are for your eyes only; the printed customer bill never includes them. Bins sitting idle in inventory appear in their own “cost only” group.':''}</div>
 
-    {report.groups.length===0?(
+    {visibleGroups.length===0?(
       <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',background:'var(--bg-white)',borderRadius:10,boxShadow:'var(--shadow)'}}>No billable bin activity for {report.monthLabel||'this month'}.</div>
     ):(
       <div>
-        {report.groups.map((g,gi)=>(<div key={gi} style={{marginBottom:18}}>
-          <div style={{fontWeight:800,fontSize:14,background:'#eff6ff',borderLeft:'4px solid var(--primary)',padding:'6px 10px',marginBottom:6}}>{g.customer}</div>
+        {visibleGroups.map((g,gi)=>(<div key={gi} style={{marginBottom:18}}>
+          <div style={{fontWeight:800,fontSize:14,background:g.idle?'#eef2ff':'#eff6ff',borderLeft:'4px solid '+(g.idle?'#6366f1':'var(--primary)'),padding:'6px 10px',marginBottom:6,color:g.idle?'#3730a3':'inherit'}}>{g.customer}{g.idle?' — still on vendor rent, no customer billing':''}</div>
           <div className="rtable">
             <table>
-              <thead><tr><th>Bin #</th><th>Size</th><th>Vendor</th><th>Dropped</th><th>Picked Up</th><th style={{textAlign:'right'}}>Days</th><th style={{textAlign:'right'}}>Day Rate</th><th style={{textAlign:'right'}}>Haul Fee</th><th style={{textAlign:'right'}}>Line Total</th>{showMargin&&<th style={{textAlign:'right',color:'#b45309'}}>Vendor Cost</th>}{showMargin&&<th style={{textAlign:'right',color:'#166534'}}>Margin</th>}</tr></thead>
+              <thead><tr><th>Bin #</th><th>Size</th><th>Vendor</th><th>Dropped</th><th>Picked Up</th><th style={{textAlign:'right'}}>{showMargin?'Cust Days':'Days'}</th><th style={{textAlign:'right'}}>Day Rate</th><th style={{textAlign:'right'}}>Haul Fee</th><th style={{textAlign:'right'}}>Line Total</th>{showMargin&&<th style={{textAlign:'right',color:'#b45309'}}>Vend Days</th>}{showMargin&&<th style={{textAlign:'right',color:'#b45309'}}>Vendor Cost</th>}{showMargin&&<th style={{textAlign:'right',color:'#166534'}}>Margin</th>}</tr></thead>
               <tbody>
                 {g.rows.map((r,ri)=>(<tr key={ri}>
                   <td style={{fontWeight:600}}>{r.binNumber}</td><td>{r.binSize}</td><td>{r.vendor}</td><td>{r.dateDropped}</td><td>{r.datePickedUp||'On site'}</td>
                   <td style={{textAlign:'right'}}>{r.days}</td><td style={{textAlign:'right'}}>{money(r.dailyRate)}</td><td style={{textAlign:'right'}}>{money(r.haulFee)}</td><td style={{textAlign:'right',fontWeight:700}}>{money(r.lineTotal)}</td>
-                  {showMargin&&<td style={{textAlign:'right',color:'#b45309'}}>{money(r.vendorCost)}</td>}{showMargin&&<td style={{textAlign:'right',fontWeight:700,color:r.margin<0?'var(--danger)':'#166534'}}>{money(r.margin)}</td>}
+                  {showMargin&&<td style={{textAlign:'right',color:'#b45309'}}>{r.vendorDays}</td>}{showMargin&&<td style={{textAlign:'right',color:'#b45309'}}>{money(r.vendorCost)}</td>}{showMargin&&<td style={{textAlign:'right',fontWeight:700,color:r.margin<0?'var(--danger)':'#166534'}}>{money(r.margin)}</td>}
                 </tr>))}
-                <tr><td colSpan={8} style={{textAlign:'right',fontWeight:700,background:'#f8fafc'}}>Subtotal</td><td style={{textAlign:'right',fontWeight:800,background:'#f8fafc'}}>{money(g.subtotal)}</td>{showMargin&&<td style={{textAlign:'right',fontWeight:700,background:'#f8fafc',color:'#b45309'}}>{money(g.vendorCost)}</td>}{showMargin&&<td style={{textAlign:'right',fontWeight:800,background:'#f8fafc',color:g.margin<0?'var(--danger)':'#166534'}}>{money(g.margin)}</td>}</tr>
+                <tr><td colSpan={8} style={{textAlign:'right',fontWeight:700,background:'#f8fafc'}}>Subtotal</td><td style={{textAlign:'right',fontWeight:800,background:'#f8fafc'}}>{money(g.subtotal)}</td>{showMargin&&<td style={{background:'#f8fafc'}}></td>}{showMargin&&<td style={{textAlign:'right',fontWeight:700,background:'#f8fafc',color:'#b45309'}}>{money(g.vendorCost)}</td>}{showMargin&&<td style={{textAlign:'right',fontWeight:800,background:'#f8fafc',color:g.margin<0?'var(--danger)':'#166534'}}>{money(g.margin)}</td>}</tr>
               </tbody>
             </table>
           </div>
@@ -1111,6 +1141,7 @@ function Bins({data}){
             <datalist id="bin-driver-list">{driverNames.map((d,i)=><option key={i} value={d}/>)}</datalist></div>
           <div className="mrow"><label>Date Dropped *</label><input type="date" value={form.dateDropped} onChange={e=>setForm({...form,dateDropped:e.target.value})}/></div>
           <div className="mrow"><label>Date Picked Up</label><input type="date" value={form.datePickedUp} onChange={e=>setForm({...form,datePickedUp:e.target.value})}/></div>
+          <div className="mrow"><label>Date To Inventory / Yard</label><input type="date" value={form.dateToInventory} onChange={e=>setForm({...form,dateToInventory:e.target.value})}/></div>
           <div className="mrow"><label>Date Returned to Vendor</label><input type="date" value={form.dateReturnedToVendor} onChange={e=>setForm({...form,dateReturnedToVendor:e.target.value})}/></div>
           <div className="mrow"><label>Day Rate ($/day to customer)</label><input type="number" step="0.01" value={form.dailyRate} onChange={e=>setForm({...form,dailyRate:e.target.value})} placeholder="0.00"/></div>
           <div className="mrow"><label>Haul / Delivery Fee ($)</label><input type="number" step="0.01" value={form.haulFee} onChange={e=>setForm({...form,haulFee:e.target.value})} placeholder="0.00"/></div>
