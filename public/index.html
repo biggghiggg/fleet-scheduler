@@ -238,7 +238,7 @@ function App(){
         </div>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['capitol','Capitol Calendar'],['bins','Roll-Off Bins'],['roster','People'],['fleet','Trucks & Trailers'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['capitol','Capitol Calendar'],['bins','Roll-Off Bins'],['roster','People'],['fleet','Trucks & Trailers'],['customers','Customers'],['docs','Documents'],['profiles','Waste Profiles']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
@@ -251,6 +251,7 @@ function App(){
         {tab==='bins'&&<Bins data={data}/>}
         {tab==='customers'&&<Customers data={data}/>}
         {tab==='docs'&&<Documents/>}
+        {tab==='profiles'&&<WasteProfiles data={data}/>}
       </div>
       {toast&&<div className="toast">{toast}</div>}
     </div>
@@ -1648,6 +1649,405 @@ function Documents(){
         </div>
       ))}
     </div>
+  </div>);
+}
+
+// ============================================================
+// WASTE PROFILES TAB
+// ============================================================
+function WasteProfiles({data}) {
+  const [profiles, setProfiles] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
+
+  const emptyForm = {
+    name: '', customer: '', chemicals: [], unNumber: '', properShippingName: '',
+    hazardClass: '', packingGroup: '', epaWasteCodes: [], caWasteCodes: [],
+    flashPoint: '', pH: '', physicalState: '', color: '', odor: '',
+    profileNotes: '', sdsFiles: [], suggestedPercentages: ''
+  };
+  const [form, setForm] = useState(emptyForm);
+  const [newEpaCode, setNewEpaCode] = useState('');
+  const [newCaCode, setNewCaCode] = useState('');
+
+  // Load profiles
+  const loadProfiles = async () => {
+    try {
+      const r = await fetch('/api/profiles');
+      const p = await r.json();
+      setProfiles(p);
+    } catch(e) { console.error('Load profiles error:', e); }
+  };
+  useEffect(() => { loadProfiles(); }, []);
+
+  // Upload SDS and parse
+  const uploadSDS = async (files) => {
+    setParsing(true);
+    try {
+      const fd = new FormData();
+      Array.from(files).forEach(f => fd.append('files', f));
+      const r = await fetch('/api/sds/parse', { method: 'POST', body: fd });
+      const result = await r.json();
+      if (result.merged) {
+        // Pre-fill form with parsed data
+        setForm({
+          ...emptyForm,
+          chemicals: result.merged.chemicals || [],
+          unNumber: result.merged.unNumber || '',
+          properShippingName: result.merged.properShippingName || '',
+          hazardClass: result.merged.hazardClass || '',
+          packingGroup: result.merged.packingGroup || '',
+          epaWasteCodes: result.merged.epaWasteCodes || [],
+          caWasteCodes: result.merged.caWasteCodes || [],
+          flashPoint: result.merged.flashPoint || '',
+          pH: result.merged.pH || '',
+          physicalState: result.merged.physicalState || '',
+          color: result.merged.color || '',
+          odor: result.merged.odor || '',
+          sdsFiles: result.merged.sdsFiles || [],
+          profileNotes: ''
+        });
+        setEditId(null);
+        setShowForm(true);
+      }
+    } catch(e) { alert('Error parsing SDS: ' + e.message); }
+    setParsing(false);
+  };
+
+  // Save profile
+  const save = async () => {
+    if (!form.name.trim()) { alert('Please enter a profile name'); return; }
+    const payload = { ...form };
+    if (editId) {
+      await fetch('/api/profiles/' + editId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    } else {
+      await fetch('/api/profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    }
+    setShowForm(false); setEditId(null); setForm(emptyForm);
+    loadProfiles();
+  };
+
+  const openEdit = (p) => {
+    setEditId(p.id);
+    setForm({
+      name: p.name || '', customer: p.customer || '',
+      chemicals: p.chemicals || [], unNumber: p.unNumber || '',
+      properShippingName: p.properShippingName || '',
+      hazardClass: p.hazardClass || '', packingGroup: p.packingGroup || '',
+      epaWasteCodes: p.epaWasteCodes || [], caWasteCodes: p.caWasteCodes || [],
+      flashPoint: p.flashPoint || '', pH: p.pH || '',
+      physicalState: p.physicalState || '', color: p.color || '', odor: p.odor || '',
+      profileNotes: p.profileNotes || '', sdsFiles: p.sdsFiles || [],
+      suggestedPercentages: p.suggestedPercentages || ''
+    });
+    setShowForm(true);
+  };
+
+  const openNew = () => {
+    setEditId(null); setForm(emptyForm); setShowForm(true);
+  };
+
+  const del = async (id) => {
+    if (!confirm('Delete this profile?')) return;
+    await fetch('/api/profiles/' + id, { method: 'DELETE' });
+    loadProfiles();
+  };
+
+  // Add/remove chemicals
+  const addChemical = () => {
+    setForm({ ...form, chemicals: [...form.chemicals, { name: '', cas: '', percentage: '' }] });
+  };
+  const updateChemical = (idx, field, value) => {
+    const updated = form.chemicals.map((c, i) => i === idx ? { ...c, [field]: value } : c);
+    setForm({ ...form, chemicals: updated });
+  };
+  const removeChemical = (idx) => {
+    setForm({ ...form, chemicals: form.chemicals.filter((_, i) => i !== idx) });
+  };
+
+  // Add/remove waste codes
+  const addEpaCode = () => {
+    if (newEpaCode.trim() && !form.epaWasteCodes.includes(newEpaCode.trim().toUpperCase())) {
+      setForm({ ...form, epaWasteCodes: [...form.epaWasteCodes, newEpaCode.trim().toUpperCase()] });
+      setNewEpaCode('');
+    }
+  };
+  const removeEpaCode = (code) => {
+    setForm({ ...form, epaWasteCodes: form.epaWasteCodes.filter(c => c !== code) });
+  };
+  const addCaCode = () => {
+    if (newCaCode.trim() && !form.caWasteCodes.includes(newCaCode.trim())) {
+      setForm({ ...form, caWasteCodes: [...form.caWasteCodes, newCaCode.trim()] });
+      setNewCaCode('');
+    }
+  };
+  const removeCaCode = (code) => {
+    setForm({ ...form, caWasteCodes: form.caWasteCodes.filter(c => c !== code) });
+  };
+
+  // Filter profiles
+  const filtered = search ? profiles.filter(p => {
+    const s = search.toLowerCase();
+    return (p.name || '').toLowerCase().includes(s) ||
+      (p.customer || '').toLowerCase().includes(s) ||
+      (p.unNumber || '').toLowerCase().includes(s) ||
+      (p.properShippingName || '').toLowerCase().includes(s);
+  }) : profiles;
+
+  // Hazard class descriptions
+  const HC_MAP = {
+    '1': 'Explosives', '2': 'Gases', '2.1': 'Flammable Gas', '2.2': 'Non-Flammable Gas',
+    '2.3': 'Poison Gas', '3': 'Flammable Liquid', '4.1': 'Flammable Solid',
+    '4.2': 'Spont. Combustible', '4.3': 'Dangerous When Wet', '5.1': 'Oxidizer',
+    '5.2': 'Organic Peroxide', '6.1': 'Toxic', '6.2': 'Infectious', '7': 'Radioactive',
+    '8': 'Corrosive', '9': 'Miscellaneous'
+  };
+
+  const custNames = (data.customers || []).map(c => c.name).filter(Boolean).sort();
+
+  return (<div>
+    {/* Header */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+      <div>
+        <h2 style={{ margin: 0, fontSize: 20 }}>Waste Profiles</h2>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Upload SDS sheets to auto-generate waste profiles with suggested UN numbers, shipping names, and waste codes.</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search profiles..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, width: 200 }} />
+        <button className="bp" onClick={openNew} style={{ padding: '8px 16px' }}>+ New Profile</button>
+      </div>
+    </div>
+
+    {/* SDS Upload Area */}
+    <div style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)', border: '2px dashed var(--primary)', textAlign: 'center' }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>Upload SDS (Safety Data Sheets)</div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Upload one or more SDS PDFs to extract chemicals, UN numbers, and generate a suggested waste profile.</div>
+      <label style={{ display: 'inline-block', background: 'var(--primary)', color: '#fff', padding: '10px 24px', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
+        {parsing ? 'Analyzing SDS...' : 'Choose SDS PDF(s)'}
+        <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
+      </label>
+      {parsing && <div style={{ marginTop: 8, color: 'var(--primary)', fontSize: 13 }}>Extracting chemical data from SDS...</div>}
+    </div>
+
+    {/* Profiles List */}
+    {filtered.length === 0 && !showForm && (
+      <div style={{ textAlign: 'center', padding: 40, color: '#999', fontSize: 14 }}>
+        {search ? 'No profiles match your search.' : 'No profiles yet. Upload an SDS or click "+ New Profile" to get started.'}
+      </div>
+    )}
+
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {filtered.map(p => (
+        <div key={p.id} style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow)', borderLeft: '4px solid #7c3aed' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: '#7c3aed' }}>{p.name || 'Unnamed Profile'}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6, fontSize: 13 }}>
+                {p.customer && <span style={{ color: 'var(--text-muted)' }}>Customer: <strong>{p.customer}</strong></span>}
+                {p.unNumber && <span style={{ background: '#fef3c7', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#92400e' }}>{p.unNumber}</span>}
+                {p.hazardClass && <span style={{ background: '#fee2e2', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#b91c1c' }}>Class {p.hazardClass}</span>}
+                {p.packingGroup && <span style={{ background: '#e0e7ff', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#3730a3' }}>PG {p.packingGroup}</span>}
+                {p.properShippingName && <span style={{ color: '#555' }}>{p.properShippingName}</span>}
+              </div>
+              {/* Waste code pills */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                {(p.epaWasteCodes || []).map(c => <span key={c} style={{ background: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{c}</span>)}
+                {(p.caWasteCodes || []).map(c => <span key={c} style={{ background: '#fef9c3', color: '#854d0e', padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>CA-{c}</span>)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => openEdit(p)}>Edit</button>
+              <button style={{ background: '#fee2e2', color: 'var(--danger)', fontSize: 11, padding: '4px 10px' }} onClick={() => del(p.id)}>Delete</button>
+            </div>
+          </div>
+
+          {/* Expanded view */}
+          {expandedId === p.id && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 13, marginBottom: 12 }}>
+                {p.flashPoint && <div><strong>Flash Point:</strong> {p.flashPoint}</div>}
+                {p.pH && <div><strong>pH:</strong> {p.pH}</div>}
+                {p.physicalState && <div><strong>Physical State:</strong> {p.physicalState}</div>}
+                {p.color && <div><strong>Color:</strong> {p.color}</div>}
+                {p.odor && <div><strong>Odor:</strong> {p.odor}</div>}
+              </div>
+              {p.chemicals && p.chemicals.length > 0 && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: 'var(--primary)' }}>Chemical Composition</div>
+                  <div className="rtable">
+                    <table>
+                      <thead><tr><th>Chemical Name</th><th>CAS Number</th><th>Percentage</th></tr></thead>
+                      <tbody>
+                        {p.chemicals.map((c, i) => (
+                          <tr key={i}>
+                            <td style={{ fontWeight: 600 }}>{c.name}</td>
+                            <td>{c.cas || '—'}</td>
+                            <td>{c.percentage || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {p.profileNotes && <div style={{ marginTop: 8, padding: '8px 12px', background: '#fffbeb', borderRadius: 6, fontSize: 13, whiteSpace: 'pre-wrap' }}><strong>Notes:</strong> {p.profileNotes}</div>}
+              {p.sdsFiles && p.sdsFiles.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 12 }}>
+                  <strong>SDS Files:</strong> {p.sdsFiles.map(f => f.name).join(', ')}
+                </div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                Created: {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
+                {p.updatedAt && p.updatedAt !== p.createdAt && <span> | Updated: {new Date(p.updatedAt).toLocaleDateString()}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+
+    {/* New/Edit Profile Modal */}
+    {showForm && (
+      <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 700, maxHeight: '90vh', overflowY: 'auto' }}>
+          <h2>{editId ? 'Edit Profile' : 'New Waste Profile'}</h2>
+
+          {/* Profile name and customer */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="mrow"><label>Profile Name *</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Used Motor Oil, Waste Acetone" autoFocus /></div>
+            <div className="mrow"><label>Customer</label>
+              <input list="profile-cust-list" value={form.customer} onChange={e => setForm({ ...form, customer: e.target.value })} placeholder="Link to customer (optional)" />
+              <datalist id="profile-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist></div>
+          </div>
+
+          {/* Transport info */}
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#1e40af', marginBottom: 8 }}>DOT Transport Information</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="mrow" style={{ marginBottom: 0 }}><label>UN Number</label>
+                <input value={form.unNumber} onChange={e => setForm({ ...form, unNumber: e.target.value })} placeholder="e.g. UN1993" /></div>
+              <div className="mrow" style={{ marginBottom: 0 }}><label>Proper Shipping Name</label>
+                <input value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste flammable liquid, n.o.s." /></div>
+              <div className="mrow" style={{ marginBottom: 0 }}><label>Hazard Class</label>
+                <select value={form.hazardClass} onChange={e => setForm({ ...form, hazardClass: e.target.value })}>
+                  <option value="">-- Select --</option>
+                  {Object.entries(HC_MAP).map(([k, v]) => <option key={k} value={k}>{k} - {v}</option>)}
+                </select></div>
+              <div className="mrow" style={{ marginBottom: 0 }}><label>Packing Group</label>
+                <select value={form.packingGroup} onChange={e => setForm({ ...form, packingGroup: e.target.value })}>
+                  <option value="">-- Select --</option>
+                  <option value="I">I - Great Danger</option>
+                  <option value="II">II - Medium Danger</option>
+                  <option value="III">III - Minor Danger</option>
+                </select></div>
+            </div>
+          </div>
+
+          {/* Physical properties */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{ marginBottom: 0 }}><label>Flash Point</label>
+              <input value={form.flashPoint} onChange={e => setForm({ ...form, flashPoint: e.target.value })} placeholder="e.g. 140°F" /></div>
+            <div className="mrow" style={{ marginBottom: 0 }}><label>pH</label>
+              <input value={form.pH} onChange={e => setForm({ ...form, pH: e.target.value })} placeholder="e.g. 7" /></div>
+            <div className="mrow" style={{ marginBottom: 0 }}><label>Physical State</label>
+              <select value={form.physicalState} onChange={e => setForm({ ...form, physicalState: e.target.value })}>
+                <option value="">-- Select --</option>
+                <option>Liquid</option><option>Solid</option><option>Gas</option><option>Sludge</option><option>Powder</option>
+              </select></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{ marginBottom: 0 }}><label>Color</label>
+              <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="e.g. Clear, Amber" /></div>
+            <div className="mrow" style={{ marginBottom: 0 }}><label>Odor</label>
+              <input value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} placeholder="e.g. Petroleum, Solvent" /></div>
+          </div>
+
+          {/* Waste Codes */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#166534', marginBottom: 6 }}>EPA / RCRA Waste Codes</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                {form.epaWasteCodes.map(c => (
+                  <span key={c} style={{ background: '#dcfce7', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {c}<span onClick={() => removeEpaCode(c)} style={{ cursor: 'pointer', color: '#b91c1c', fontWeight: 700 }}>&times;</span>
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input value={newEpaCode} onChange={e => setNewEpaCode(e.target.value)} placeholder="e.g. D001" style={{ flex: 1, fontSize: 12, padding: '4px 8px' }} onKeyDown={e => { if (e.key === 'Enter') addEpaCode(); }} />
+                <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={addEpaCode}>Add</button>
+              </div>
+            </div>
+            <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#854d0e', marginBottom: 6 }}>California Waste Codes</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                {form.caWasteCodes.map(c => (
+                  <span key={c} style={{ background: '#fef9c3', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    CA-{c}<span onClick={() => removeCaCode(c)} style={{ cursor: 'pointer', color: '#b91c1c', fontWeight: 700 }}>&times;</span>
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input value={newCaCode} onChange={e => setNewCaCode(e.target.value)} placeholder="e.g. 131" style={{ flex: 1, fontSize: 12, padding: '4px 8px' }} onKeyDown={e => { if (e.key === 'Enter') addCaCode(); }} />
+                <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={addCaCode}>Add</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Chemical Composition Table */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary)' }}>Chemical Composition</div>
+              <button className="bp" style={{ fontSize: 11, padding: '4px 10px' }} onClick={addChemical}>+ Add Chemical</button>
+            </div>
+            {form.chemicals.length > 0 ? (
+              <div className="rtable">
+                <table>
+                  <thead><tr><th>Chemical Name</th><th>CAS Number</th><th>Percentage</th><th style={{ width: 40 }}></th></tr></thead>
+                  <tbody>
+                    {form.chemicals.map((c, i) => (
+                      <tr key={i}>
+                        <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Chemical name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 12, width: '100%' }} /></td>
+                        <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 12, width: '100%' }} /></td>
+                        <td><input value={c.percentage} onChange={e => updateChemical(i, 'percentage', e.target.value)} placeholder="e.g. 10-20%" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 6px', fontSize: 12, width: '100%' }} /></td>
+                        <td><span onClick={() => removeChemical(i)} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 700, fontSize: 14 }}>&times;</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: '#f8fafc', borderRadius: 6 }}>No chemicals added. Upload an SDS to auto-extract or click "+ Add Chemical".</div>
+            )}
+          </div>
+
+          {/* SDS Files display */}
+          {form.sdsFiles && form.sdsFiles.length > 0 && (
+            <div style={{ marginBottom: 12, fontSize: 12 }}>
+              <label style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Source SDS Files</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                {form.sdsFiles.map((f, i) => (
+                  <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{f.name}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div className="mrow"><label>Profile Notes</label>
+            <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={3} placeholder="Additional notes about this waste profile, handling instructions, etc." /></div>
+
+          <div className="mactions">
+            <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
+            <button className="bp" onClick={save}>{editId ? 'Update Profile' : 'Save Profile'}</button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>);
 }
 
