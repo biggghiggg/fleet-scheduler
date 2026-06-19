@@ -54,6 +54,8 @@ const defaultData = {
   ],
   jobs: [],
   customers: [],
+  bins: [],
+  vendors: [],
   equipment: ['Liftgate','Drum Dolly','Placards','PPE','Bins','Totes'],
   locations: ['EWS','Brenntag Fresno','Brenntag Richmond','Coast','GQ','Avenal','Lost Hills','Madera','Thatcher','Bolthouse','Leprinos','Eagle Quick Lube','Faraday','PAC','PRR','Local Route','Parc/Atlas/High Bar','F&T Farms']
 };
@@ -86,6 +88,8 @@ var data = loadData();
 if (!data.locations) { data.locations = defaultData.locations; saveData(data); }
 if (!data.customers) { data.customers = []; saveData(data); }
 if (!data.pickups) { data.pickups = []; saveData(data); }
+if (!data.bins) { data.bins = []; saveData(data); }
+if (!data.vendors) { data.vendors = []; saveData(data); }
 console.log('DATA_DIR = ' + DATA_DIR);
 console.log('DATA_FILE = ' + DATA_FILE);
 console.log('RAILWAY_VOLUME_MOUNT_PATH = ' + (process.env.RAILWAY_VOLUME_MOUNT_PATH || 'NOT SET'));
@@ -597,6 +601,115 @@ app.delete('/api/pickups/:id', function(req, res) {
   data.pickups = (data.pickups || []).filter(function(p) { return p.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true});
+});
+
+// ROLL-OFF BINS - movement / rental tracking
+app.get('/api/bins', function(req, res) { res.json(data.bins || []); });
+
+app.post('/api/bins', function(req, res) {
+  var bin = Object.assign({}, req.body, {
+    id: 'bin' + Date.now() + Math.random().toString(36).slice(2),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  data.bins.push(bin);
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json(bin);
+});
+
+app.put('/api/bins/:id', function(req, res) {
+  var idx = data.bins.findIndex(function(b) { return b.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(data.bins[idx], req.body, { updatedAt: new Date().toISOString() });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json(data.bins[idx]);
+});
+
+app.delete('/api/bins/:id', function(req, res) {
+  data.bins = (data.bins || []).filter(function(b) { return b.id !== req.params.id; });
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json({ok:true});
+});
+
+// VENDORS (bin suppliers) - managed list
+app.post('/api/vendors', function(req, res) {
+  if (req.body.name && (data.vendors || []).indexOf(req.body.name) === -1) {
+    data.vendors.push(req.body.name); data.vendors.sort();
+    saveData(data); broadcast({type:'full-sync',data:data});
+  }
+  res.json({ok:true});
+});
+app.delete('/api/vendors/:name', function(req, res) {
+  data.vendors = (data.vendors || []).filter(function(v) { return v !== req.params.name; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
+
+// PRINTABLE MONTHLY BIN BILLING REPORT (POST so it works in Safari)
+app.post('/print-bin-report', function(req, res) {
+  var payload;
+  try { payload = JSON.parse(req.body.reportData); } catch(e) { return res.status(400).send('Invalid data'); }
+  var monthLabel = payload.monthLabel || '';
+  var groups = payload.groups || [];   // [{customer, rows:[{...}], subtotal}]
+  var grandTotal = payload.grandTotal || 0;
+  var fmtMoney = function(n) { return '$' + (Number(n)||0).toFixed(2); };
+  var esc = function(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+
+  var html = '<!DOCTYPE html><html><head><title>Bin Billing - ' + esc(monthLabel) + '</title>';
+  html += '<style>';
+  html += '*{margin:0;padding:0;box-sizing:border-box}';
+  html += 'body{font-family:Arial,Helvetica,sans-serif;padding:24px 30px;color:#000;max-width:900px;margin:0 auto;font-size:12px}';
+  html += '.header{text-align:center;margin-bottom:18px;padding-bottom:10px;border-bottom:3px solid #000}';
+  html += '.header h1{font-size:22px;font-weight:900;margin-bottom:2px}';
+  html += '.header .company{font-size:12px;color:#444;font-weight:600;letter-spacing:0.5px}';
+  html += '.header .period{font-size:14px;font-weight:700;margin-top:6px}';
+  html += '.cust-group{margin-bottom:22px;page-break-inside:avoid}';
+  html += '.cust-name{font-size:15px;font-weight:800;background:#eff6ff;border-left:4px solid #2563eb;padding:6px 10px;margin-bottom:6px}';
+  html += 'table{width:100%;border-collapse:collapse;margin-bottom:4px}';
+  html += 'th{background:#f1f5f9;text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;color:#444;border-bottom:2px solid #cbd5e1}';
+  html += 'td{padding:5px 8px;border-bottom:1px solid #e5e7eb;font-size:11px}';
+  html += 'td.num,th.num{text-align:right}';
+  html += '.subtotal{text-align:right;font-weight:700;padding:6px 8px;font-size:12px;background:#f8fafc}';
+  html += '.grand{margin-top:14px;padding:12px 14px;border:3px solid #000;background:#f0fdf4;display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:900}';
+  html += '.footer{margin-top:24px;padding-top:8px;border-top:2px solid #000;font-size:9px;color:#888;display:flex;justify-content:space-between}';
+  html += '.back-link{display:inline-block;margin-bottom:12px;color:#2563eb;text-decoration:none;font-size:13px}';
+  html += '.empty{padding:30px;text-align:center;color:#888;font-size:14px}';
+  html += '@media print{.back-link{display:none}body{padding:14px 18px}.cust-name{background:#eff6ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.grand{background:#f0fdf4 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}th{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '</style></head><body>';
+  html += '<a href="javascript:history.back()" class="back-link">&larr; Back to RouteBoard</a>';
+  html += '<div class="header"><h1>Roll-Off Bin Billing</h1><div class="company">Independence Environmental Services</div><div class="period">' + esc(monthLabel) + '</div></div>';
+
+  if (groups.length === 0) {
+    html += '<div class="empty">No billable bin activity for this period.</div>';
+  } else {
+    groups.forEach(function(g) {
+      html += '<div class="cust-group">';
+      html += '<div class="cust-name">' + esc(g.customer) + '</div>';
+      html += '<table><thead><tr>';
+      html += '<th>Bin #</th><th>Size</th><th>Vendor</th><th>Dropped</th><th>Picked Up</th><th class="num">Days</th><th class="num">Day Rate</th><th class="num">Haul Fee</th><th class="num">Line Total</th>';
+      html += '</tr></thead><tbody>';
+      (g.rows || []).forEach(function(r) {
+        html += '<tr>';
+        html += '<td>' + esc(r.binNumber) + '</td>';
+        html += '<td>' + esc(r.binSize) + '</td>';
+        html += '<td>' + esc(r.vendor) + '</td>';
+        html += '<td>' + esc(r.dateDropped) + '</td>';
+        html += '<td>' + esc(r.datePickedUp || 'On site') + '</td>';
+        html += '<td class="num">' + esc(r.days) + '</td>';
+        html += '<td class="num">' + fmtMoney(r.dailyRate) + '</td>';
+        html += '<td class="num">' + fmtMoney(r.haulFee) + '</td>';
+        html += '<td class="num">' + fmtMoney(r.lineTotal) + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      html += '<div class="subtotal">' + esc(g.customer) + ' subtotal: ' + fmtMoney(g.subtotal) + '</div>';
+      html += '</div>';
+    });
+    html += '<div class="grand"><span>TOTAL DUE &mdash; ' + esc(monthLabel) + '</span><span>' + fmtMoney(grandTotal) + '</span></div>';
+  }
+
+  html += '<div class="footer"><span>Independence Environmental Services</span><span>Generated: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
+  html += '</body></html>';
+  res.send(html);
 });
 
 function getLocalIP() {
