@@ -238,7 +238,7 @@ function App(){
         </div>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['capitol','Capitol Calendar'],['roster','People'],['fleet','Trucks & Trailers'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
+        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['capitol','Capitol Calendar'],['bins','Roll-Off Bins'],['roster','People'],['fleet','Trucks & Trailers'],['customers','Customers'],['docs','Documents']].map(([k,v])=>(
           <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
         ))}
       </div>
@@ -248,6 +248,7 @@ function App(){
         {tab==='roster'&&<Roster data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
         {tab==='capitol'&&<CapitolCalendar data={data}/>}
+        {tab==='bins'&&<Bins data={data}/>}
         {tab==='customers'&&<Customers data={data}/>}
         {tab==='docs'&&<Documents/>}
       </div>
@@ -883,6 +884,250 @@ function CapitolCalendar({data}) {
 }
 
 /* ============ CUSTOMERS ============ */
+function Bins({data}){
+  const BIN_SIZES=['20 yard','40 yard'];
+  const empty={binNumber:'',binSize:'20 yard',vendor:'',customer:'',driver:'',dateDropped:'',datePickedUp:'',dateReturnedToVendor:'',dailyRate:'',haulFee:'',vendorDayRate:'',vendorHaulCost:'',notes:''};
+  const [showForm,setShowForm]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [form,setForm]=useState(empty);
+  const [search,setSearch]=useState('');
+  const [statusFilter,setStatusFilter]=useState('all');
+  const [showMargin,setShowMargin]=useState(false);
+  const [newVendor,setNewVendor]=useState('');
+  const today=new Date();
+  const [reportMonth,setReportMonth]=useState(()=>today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0'));
+
+  const bins=data.bins||[];
+  const vendors=data.vendors||[];
+  const custNames=(data.customers||[]).map(c=>c.name).filter(Boolean).sort();
+  const driverNames=(data.drivers||[]).map(d=>d.name).filter(Boolean);
+
+  /* parse YYYY-MM-DD at local noon to avoid timezone drift */
+  const pd=(s)=>{if(!s)return null;const p=s.split('-');if(p.length!==3)return null;return new Date(+p[0],+p[1]-1,+p[2],12,0,0);};
+  const daysBetween=(a,b)=>Math.round((b-a)/86400000)+1; /* inclusive */
+  const binStatus=(b)=>b.dateReturnedToVendor?'Returned to vendor':(b.datePickedUp?'Picked up':'At customer');
+  const statusColor=(s)=>s==='At customer'?{bg:'#fef3c7',fg:'#92400e'}:s==='Picked up'?{bg:'#dbeafe',fg:'#1e40af'}:{bg:'#dcfce7',fg:'#166534'};
+
+  const openAdd=()=>{setEditId(null);setForm({...empty});setShowForm(true);};
+  const openEdit=(b)=>{setEditId(b.id);setForm({binNumber:b.binNumber||'',binSize:b.binSize||'20 yard',vendor:b.vendor||'',customer:b.customer||'',driver:b.driver||'',dateDropped:b.dateDropped||'',datePickedUp:b.datePickedUp||'',dateReturnedToVendor:b.dateReturnedToVendor||'',dailyRate:b.dailyRate||'',haulFee:b.haulFee||'',vendorDayRate:b.vendorDayRate||'',vendorHaulCost:b.vendorHaulCost||'',notes:b.notes||''});setShowForm(true);};
+  const save=async()=>{
+    if(!form.binNumber.trim()){alert('Bin number is required');return;}
+    if(!form.dateDropped){alert('Date dropped is required');return;}
+    const payload={...form,binNumber:form.binNumber.trim(),vendor:form.vendor.trim(),customer:form.customer.trim(),driver:form.driver.trim(),dailyRate:parseFloat(form.dailyRate)||0,haulFee:parseFloat(form.haulFee)||0,vendorDayRate:parseFloat(form.vendorDayRate)||0,vendorHaulCost:parseFloat(form.vendorHaulCost)||0};
+    if(form.vendor.trim()&&vendors.indexOf(form.vendor.trim())===-1){await api('POST','/vendors',{name:form.vendor.trim()});}
+    if(editId){await api('PUT','/bins/'+editId,payload);}else{await api('POST','/bins',payload);}
+    setShowForm(false);setEditId(null);setForm(empty);
+  };
+  const del=async(b)=>{if(!confirm('Delete bin '+b.binNumber+' / '+(b.customer||'no customer')+'?'))return;await api('DELETE','/bins/'+b.id);};
+  const quickReturn=async(b)=>{const d=prompt('Date returned to vendor (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;await api('PUT','/bins/'+b.id,{dateReturnedToVendor:d});};
+  const quickPickup=async(b)=>{const d=prompt('Date picked up from customer (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;await api('PUT','/bins/'+b.id,{datePickedUp:d});};
+
+  /* filtered table view */
+  const filtered=bins.filter(b=>{
+    if(statusFilter!=='all'&&binStatus(b)!==statusFilter)return false;
+    if(!search.trim())return true;
+    const q=search.toLowerCase();
+    return [b.binNumber,b.customer,b.vendor,b.driver,b.binSize].some(v=>(v||'').toLowerCase().includes(q));
+  }).sort((a,b)=>(b.dateDropped||'').localeCompare(a.dateDropped||''));
+
+  /* ---- monthly billing report ---- */
+  const report=useMemo(()=>{
+    const parts=reportMonth.split('-');
+    if(parts.length!==2)return{groups:[],grandTotal:0,monthLabel:''};
+    const yr=+parts[0],mo=+parts[1]-1;
+    const first=new Date(yr,mo,1,12,0,0);
+    const last=new Date(yr,mo+1,0,12,0,0);
+    const now=new Date();now.setHours(12,0,0,0);
+    const monthLabel=first.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+    const byCust={};
+    bins.forEach(b=>{
+      const drop=pd(b.dateDropped);if(!drop)return;
+      let endRaw=pd(b.datePickedUp)||now;          /* still on site -> through today */
+      if(drop>last)return;                          /* dropped after this month */
+      if(endRaw<first)return;                        /* ended before this month */
+      const ps=drop>first?drop:first;
+      const pe=endRaw<last?endRaw:last;
+      let days=pe>=ps?daysBetween(ps,pe):0;
+      const dailyRate=parseFloat(b.dailyRate)||0;
+      const haulFee=parseFloat(b.haulFee)||0;
+      const vendorDayRate=parseFloat(b.vendorDayRate)||0;
+      const vendorHaulCost=parseFloat(b.vendorHaulCost)||0;
+      const haulApplies=drop>=first&&drop<=last;     /* delivery billed in month dropped */
+      const lineTotal=days*dailyRate+(haulApplies?haulFee:0);
+      const vendorCost=days*vendorDayRate+(haulApplies?vendorHaulCost:0);
+      const margin=lineTotal-vendorCost;
+      if(days<=0&&!haulApplies)return;               /* nothing to bill this month */
+      if(lineTotal===0&&vendorCost===0&&!haulApplies&&dailyRate===0)return;
+      const cust=b.customer||'(no customer)';
+      if(!byCust[cust])byCust[cust]={customer:cust,rows:[],subtotal:0,vendorCost:0,margin:0};
+      byCust[cust].rows.push({binNumber:b.binNumber,binSize:b.binSize,vendor:b.vendor,dateDropped:b.dateDropped,datePickedUp:b.datePickedUp,days,dailyRate,haulFee:haulApplies?haulFee:0,lineTotal,vendorCost,margin});
+      byCust[cust].subtotal+=lineTotal;
+      byCust[cust].vendorCost+=vendorCost;
+      byCust[cust].margin+=margin;
+    });
+    const groups=Object.values(byCust).sort((a,b)=>a.customer.localeCompare(b.customer));
+    const grandTotal=groups.reduce((s,g)=>s+g.subtotal,0);
+    const grandCost=groups.reduce((s,g)=>s+g.vendorCost,0);
+    const grandMargin=groups.reduce((s,g)=>s+g.margin,0);
+    return{groups,grandTotal,grandCost,grandMargin,monthLabel};
+  },[bins,reportMonth]);
+
+  const money=(n)=>'$'+(Number(n)||0).toFixed(2);
+
+  const printReport=()=>{
+    const f=document.createElement('form');f.method='POST';f.action='/print-bin-report';f.target='_blank';
+    const inp=document.createElement('input');inp.type='hidden';inp.name='reportData';
+    inp.value=JSON.stringify({monthLabel:report.monthLabel,groups:report.groups,grandTotal:report.grandTotal});
+    f.appendChild(inp);document.body.appendChild(f);f.submit();document.body.removeChild(f);
+  };
+  const exportExcel=()=>{
+    const head=['Customer','Bin #','Size','Vendor','Dropped','Picked Up','Days','Day Rate','Haul Fee','Line Total'];
+    if(showMargin)head.push('Vendor Cost','Margin');
+    const rows=[head];
+    report.groups.forEach(g=>{
+      g.rows.forEach(r=>{const row=[g.customer,r.binNumber,r.binSize,r.vendor,r.dateDropped,r.datePickedUp||'On site',r.days,r.dailyRate,r.haulFee,r.lineTotal];if(showMargin)row.push(r.vendorCost,r.margin);rows.push(row);});
+      const sub=['',' ','','','','','','','Subtotal',g.subtotal];if(showMargin)sub.push(g.vendorCost,g.margin);rows.push(sub);
+    });
+    const gt=['','','','','','','','','GRAND TOTAL',report.grandTotal];if(showMargin)gt.push(report.grandCost,report.grandMargin);rows.push(gt);
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Bin Billing');
+    XLSX.writeFile(wb,'Bin-Billing-'+reportMonth+(showMargin?'-internal':'')+'.xlsx');
+  };
+
+  return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+      <div className="stitle" style={{margin:0}}>Roll-Off Bin Tracking ({bins.length})</div>
+      <button className="bp" onClick={openAdd}>+ Log Bin Movement</button>
+    </div>
+    <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Enter bins from the drivers' Daily Tickets as they drop, pick up, and return. Use the Monthly Billing Report below to bill customers.</div>
+
+    <div className="addrow">
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search bin #, customer, vendor, driver..." style={{flex:2}}/>
+      <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{maxWidth:200}}>
+        <option value="all">All statuses</option>
+        <option value="At customer">At customer</option>
+        <option value="Picked up">Picked up</option>
+        <option value="Returned to vendor">Returned to vendor</option>
+      </select>
+    </div>
+
+    <div className="rtable">
+      <table>
+        <thead><tr>
+          <th>Bin #</th><th>Size</th><th>Customer</th><th>Vendor</th><th>Driver</th><th>Dropped</th><th>Picked Up</th><th>Returned</th><th>Status</th><th>Rates</th><th></th>
+        </tr></thead>
+        <tbody>
+          {filtered.length===0&&<tr><td colSpan={11} style={{textAlign:'center',color:'var(--text-muted)',padding:24}}>No bins logged yet. Click "+ Log Bin Movement" to start.</td></tr>}
+          {filtered.map(b=>{const s=binStatus(b);const sc=statusColor(s);return(<tr key={b.id}>
+            <td style={{fontWeight:700}}>{b.binNumber}</td>
+            <td>{b.binSize}</td>
+            <td>{b.customer||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td>{b.vendor||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td>{b.driver||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td>{b.dateDropped||'—'}</td>
+            <td>{b.datePickedUp||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td>{b.dateReturnedToVendor||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td><span style={{background:sc.bg,color:sc.fg,padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>{s}</span></td>
+            <td style={{fontSize:11,whiteSpace:'nowrap'}}>{money(b.dailyRate)}/day{(parseFloat(b.haulFee)||0)>0?' + '+money(b.haulFee)+' haul':''}</td>
+            <td style={{whiteSpace:'nowrap'}}>
+              {!b.datePickedUp&&<button className="ebtn" onClick={()=>quickPickup(b)}>Pick up</button>}
+              {b.datePickedUp&&!b.dateReturnedToVendor&&<button className="ebtn" onClick={()=>quickReturn(b)}>Return</button>}
+              <button className="ebtn" onClick={()=>openEdit(b)}>Edit</button>
+              <button className="ebtn" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>del(b)}>Del</button>
+            </td>
+          </tr>);})}
+        </tbody>
+      </table>
+    </div>
+
+    {/* MONTHLY BILLING REPORT */}
+    <div className="stitle" style={{marginTop:32}}>Monthly Billing Report</div>
+    <div className="addrow" style={{alignItems:'center'}}>
+      <label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',width:'auto'}}>Billing month:</label>
+      <input type="month" value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{maxWidth:180}}/>
+      <button className="bp" onClick={printReport} disabled={report.groups.length===0}>Print / PDF</button>
+      <button onClick={exportExcel} disabled={report.groups.length===0} style={{background:'#16a34a',color:'#fff',fontWeight:600,padding:'8px 16px'}}>Export to Excel</button>
+      <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,fontWeight:600,color:'var(--text-muted)',width:'auto',cursor:'pointer',whiteSpace:'nowrap'}}>
+        <input type="checkbox" checked={showMargin} onChange={e=>setShowMargin(e.target.checked)} style={{width:'auto'}}/>Show margin (internal)
+      </label>
+    </div>
+    <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:10}}>Bills each customer for days the bin was on site during {report.monthLabel||'the selected month'} (day rate &times; days), plus the haul fee in the month the bin was dropped. Bins still on site count through today.{showMargin?' Vendor cost & margin shown for your eyes only — the printed customer bill never includes them.':''}</div>
+
+    {report.groups.length===0?(
+      <div style={{padding:24,textAlign:'center',color:'var(--text-muted)',background:'var(--bg-white)',borderRadius:10,boxShadow:'var(--shadow)'}}>No billable bin activity for {report.monthLabel||'this month'}.</div>
+    ):(
+      <div>
+        {report.groups.map((g,gi)=>(<div key={gi} style={{marginBottom:18}}>
+          <div style={{fontWeight:800,fontSize:14,background:'#eff6ff',borderLeft:'4px solid var(--primary)',padding:'6px 10px',marginBottom:6}}>{g.customer}</div>
+          <div className="rtable">
+            <table>
+              <thead><tr><th>Bin #</th><th>Size</th><th>Vendor</th><th>Dropped</th><th>Picked Up</th><th style={{textAlign:'right'}}>Days</th><th style={{textAlign:'right'}}>Day Rate</th><th style={{textAlign:'right'}}>Haul Fee</th><th style={{textAlign:'right'}}>Line Total</th>{showMargin&&<th style={{textAlign:'right',color:'#b45309'}}>Vendor Cost</th>}{showMargin&&<th style={{textAlign:'right',color:'#166534'}}>Margin</th>}</tr></thead>
+              <tbody>
+                {g.rows.map((r,ri)=>(<tr key={ri}>
+                  <td style={{fontWeight:600}}>{r.binNumber}</td><td>{r.binSize}</td><td>{r.vendor}</td><td>{r.dateDropped}</td><td>{r.datePickedUp||'On site'}</td>
+                  <td style={{textAlign:'right'}}>{r.days}</td><td style={{textAlign:'right'}}>{money(r.dailyRate)}</td><td style={{textAlign:'right'}}>{money(r.haulFee)}</td><td style={{textAlign:'right',fontWeight:700}}>{money(r.lineTotal)}</td>
+                  {showMargin&&<td style={{textAlign:'right',color:'#b45309'}}>{money(r.vendorCost)}</td>}{showMargin&&<td style={{textAlign:'right',fontWeight:700,color:r.margin<0?'var(--danger)':'#166534'}}>{money(r.margin)}</td>}
+                </tr>))}
+                <tr><td colSpan={8} style={{textAlign:'right',fontWeight:700,background:'#f8fafc'}}>Subtotal</td><td style={{textAlign:'right',fontWeight:800,background:'#f8fafc'}}>{money(g.subtotal)}</td>{showMargin&&<td style={{textAlign:'right',fontWeight:700,background:'#f8fafc',color:'#b45309'}}>{money(g.vendorCost)}</td>}{showMargin&&<td style={{textAlign:'right',fontWeight:800,background:'#f8fafc',color:g.margin<0?'var(--danger)':'#166534'}}>{money(g.margin)}</td>}</tr>
+              </tbody>
+            </table>
+          </div>
+        </div>))}
+        <div style={{marginTop:8,padding:'12px 16px',border:'3px solid var(--success)',borderRadius:10,background:'#f0fdf4',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:17,fontWeight:900}}>
+          <span>BILLED TO CUSTOMERS &mdash; {report.monthLabel}</span><span>{money(report.grandTotal)}</span>
+        </div>
+        {showMargin&&<div style={{marginTop:8,display:'flex',gap:10,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:160,padding:'10px 14px',border:'2px solid #b45309',borderRadius:10,background:'#fffbeb',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:14,fontWeight:700,color:'#92400e'}}><span>Vendor Cost</span><span>{money(report.grandCost)}</span></div>
+          <div style={{flex:1,minWidth:160,padding:'10px 14px',border:'2px solid',borderColor:report.grandMargin<0?'var(--danger)':'#166534',borderRadius:10,background:report.grandMargin<0?'#fef2f2':'#f0fdf4',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:15,fontWeight:800,color:report.grandMargin<0?'var(--danger)':'#166534'}}><span>Margin{report.grandTotal>0?' ('+Math.round(report.grandMargin/report.grandTotal*100)+'%)':''}</span><span>{money(report.grandMargin)}</span></div>
+        </div>}
+      </div>
+    )}
+
+    {/* MANAGE VENDORS */}
+    <div className="stitle" style={{marginTop:32}}>Bin Vendors (suppliers)</div>
+    <div className="addrow">
+      <input value={newVendor} onChange={e=>setNewVendor(e.target.value)} placeholder="New vendor name" onKeyDown={async e=>{if(e.key==='Enter'&&newVendor.trim()){await api('POST','/vendors',{name:newVendor.trim()});setNewVendor('');}}}/>
+      <button className="bp" onClick={async()=>{if(newVendor.trim()){await api('POST','/vendors',{name:newVendor.trim()});setNewVendor('');}}}>Add</button>
+    </div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+      {vendors.length===0&&<span style={{fontSize:12,color:'var(--text-muted)'}}>No vendors yet — they'll be added automatically when you type one on a bin, or add them here.</span>}
+      {vendors.map((v,i)=>(<span key={i} style={{background:'#f0fdf4',border:'1px solid #86efac',padding:'4px 10px',borderRadius:6,fontSize:12,display:'flex',alignItems:'center',gap:6}}>
+        {v}<span style={{cursor:'pointer',color:'#999',fontSize:10}} onClick={()=>api('DELETE','/vendors/'+encodeURIComponent(v))}>&#10005;</span>
+      </span>))}
+    </div>
+
+    {/* ADD/EDIT MODAL */}
+    {showForm&&<div className="overlay" onClick={()=>setShowForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h2>{editId?'Edit Bin Movement':'Log Bin Movement'}</h2>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div className="mrow"><label>Bin Number *</label><input value={form.binNumber} onChange={e=>setForm({...form,binNumber:e.target.value})} placeholder="e.g. RO-1042" autoFocus/></div>
+          <div className="mrow"><label>Bin Size</label><select value={form.binSize} onChange={e=>setForm({...form,binSize:e.target.value})}>{BIN_SIZES.map(s=><option key={s}>{s}</option>)}</select></div>
+          <div className="mrow"><label>Customer</label><input list="bin-cust-list" value={form.customer} onChange={e=>setForm({...form,customer:e.target.value})} placeholder="Who it's rented to"/>
+            <datalist id="bin-cust-list">{custNames.map((c,i)=><option key={i} value={c}/>)}</datalist></div>
+          <div className="mrow"><label>Vendor (supplier)</label><input list="bin-vendor-list" value={form.vendor} onChange={e=>setForm({...form,vendor:e.target.value})} placeholder="Who you rent it from"/>
+            <datalist id="bin-vendor-list">{vendors.map((v,i)=><option key={i} value={v}/>)}</datalist></div>
+          <div className="mrow"><label>Driver</label><input list="bin-driver-list" value={form.driver} onChange={e=>setForm({...form,driver:e.target.value})} placeholder="Driver who moved it"/>
+            <datalist id="bin-driver-list">{driverNames.map((d,i)=><option key={i} value={d}/>)}</datalist></div>
+          <div className="mrow"><label>Date Dropped *</label><input type="date" value={form.dateDropped} onChange={e=>setForm({...form,dateDropped:e.target.value})}/></div>
+          <div className="mrow"><label>Date Picked Up</label><input type="date" value={form.datePickedUp} onChange={e=>setForm({...form,datePickedUp:e.target.value})}/></div>
+          <div className="mrow"><label>Date Returned to Vendor</label><input type="date" value={form.dateReturnedToVendor} onChange={e=>setForm({...form,dateReturnedToVendor:e.target.value})}/></div>
+          <div className="mrow"><label>Day Rate ($/day to customer)</label><input type="number" step="0.01" value={form.dailyRate} onChange={e=>setForm({...form,dailyRate:e.target.value})} placeholder="0.00"/></div>
+          <div className="mrow"><label>Haul / Delivery Fee ($)</label><input type="number" step="0.01" value={form.haulFee} onChange={e=>setForm({...form,haulFee:e.target.value})} placeholder="0.00"/></div>
+          <div className="mrow"><label style={{color:'#b45309'}}>Vendor Day Cost ($/day you pay)</label><input type="number" step="0.01" value={form.vendorDayRate} onChange={e=>setForm({...form,vendorDayRate:e.target.value})} placeholder="0.00"/></div>
+          <div className="mrow"><label style={{color:'#b45309'}}>Vendor Haul Cost ($)</label><input type="number" step="0.01" value={form.vendorHaulCost} onChange={e=>setForm({...form,vendorHaulCost:e.target.value})} placeholder="0.00"/></div>
+        </div>
+        <div className="mrow"><label>Notes</label><textarea rows={2} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="From the Daily Ticket — anything worth noting"/></div>
+        <div style={{fontSize:11,color:'var(--text-muted)',marginTop:4}}>Flat per-haul billing? Leave Day Rate at 0 and put the flat charge in Haul / Delivery Fee.</div>
+        <div className="mactions">
+          <button className="bc" onClick={()=>setShowForm(false)}>Cancel</button>
+          <button className="bp" onClick={save}>{editId?'Save Changes':'Add Bin'}</button>
+        </div>
+      </div>
+    </div>}
+  </div>);
+}
+
 function Customers({data}){
   const [showForm,setShowForm]=useState(false);
   const [editId,setEditId]=useState(null);
