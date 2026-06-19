@@ -1220,9 +1220,24 @@ function Bins({data}){
           <div className="mrow"><label>Driver</label><input list="bin-driver-list" value={form.driver} onChange={e=>setForm({...form,driver:e.target.value})} placeholder="Driver who moved it"/>
             <datalist id="bin-driver-list">{driverNames.map((d,i)=><option key={i} value={d}/>)}</datalist></div>
           <div className="mrow"><label>Date Dropped *</label><input type="date" value={form.dateDropped} onChange={e=>setForm({...form,dateDropped:e.target.value})}/></div>
-          <div className="mrow"><label>Date Picked Up</label><input type="date" value={form.datePickedUp} onChange={e=>setForm({...form,datePickedUp:e.target.value})}/></div>
-          <div className="mrow"><label>Date To Inventory / Yard</label><input type="date" value={form.dateToInventory} onChange={e=>setForm({...form,dateToInventory:e.target.value})}/></div>
-          <div className="mrow"><label>Date Returned to Vendor</label><input type="date" value={form.dateReturnedToVendor} onChange={e=>setForm({...form,dateReturnedToVendor:e.target.value})}/></div>
+          <div className="mrow"><label>Date Picked Up</label>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <input type="date" value={form.datePickedUp} onChange={e=>setForm({...form,datePickedUp:e.target.value})}/>
+              {form.datePickedUp&&<button type="button" className="bc" style={{padding:'6px 10px',whiteSpace:'nowrap'}} onClick={()=>setForm({...form,datePickedUp:''})}>Clear</button>}
+            </div>
+          </div>
+          <div className="mrow"><label>Date To Inventory / Yard</label>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <input type="date" value={form.dateToInventory} onChange={e=>setForm({...form,dateToInventory:e.target.value})}/>
+              {form.dateToInventory&&<button type="button" className="bc" style={{padding:'6px 10px',whiteSpace:'nowrap'}} onClick={()=>setForm({...form,dateToInventory:''})}>Clear</button>}
+            </div>
+          </div>
+          <div className="mrow"><label>Date Returned to Vendor</label>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <input type="date" value={form.dateReturnedToVendor} onChange={e=>setForm({...form,dateReturnedToVendor:e.target.value})}/>
+              {form.dateReturnedToVendor&&<button type="button" className="bc" style={{padding:'6px 10px',whiteSpace:'nowrap'}} onClick={()=>setForm({...form,dateReturnedToVendor:''})}>Clear</button>}
+            </div>
+          </div>
           <div className="mrow"><label>Day Rate ($/day to customer)</label><input type="number" step="0.01" value={form.dailyRate} onChange={e=>setForm({...form,dailyRate:e.target.value})} placeholder="0.00"/></div>
           <div className="mrow"><label>Haul / Delivery Fee ($)</label><input type="number" step="0.01" value={form.haulFee} onChange={e=>setForm({...form,haulFee:e.target.value})} placeholder="0.00"/></div>
           <div className="mrow"><label style={{color:'#b45309'}}>Vendor Day Cost ($/day you pay)</label><input type="number" step="0.01" value={form.vendorDayRate} onChange={e=>setForm({...form,vendorDayRate:e.target.value})} placeholder="0.00"/></div>
@@ -1230,6 +1245,7 @@ function Bins({data}){
         </div>
         <div className="mrow"><label>Notes</label><textarea rows={2} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="From the Daily Ticket — anything worth noting"/></div>
         <div style={{fontSize:11,color:'var(--text-muted)',marginTop:4}}>Flat per-haul billing? Leave Day Rate at 0 and put the flat charge in Haul / Delivery Fee.</div>
+        <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>Set a date by mistake? Click <strong>Clear</strong> next to it and Save — e.g. clearing Date Picked Up sets the bin back to “At customer.”</div>
         <div className="mactions">
           <button className="bc" onClick={()=>setShowForm(false)}>Cancel</button>
           <button className="bp" onClick={save}>{editId?'Save Changes':'Add Bin'}</button>
