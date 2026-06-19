@@ -742,6 +742,370 @@ app.post('/print-bin-report', function(req, res) {
   res.send(html);
 });
 
+// WASTE PROFILES
+var PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
+
+function loadProfiles() {
+  try {
+    if (fs.existsSync(PROFILES_FILE)) return JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8'));
+  } catch(e) { console.error('Error loading profiles:', e.message); }
+  return [];
+}
+function saveProfiles(p) { fs.writeFileSync(PROFILES_FILE, JSON.stringify(p, null, 2)); }
+var profiles = loadProfiles();
+
+app.get('/api/profiles', function(req, res) { res.json(profiles); });
+
+app.post('/api/profiles', function(req, res) {
+  var profile = Object.assign({}, req.body, { id: 'prof' + Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  profiles.push(profile);
+  saveProfiles(profiles);
+  res.json(profile);
+});
+
+app.put('/api/profiles/:id', function(req, res) {
+  var idx = profiles.findIndex(function(p) { return p.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(profiles[idx], req.body, { updatedAt: new Date().toISOString() });
+  saveProfiles(profiles);
+  res.json(profiles[idx]);
+});
+
+app.delete('/api/profiles/:id', function(req, res) {
+  profiles = profiles.filter(function(p) { return p.id !== req.params.id; });
+  saveProfiles(profiles);
+  res.json({ok:true});
+});
+
+// SDS PARSING
+var pdfParse;
+try { pdfParse = require('pdf-parse'); } catch(e) { console.log('pdf-parse not available, SDS parsing disabled'); }
+
+function parseSDS(text) {
+  var result = {
+    chemicals: [],
+    unNumber: '',
+    properShippingName: '',
+    hazardClass: '',
+    packingGroup: '',
+    flashPoint: '',
+    pH: '',
+    physicalState: '',
+    color: '',
+    odor: '',
+    epaWasteCodes: [],
+    caWasteCodes: [],
+    hazardStatements: []
+  };
+
+  // Normalize text
+  var t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Extract sections
+  function getSection(num) {
+    var patterns = [
+      new RegExp('(?:SECTION\\s+' + num + '[:\\s.-]+|' + num + '\\s*[.)]\\s*)', 'i'),
+    ];
+    var startIdx = -1;
+    for (var p = 0; p < patterns.length; p++) {
+      var m = t.search(patterns[p]);
+      if (m !== -1) { startIdx = m; break; }
+    }
+    if (startIdx === -1) return '';
+    var nextSection = num + 1;
+    var endPatterns = [
+      new RegExp('(?:SECTION\\s+' + nextSection + '[:\\s.-]+|' + nextSection + '\\s*[.)]\\s*)', 'i'),
+      /(?:SECTION\s+\d+[:\s.-]+)/i
+    ];
+    var endIdx = t.length;
+    for (var p = 0; p < endPatterns.length; p++) {
+      var sub = t.substring(startIdx + 10);
+      var em = sub.search(endPatterns[p]);
+      if (em !== -1) { endIdx = startIdx + 10 + em; break; }
+    }
+    return t.substring(startIdx, endIdx);
+  }
+
+  // Section 3: Composition
+  var sec3 = getSection(3);
+  if (sec3) {
+    // Look for CAS numbers and chemical names
+    var casPattern = /(\d{2,7}-\d{2}-\d)/g;
+    var casMatch;
+    var casNumbers = [];
+    while ((casMatch = casPattern.exec(sec3)) !== null) {
+      casNumbers.push({ cas: casMatch[1], index: casMatch.index });
+    }
+
+    // For each CAS, try to find chemical name and percentage
+    var lines = sec3.split('\n');
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li].trim();
+      if (!line) continue;
+      var lineCas = line.match(/(\d{2,7}-\d{2}-\d)/);
+      if (lineCas) {
+        var pctMatch = line.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)\s*%/) || line.match(/[<>≤≥]?\s*(\d+\.?\d*)\s*%/);
+        var pct = pctMatch ? pctMatch[0] : '';
+        // Chemical name is typically before the CAS number
+        var beforeCas = line.substring(0, line.indexOf(lineCas[1])).trim();
+        // Clean up common prefixes/suffixes
+        beforeCas = beforeCas.replace(/[-–|,\s]+$/, '').trim();
+        if (!beforeCas) {
+          // Check previous line for name
+          if (li > 0) beforeCas = lines[li-1].trim().replace(/[-–|,\s]+$/, '').trim();
+        }
+        if (beforeCas && beforeCas.length > 2 && beforeCas.length < 100) {
+          result.chemicals.push({ name: beforeCas, cas: lineCas[1], percentage: pct });
+        }
+      }
+    }
+
+    // If no CAS-based parsing worked, try percentage-based
+    if (result.chemicals.length === 0) {
+      for (var li = 0; li < lines.length; li++) {
+        var line = lines[li].trim();
+        var pctMatch = line.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)\s*%/) || line.match(/(\d+\.?\d*)\s*%/);
+        if (pctMatch && line.length > 5) {
+          var name = line.replace(pctMatch[0], '').replace(/[-–|,\s]+$/, '').replace(/^[-–|,\s]+/, '').trim();
+          if (name.length > 2 && name.length < 80) {
+            result.chemicals.push({ name: name, cas: '', percentage: pctMatch[0] });
+          }
+        }
+      }
+    }
+  }
+
+  // Section 14: Transport
+  var sec14 = getSection(14);
+  if (sec14) {
+    var unMatch = sec14.match(/UN\s*(\d{4})/i);
+    if (unMatch) result.unNumber = 'UN' + unMatch[1];
+
+    var shipMatch = sec14.match(/(?:proper\s+shipping\s+name|shipping\s+name)[:\s]*([^\n]+)/i);
+    if (shipMatch) result.properShippingName = shipMatch[1].trim().replace(/^[:\s]+/, '');
+
+    var hcMatch = sec14.match(/(?:hazard\s+class|class)[:\s]*(\d+\.?\d*)/i);
+    if (hcMatch) result.hazardClass = hcMatch[1];
+
+    var pgMatch = sec14.match(/(?:packing\s+group|pkg\.?\s*group|PG)[:\s]*(I{1,3}|[123])/i);
+    if (pgMatch) {
+      var pg = pgMatch[1];
+      if (pg === '1') pg = 'I';
+      else if (pg === '2') pg = 'II';
+      else if (pg === '3') pg = 'III';
+      result.packingGroup = pg;
+    }
+  }
+
+  // Section 9: Physical properties
+  var sec9 = getSection(9);
+  if (sec9) {
+    var fpMatch = sec9.match(/(?:flash\s*point)[:\s]*([^\n]{3,40})/i);
+    if (fpMatch) result.flashPoint = fpMatch[1].trim();
+
+    var phMatch = sec9.match(/(?:^|\s)pH[:\s]*(\d+\.?\d*(?:\s*[-–]\s*\d+\.?\d*)?)/im);
+    if (phMatch) result.pH = phMatch[1].trim();
+
+    var stateMatch = sec9.match(/(?:physical\s+state|form|appearance)[:\s]*([^\n]{3,30})/i);
+    if (stateMatch) {
+      var st = stateMatch[1].toLowerCase();
+      if (st.includes('liquid')) result.physicalState = 'Liquid';
+      else if (st.includes('solid')) result.physicalState = 'Solid';
+      else if (st.includes('gas')) result.physicalState = 'Gas';
+      else if (st.includes('powder')) result.physicalState = 'Solid';
+      else result.physicalState = stateMatch[1].trim();
+    }
+
+    var colorMatch = sec9.match(/(?:color|colour)[:\s]*([^\n]{2,30})/i);
+    if (colorMatch) result.color = colorMatch[1].trim();
+
+    var odorMatch = sec9.match(/(?:odor|odour|smell)[:\s]*([^\n]{2,30})/i);
+    if (odorMatch) result.odor = odorMatch[1].trim();
+  }
+
+  // Section 15: Regulatory
+  var sec15 = getSection(15);
+  if (sec15) {
+    var rcraMatch = sec15.match(/[DFKPU]\d{3}/g);
+    if (rcraMatch) result.epaWasteCodes = Array.from(new Set(rcraMatch));
+  }
+
+  // Section 2: Hazard statements
+  var sec2 = getSection(2);
+  if (sec2) {
+    var hStatements = sec2.match(/H\d{3}/g);
+    if (hStatements) result.hazardStatements = Array.from(new Set(hStatements));
+  }
+
+  // Suggest waste codes based on findings
+  suggestWasteCodes(result);
+
+  return result;
+}
+
+// RCRA D-code lookup by CAS number
+var RCRA_TC_LOOKUP = {
+  '7440-38-2': 'D004', // Arsenic
+  '7440-39-3': 'D005', // Barium
+  '71-43-2': 'D018',   // Benzene
+  '7440-43-9': 'D006', // Cadmium
+  '56-23-5': 'D019',   // Carbon tetrachloride
+  '57-74-9': 'D020',   // Chlordane
+  '67-66-3': 'D022',   // Chloroform
+  '7440-47-3': 'D007', // Chromium
+  '72-54-8': 'D023',   // o-Cresol
+  '108-39-4': 'D024',  // m-Cresol
+  '106-44-5': 'D025',  // p-Cresol
+  '94-75-7': 'D016',   // 2,4-D
+  '106-46-7': 'D027',  // 1,4-Dichlorobenzene
+  '107-06-2': 'D028',  // 1,2-Dichloroethane
+  '75-35-4': 'D029',   // 1,1-Dichloroethylene
+  '121-14-2': 'D030',  // 2,4-Dinitrotoluene
+  '72-20-8': 'D031',   // Endrin
+  '76-44-8': 'D032',   // Heptachlor
+  '118-74-1': 'D033',  // Hexachlorobenzene
+  '87-68-3': 'D034',   // Hexachlorobutadiene
+  '67-72-1': 'D034',   // Hexachloroethane (also D034)
+  '7439-92-1': 'D008', // Lead
+  '58-89-9': 'D013',   // Lindane
+  '7439-97-6': 'D009', // Mercury
+  '72-43-5': 'D014',   // Methoxychlor
+  '78-93-3': 'D035',   // Methyl ethyl ketone
+  '98-95-3': 'D036',   // Nitrobenzene
+  '87-86-5': 'D037',   // Pentachlorophenol
+  '110-86-1': 'D038',  // Pyridine
+  '7782-49-2': 'D010', // Selenium
+  '7440-22-4': 'D011', // Silver
+  '127-18-4': 'D039',  // Tetrachloroethylene
+  '8001-35-2': 'D015', // Toxaphene
+  '79-01-6': 'D040',   // Trichloroethylene
+  '95-95-4': 'D041',   // 2,4,5-Trichlorophenol
+  '88-06-2': 'D042',   // 2,4,6-Trichlorophenol
+  '75-01-4': 'D043',   // Vinyl chloride
+  '93-72-1': 'D017',   // 2,4,5-TP (Silvex)
+};
+
+function suggestWasteCodes(result) {
+  var suggested = result.epaWasteCodes.slice();
+  var caSuggested = result.caWasteCodes.slice();
+
+  // Check chemicals against RCRA TC lookup
+  result.chemicals.forEach(function(chem) {
+    if (chem.cas && RCRA_TC_LOOKUP[chem.cas]) {
+      var code = RCRA_TC_LOOKUP[chem.cas];
+      if (suggested.indexOf(code) === -1) suggested.push(code);
+    }
+  });
+
+  // D001 - Ignitability (flash point < 140F / 60C)
+  if (result.flashPoint) {
+    var fpNum = parseFloat(result.flashPoint.replace(/[^\d.-]/g, ''));
+    var isFahrenheit = result.flashPoint.toLowerCase().includes('f') || !result.flashPoint.toLowerCase().includes('c');
+    if (!isNaN(fpNum)) {
+      if ((isFahrenheit && fpNum < 140) || (!isFahrenheit && fpNum < 60)) {
+        if (suggested.indexOf('D001') === -1) suggested.push('D001');
+        if (caSuggested.indexOf('131') === -1) caSuggested.push('131');
+      }
+    }
+  }
+
+  // D002 - Corrosivity (pH <= 2 or pH >= 12.5)
+  if (result.pH) {
+    var phNum = parseFloat(result.pH);
+    if (!isNaN(phNum)) {
+      if (phNum <= 2 || phNum >= 12.5) {
+        if (suggested.indexOf('D002') === -1) suggested.push('D002');
+        if (phNum <= 2 && caSuggested.indexOf('132') === -1) caSuggested.push('132');
+        if (phNum >= 12.5 && caSuggested.indexOf('132') === -1) caSuggested.push('132');
+      }
+    }
+  }
+
+  // California waste codes based on physical state and content
+  var hasMetals = result.chemicals.some(function(c) {
+    return ['7439-92-1','7440-47-3','7440-43-9','7440-38-2','7439-97-6','7782-49-2','7440-22-4','7440-39-3'].indexOf(c.cas) !== -1;
+  });
+  var hasOrganics = result.chemicals.some(function(c) {
+    return ['71-43-2','127-18-4','79-01-6','67-66-3','78-93-3','108-88-3','1330-20-7','100-41-4','75-09-2','110-54-3'].indexOf(c.cas) !== -1;
+  });
+  var hasSolvents = result.hazardClass === '3' || (result.properShippingName || '').toLowerCase().includes('solvent');
+  var isLiquid = (result.physicalState || '').toLowerCase() === 'liquid';
+
+  if (hasMetals && isLiquid && caSuggested.indexOf('721') === -1) caSuggested.push('721');
+  if (hasMetals && !isLiquid && caSuggested.indexOf('181') === -1) caSuggested.push('181');
+  if (hasOrganics && isLiquid && caSuggested.indexOf('741') === -1) caSuggested.push('741');
+  if (hasSolvents && caSuggested.indexOf('214') === -1) caSuggested.push('214');
+  if (isLiquid && !hasMetals && !hasOrganics && caSuggested.indexOf('151') === -1) caSuggested.push('151');
+
+  result.epaWasteCodes = suggested;
+  result.caWasteCodes = caSuggested;
+}
+
+app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
+  if (!pdfParse) return res.status(500).json({ error: 'pdf-parse not installed' });
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+
+  var allResults = [];
+  var mergedResult = {
+    chemicals: [],
+    unNumber: '',
+    properShippingName: '',
+    hazardClass: '',
+    packingGroup: '',
+    flashPoint: '',
+    pH: '',
+    physicalState: '',
+    color: '',
+    odor: '',
+    epaWasteCodes: [],
+    caWasteCodes: [],
+    hazardStatements: [],
+    sdsFiles: []
+  };
+
+  for (var i = 0; i < req.files.length; i++) {
+    var file = req.files[i];
+    try {
+      var dataBuffer = fs.readFileSync(file.path);
+      var pdfData = await pdfParse(dataBuffer);
+      var parsed = parseSDS(pdfData.text);
+      parsed.fileName = file.originalname;
+      allResults.push(parsed);
+      mergedResult.sdsFiles.push({ id: 'sds' + Date.now() + i, name: file.originalname, filename: file.filename });
+
+      // Merge chemicals (avoid duplicates by CAS)
+      parsed.chemicals.forEach(function(c) {
+        var exists = mergedResult.chemicals.some(function(mc) { return mc.cas && mc.cas === c.cas; });
+        if (!exists) mergedResult.chemicals.push(c);
+      });
+
+      // Take first non-empty values
+      if (!mergedResult.unNumber && parsed.unNumber) mergedResult.unNumber = parsed.unNumber;
+      if (!mergedResult.properShippingName && parsed.properShippingName) mergedResult.properShippingName = parsed.properShippingName;
+      if (!mergedResult.hazardClass && parsed.hazardClass) mergedResult.hazardClass = parsed.hazardClass;
+      if (!mergedResult.packingGroup && parsed.packingGroup) mergedResult.packingGroup = parsed.packingGroup;
+      if (!mergedResult.flashPoint && parsed.flashPoint) mergedResult.flashPoint = parsed.flashPoint;
+      if (!mergedResult.pH && parsed.pH) mergedResult.pH = parsed.pH;
+      if (!mergedResult.physicalState && parsed.physicalState) mergedResult.physicalState = parsed.physicalState;
+      if (!mergedResult.color && parsed.color) mergedResult.color = parsed.color;
+      if (!mergedResult.odor && parsed.odor) mergedResult.odor = parsed.odor;
+
+      // Merge waste codes
+      parsed.epaWasteCodes.forEach(function(c) { if (mergedResult.epaWasteCodes.indexOf(c) === -1) mergedResult.epaWasteCodes.push(c); });
+      parsed.caWasteCodes.forEach(function(c) { if (mergedResult.caWasteCodes.indexOf(c) === -1) mergedResult.caWasteCodes.push(c); });
+      parsed.hazardStatements.forEach(function(h) { if (mergedResult.hazardStatements.indexOf(h) === -1) mergedResult.hazardStatements.push(h); });
+    } catch(e) {
+      console.error('Error parsing SDS ' + file.originalname + ':', e.message);
+      allResults.push({ fileName: file.originalname, error: e.message });
+    }
+  }
+
+  // Re-run waste code suggestions on merged result
+  suggestWasteCodes(mergedResult);
+
+  res.json({ merged: mergedResult, individual: allResults });
+});
+
 function getLocalIP() {
   var interfaces = os.networkInterfaces();
   var keys = Object.keys(interfaces);
