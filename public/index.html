@@ -885,7 +885,7 @@ function CapitolCalendar({data}) {
 
 /* ============ CUSTOMERS ============ */
 function Bins({data}){
-  const BIN_SIZES=['20 yard','40 yard'];
+  const BIN_SIZES=['10 yard','20 yard','40 yard'];
   const empty={binNumber:'',binSize:'20 yard',vendor:'',customer:'',driver:'',dateDropped:'',datePickedUp:'',dateToInventory:'',dateReturnedToVendor:'',dailyRate:'',haulFee:'',vendorDayRate:'',vendorHaulCost:'',notes:''};
   const [showForm,setShowForm]=useState(false);
   const [editId,setEditId]=useState(null);
@@ -893,12 +893,17 @@ function Bins({data}){
   const [search,setSearch]=useState('');
   const [statusFilter,setStatusFilter]=useState('all');
   const [showMargin,setShowMargin]=useState(false);
+  const ubEmpty={binNumber:'',vendor:'',amount:'',dateBilled:'',status:'Open',notes:''};
+  const [ubForm,setUbForm]=useState(ubEmpty);
+  const [showUbForm,setShowUbForm]=useState(false);
+  const [ubEditId,setUbEditId]=useState(null);
   const [newVendor,setNewVendor]=useState('');
   const today=new Date();
   const [reportMonth,setReportMonth]=useState(()=>today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0'));
 
   const bins=data.bins||[];
   const vendors=data.vendors||[];
+  const unbilled=data.unbilled||[];
   const custNames=(data.customers||[]).map(c=>c.name).filter(Boolean).sort();
   const driverNames=(data.drivers||[]).map(d=>d.name).filter(Boolean);
 
@@ -922,6 +927,21 @@ function Bins({data}){
   const quickReturn=async(b)=>{const d=prompt('Date returned to vendor (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;const patch={dateReturnedToVendor:d};if(!b.datePickedUp)patch.datePickedUp=d;await api('PUT','/bins/'+b.id,patch);};
   const quickInventory=async(b)=>{const d=prompt('Date put into our inventory / yard (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;const patch={dateToInventory:d};if(!b.datePickedUp)patch.datePickedUp=d;await api('PUT','/bins/'+b.id,patch);};
   const quickPickup=async(b)=>{const d=prompt('Date picked up from customer (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;await api('PUT','/bins/'+b.id,{datePickedUp:d});};
+
+  /* ---- Unaccounted bins (vendor-billed, not in tracking) ---- */
+  const inTracking=(num)=>!!num&&bins.some(b=>(b.binNumber||'').toLowerCase()===num.toLowerCase());
+  const ubStatusColor=(s)=>s==='Resolved'?{bg:'#dcfce7',fg:'#166534'}:s==='Investigating'?{bg:'#fef3c7',fg:'#92400e'}:{bg:'#fee2e2',fg:'#b91c1c'};
+  const ubOpenAdd=()=>{setUbEditId(null);setUbForm({...ubEmpty});setShowUbForm(true);};
+  const ubOpenEdit=(u)=>{setUbEditId(u.id);setUbForm({binNumber:u.binNumber||'',vendor:u.vendor||'',amount:u.amount||'',dateBilled:u.dateBilled||'',status:u.status||'Open',notes:u.notes||''});setShowUbForm(true);};
+  const ubSave=async()=>{
+    if(!ubForm.binNumber.trim()&&!ubForm.vendor.trim()){alert('Enter at least a bin number or vendor.');return;}
+    const payload={...ubForm,binNumber:ubForm.binNumber.trim(),vendor:ubForm.vendor.trim(),amount:parseFloat(ubForm.amount)||0};
+    if(ubForm.vendor.trim()&&vendors.indexOf(ubForm.vendor.trim())===-1){await api('POST','/vendors',{name:ubForm.vendor.trim()});}
+    if(ubEditId){await api('PUT','/unbilled/'+ubEditId,payload);}else{await api('POST','/unbilled',payload);}
+    setShowUbForm(false);setUbEditId(null);setUbForm(ubEmpty);
+  };
+  const ubDel=async(u)=>{if(!confirm('Remove this entry'+(u.binNumber?' for bin '+u.binNumber:'')+'?'))return;await api('DELETE','/unbilled/'+u.id);};
+  const ubSetStatus=async(u,status)=>{await api('PUT','/unbilled/'+u.id,{status});};
 
   /* filtered table view */
   const filtered=bins.filter(b=>{
@@ -1000,6 +1020,7 @@ function Bins({data}){
   const money=(n)=>'$'+(Number(n)||0).toFixed(2);
   const visibleGroups=showMargin?report.groups:report.groups.filter(g=>!g.idle);
   const billableGroups=report.groups.filter(g=>!g.idle);
+  const unbilledOpenTotal=unbilled.filter(u=>u.status!=='Resolved').reduce((s,u)=>s+(parseFloat(u.amount)||0),0);
 
   const printReport=()=>{
     const f=document.createElement('form');f.method='POST';f.action='/print-bin-report';f.target='_blank';
@@ -1113,6 +1134,35 @@ function Bins({data}){
       </div>
     )}
 
+    {/* UNACCOUNTED BINS */}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10,marginTop:32}}>
+      <div className="stitle" style={{margin:0}}>Unaccounted Bins ({unbilled.length})</div>
+      <button className="bp" onClick={ubOpenAdd}>+ Add Unaccounted Bin</button>
+    </div>
+    <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 12px'}}>For the biller: log bins a vendor is charging us for that aren't in the tracking list above, so they can be found or explained. {unbilledOpenTotal>0?'Open / investigating total: '+money(unbilledOpenTotal):''}</div>
+    <div className="rtable">
+      <table>
+        <thead><tr><th>Bin #</th><th>Vendor</th><th style={{textAlign:'right'}}>Amount</th><th>Date Billed</th><th>In Tracking?</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+        <tbody>
+          {unbilled.length===0&&<tr><td colSpan={8} style={{textAlign:'center',color:'var(--text-muted)',padding:20}}>Nothing logged. Use this when a vendor bills for a bin you can't find in tracking.</td></tr>}
+          {unbilled.map(u=>{const sc=ubStatusColor(u.status||'Open');const tracked=inTracking(u.binNumber);return(<tr key={u.id} style={{opacity:u.status==='Resolved'?0.55:1}}>
+            <td style={{fontWeight:600}}>{u.binNumber||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td>{u.vendor||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td style={{textAlign:'right'}}>{money(u.amount)}</td>
+            <td>{u.dateBilled||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td>{u.binNumber?(tracked?<span style={{color:'#166534',fontWeight:600}}>Yes</span>:<span style={{color:'#b91c1c',fontWeight:600}}>Not found</span>):<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td><select value={u.status||'Open'} onChange={e=>ubSetStatus(u,e.target.value)} style={{width:'auto',padding:'2px 8px',fontSize:11,background:sc.bg,color:sc.fg,fontWeight:600,border:'none',borderRadius:10}}>
+              <option>Open</option><option>Investigating</option><option>Resolved</option></select></td>
+            <td style={{fontSize:11,maxWidth:220,whiteSpace:'normal'}}>{u.notes||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
+            <td style={{whiteSpace:'nowrap'}}>
+              <button className="ebtn" onClick={()=>ubOpenEdit(u)}>Edit</button>
+              <button className="ebtn" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>ubDel(u)}>Del</button>
+            </td>
+          </tr>);})}
+        </tbody>
+      </table>
+    </div>
+
     {/* MANAGE VENDORS */}
     <div className="stitle" style={{marginTop:32}}>Bin Vendors (suppliers)</div>
     <div className="addrow">
@@ -1153,6 +1203,27 @@ function Bins({data}){
         <div className="mactions">
           <button className="bc" onClick={()=>setShowForm(false)}>Cancel</button>
           <button className="bp" onClick={save}>{editId?'Save Changes':'Add Bin'}</button>
+        </div>
+      </div>
+    </div>}
+
+    {/* UNACCOUNTED BIN ADD/EDIT MODAL */}
+    {showUbForm&&<div className="overlay" onClick={()=>setShowUbForm(false)}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <h2>{ubEditId?'Edit Unaccounted Bin':'Add Unaccounted Bin'}</h2>
+        <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>A bin a vendor is billing us for that isn't in tracking. Record what you know and use Notes/Status to work it.</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div className="mrow"><label>Bin Number</label><input value={ubForm.binNumber} onChange={e=>setUbForm({...ubForm,binNumber:e.target.value})} placeholder="From the vendor invoice" autoFocus/></div>
+          <div className="mrow"><label>Vendor</label><input list="ub-vendor-list" value={ubForm.vendor} onChange={e=>setUbForm({...ubForm,vendor:e.target.value})} placeholder="Who billed us"/>
+            <datalist id="ub-vendor-list">{vendors.map((v,i)=><option key={i} value={v}/>)}</datalist></div>
+          <div className="mrow"><label>Amount Billed ($)</label><input type="number" step="0.01" value={ubForm.amount} onChange={e=>setUbForm({...ubForm,amount:e.target.value})} placeholder="0.00"/></div>
+          <div className="mrow"><label>Date Billed</label><input type="date" value={ubForm.dateBilled} onChange={e=>setUbForm({...ubForm,dateBilled:e.target.value})}/></div>
+          <div className="mrow"><label>Status</label><select value={ubForm.status} onChange={e=>setUbForm({...ubForm,status:e.target.value})}><option>Open</option><option>Investigating</option><option>Resolved</option></select></div>
+        </div>
+        <div className="mrow"><label>Notes / What Happened</label><textarea rows={3} value={ubForm.notes} onChange={e=>setUbForm({...ubForm,notes:e.target.value})} placeholder="What you found, who you called, where the bin might be, etc."/></div>
+        <div className="mactions">
+          <button className="bc" onClick={()=>setShowUbForm(false)}>Cancel</button>
+          <button className="bp" onClick={ubSave}>{ubEditId?'Save Changes':'Add'}</button>
         </div>
       </div>
     </div>}
