@@ -795,7 +795,11 @@ function parseSDS(text) {
     odor: '',
     epaWasteCodes: [],
     caWasteCodes: [],
-    hazardStatements: []
+    hazardStatements: [],
+    toxicity: [],
+    reactivityFlags: [],
+    incompatibles: '',
+    stabilityNotes: ''
   };
 
   // Normalize text
@@ -937,8 +941,68 @@ function parseSDS(text) {
     if (hStatements) result.hazardStatements = Array.from(new Set(hStatements));
   }
 
+  // Section 10: Stability and Reactivity
+  var sec10 = getSection(10);
+  if (sec10) {
+    var incompMatch = sec10.match(/(?:incompatible|incompatibility|materials to avoid)[:\s]*([^\n]+(?:\n(?!SECTION)[^\n]+)*)/i);
+    if (incompMatch) result.incompatibles = incompMatch[1].trim().replace(/\n/g, '; ').substring(0, 200);
+
+    var stabMatch = sec10.match(/(?:conditions to avoid|hazardous decomposition|thermal decomposition)[:\s]*([^\n]+)/i);
+    if (stabMatch) result.stabilityNotes = stabMatch[1].trim().substring(0, 200);
+
+    // Check for reactivity keywords
+    var sec10lower = sec10.toLowerCase();
+    if (sec10lower.includes('water reactive') || sec10lower.includes('reacts with water') || sec10lower.includes('reacts violently with water'))
+      result.reactivityFlags.push('Water-reactive');
+    if (sec10lower.includes('oxidiz') || sec10lower.includes('strong oxidizer') || sec10lower.includes('oxidising'))
+      result.reactivityFlags.push('Oxidizer');
+    if (sec10lower.includes('air reactive') || sec10lower.includes('pyrophoric') || sec10lower.includes('spontaneously combustible'))
+      result.reactivityFlags.push('Air-reactive / Pyrophoric');
+    if (sec10lower.includes('explosive') || sec10lower.includes('shock sensitive'))
+      result.reactivityFlags.push('Explosive / Shock-sensitive');
+    if (sec10lower.includes('polymeriz'))
+      result.reactivityFlags.push('May polymerize');
+  }
+
+  // Section 11: Toxicological Information
+  var sec11 = getSection(11);
+  if (sec11) {
+    // Extract LD50 values
+    var ld50Pattern = /LD50\s*(?:\(([^)]+)\))?\s*[:\s]*([^\n]*\d[\d,.\s]*(?:mg\/kg|g\/kg)[^\n]*)/gi;
+    var ld50Match;
+    while ((ld50Match = ld50Pattern.exec(sec11)) !== null) {
+      result.toxicity.push({
+        type: 'LD50',
+        route: (ld50Match[1] || 'Oral').trim(),
+        value: ld50Match[2].trim().substring(0, 80),
+        species: ''
+      });
+    }
+
+    // Extract LC50 values
+    var lc50Pattern = /LC50\s*(?:\(([^)]+)\))?\s*[:\s]*([^\n]*\d[\d,.\s]*(?:mg\/[Lm]|ppm)[^\n]*)/gi;
+    var lc50Match;
+    while ((lc50Match = lc50Pattern.exec(sec11)) !== null) {
+      result.toxicity.push({
+        type: 'LC50',
+        route: (lc50Match[1] || 'Inhalation').trim(),
+        value: lc50Match[2].trim().substring(0, 80),
+        species: ''
+      });
+    }
+
+    // Check for acute toxicity category
+    var sec11lower = sec11.toLowerCase();
+    if (sec11lower.includes('category 1') || sec11lower.includes('fatal'))
+      result.reactivityFlags.push('Acute Toxicity Cat 1 (Fatal)');
+    else if (sec11lower.includes('category 2') && sec11lower.includes('fatal'))
+      result.reactivityFlags.push('Acute Toxicity Cat 2 (Fatal)');
+  }
+
   // Suggest waste codes based on findings
   suggestWasteCodes(result);
+
+  estimateMixtureProps(result);
 
   return result;
 }
@@ -983,6 +1047,176 @@ var RCRA_TC_LOOKUP = {
   '88-06-2': 'D042',   // 2,4,6-Trichlorophenol
   '75-01-4': 'D043',   // Vinyl chloride
   '93-72-1': 'D017',   // 2,4,5-TP (Silvex)
+};
+
+var UHC_LOOKUP = {
+  // D004-D011 Metals
+  '7440-38-2': { name: 'Arsenic', code: 'D004', wwStd: '5.0', nwStd: '5.0', units: 'mg/L TCLP', technology: 'Stabilization' },
+  '7440-39-3': { name: 'Barium', code: 'D005', wwStd: '100', nwStd: '100', units: 'mg/L TCLP', technology: 'Stabilization' },
+  '7440-43-9': { name: 'Cadmium', code: 'D006', wwStd: '1.0', nwStd: '1.0', units: 'mg/L TCLP', technology: 'Stabilization' },
+  '7440-47-3': { name: 'Chromium', code: 'D007', wwStd: '5.0', nwStd: '5.0', units: 'mg/L TCLP', technology: 'Stabilization' },
+  '7439-92-1': { name: 'Lead', code: 'D008', wwStd: '5.0', nwStd: '5.0', units: 'mg/L TCLP', technology: 'Stabilization' },
+  '7439-97-6': { name: 'Mercury', code: 'D009', wwStd: '0.2', nwStd: '0.2', units: 'mg/L TCLP', technology: 'Stabilization' },
+  '7782-49-2': { name: 'Selenium', code: 'D010', wwStd: '1.0', nwStd: '1.0', units: 'mg/L TCLP', technology: 'Stabilization' },
+  '7440-22-4': { name: 'Silver', code: 'D011', wwStd: '5.0', nwStd: '5.0', units: 'mg/L TCLP', technology: 'Stabilization' },
+  // D012-D017 Pesticides
+  '72-20-8': { name: 'Endrin', code: 'D012', wwStd: '0.02', nwStd: '0.13', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '58-89-9': { name: 'Lindane', code: 'D013', wwStd: '0.4', nwStd: '0.066', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '72-43-5': { name: 'Methoxychlor', code: 'D014', wwStd: '10', nwStd: '0.18', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '8001-35-2': { name: 'Toxaphene', code: 'D015', wwStd: '0.5', nwStd: '2.6', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '94-75-7': { name: '2,4-D', code: 'D016', wwStd: '10', nwStd: '10', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '93-72-1': { name: '2,4,5-TP (Silvex)', code: 'D017', wwStd: '1.0', nwStd: '7.9', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  // D018-D043 Organics (common ones)
+  '71-43-2': { name: 'Benzene', code: 'D018', wwStd: '0.5', nwStd: '10', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '56-23-5': { name: 'Carbon tetrachloride', code: 'D019', wwStd: '0.5', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '57-74-9': { name: 'Chlordane', code: 'D020', wwStd: '0.03', nwStd: '0.26', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '108-90-7': { name: 'Chlorobenzene', code: 'D021', wwStd: '100', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '67-66-3': { name: 'Chloroform', code: 'D022', wwStd: '6.0', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '108-39-4': { name: 'm-Cresol', code: 'D024', wwStd: '200', nwStd: '5.6', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '95-48-7': { name: 'o-Cresol', code: 'D023', wwStd: '200', nwStd: '5.6', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '106-44-5': { name: 'p-Cresol', code: 'D025', wwStd: '200', nwStd: '5.6', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '106-46-7': { name: '1,4-Dichlorobenzene', code: 'D027', wwStd: '6.0', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '107-06-2': { name: '1,2-Dichloroethane', code: 'D028', wwStd: '6.0', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '75-35-4': { name: '1,1-Dichloroethylene', code: 'D029', wwStd: '6.0', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '121-14-2': { name: '2,4-Dinitrotoluene', code: 'D030', wwStd: '0.13', nwStd: '140', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '76-44-8': { name: 'Heptachlor', code: 'D031', wwStd: '0.008', nwStd: '0.066', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '118-74-1': { name: 'Hexachlorobenzene', code: 'D032', wwStd: '0.13', nwStd: '10', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '87-68-3': { name: 'Hexachlorobutadiene', code: 'D033', wwStd: '0.5', nwStd: '5.6', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '67-72-1': { name: 'Hexachloroethane', code: 'D034', wwStd: '30', nwStd: '30', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '78-93-3': { name: 'Methyl ethyl ketone', code: 'D035', wwStd: '200', nwStd: '36', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '98-95-3': { name: 'Nitrobenzene', code: 'D036', wwStd: '0.13', nwStd: '14', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '87-86-5': { name: 'Pentachlorophenol', code: 'D037', wwStd: '100', nwStd: '7.4', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '110-86-1': { name: 'Pyridine', code: 'D038', wwStd: '5.0', nwStd: '16', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '127-18-4': { name: 'Tetrachloroethylene', code: 'D039', wwStd: '6.0', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '79-01-6': { name: 'Trichloroethylene', code: 'D040', wwStd: '6.0', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '95-95-4': { name: '2,4,5-Trichlorophenol', code: 'D041', wwStd: '400', nwStd: '7.4', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '88-06-2': { name: '2,4,6-Trichlorophenol', code: 'D042', wwStd: '2.0', nwStd: '7.4', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '75-01-4': { name: 'Vinyl chloride', code: 'D043', wwStd: '6.0', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  // F001-F005 Spent solvents
+  '75-09-2': { name: 'Methylene chloride', code: 'F001', wwStd: '0.96', nwStd: '30', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '108-88-3': { name: 'Toluene', code: 'F005', wwStd: '28', nwStd: '10', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '1330-20-7': { name: 'Xylenes (mixed)', code: 'F005', wwStd: '28', nwStd: '10', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '100-41-4': { name: 'Ethylbenzene', code: 'F005', wwStd: '28', nwStd: '10', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '67-64-1': { name: 'Acetone', code: 'F003', wwStd: '0.59', nwStd: '160', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '108-10-1': { name: 'Methyl isobutyl ketone', code: 'F003', wwStd: '0.14', nwStd: '33', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '71-55-6': { name: '1,1,1-Trichloroethane', code: 'F001', wwStd: '0.054', nwStd: '6.0', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '111-76-2': { name: '2-Butoxyethanol', code: 'F005', wwStd: '5.6', nwStd: '5.6', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '110-54-3': { name: 'n-Hexane', code: 'F005', wwStd: '28', nwStd: '10', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '67-56-1': { name: 'Methanol', code: 'F003', wwStd: '0.25', nwStd: '0.75', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '64-17-5': { name: 'Ethanol', code: 'F003', wwStd: '0.25', nwStd: '0.75', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '67-63-0': { name: 'Isopropanol', code: 'F003', wwStd: '0.25', nwStd: '0.75', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '141-78-6': { name: 'Ethyl acetate', code: 'F003', wwStd: '0.25', nwStd: '0.75', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  '109-99-9': { name: 'Tetrahydrofuran', code: 'F003', wwStd: '0.25', nwStd: '0.75', units: 'mg/L / mg/kg', technology: 'Incineration/Fuel Sub' },
+  // Additional common industrial chemicals
+  '7664-39-3': { name: 'Hydrofluoric acid', code: 'U134', wwStd: '35', nwStd: '35', units: 'mg/L / mg/kg', technology: 'Neutralization' },
+  '7697-37-2': { name: 'Nitric acid', code: 'P076', wwStd: '1.2', nwStd: '1.2', units: 'mg/L / mg/kg', technology: 'Neutralization/Denitration' },
+  '50-00-0': { name: 'Formaldehyde', code: 'U122', wwStd: '15', nwStd: '15', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '75-05-8': { name: 'Acetonitrile', code: 'U003', wwStd: '5.73', nwStd: '38', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '62-53-3': { name: 'Aniline', code: 'U012', wwStd: '14', nwStd: '14', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '91-20-3': { name: 'Naphthalene', code: 'U165', wwStd: '5.6', nwStd: '5.6', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '108-95-2': { name: 'Phenol', code: 'U188', wwStd: '6.2', nwStd: '6.2', units: 'mg/L / mg/kg', technology: 'Incineration' },
+  '1336-36-3': { name: 'PCBs', code: 'U209', wwStd: '0.01', nwStd: '2.0', units: 'mg/L / mg/kg', technology: 'Incineration/TSCA' },
+};
+
+var WATER_REACTIVE = {
+  '7440-23-5': 'Sodium metal',
+  '7440-09-7': 'Potassium metal',
+  '7439-93-2': 'Lithium metal',
+  '7440-70-2': 'Calcium metal',
+  '7429-90-5': 'Aluminum powder',
+  '1302-76-7': 'Aluminum oxide (reactive forms)',
+  '7647-01-0': 'Hydrogen chloride (anhydrous)',
+  '7803-62-5': 'Silicon tetrahydride (silane)',
+  '7580-67-8': 'Lithium hydride',
+  '7646-69-7': 'Sodium hydride',
+  '7789-78-8': 'Calcium hydride',
+  '16853-85-3': 'Lithium aluminum hydride',
+  '16940-66-2': 'Sodium borohydride',
+  '75-44-5': 'Phosgene',
+  '7719-12-2': 'Phosphorus trichloride',
+  '10025-87-3': 'Phosphorus oxychloride',
+};
+
+var OXIDIZER_CAS = {
+  '7722-84-1': 'Hydrogen peroxide',
+  '7601-90-3': 'Perchloric acid',
+  '7790-98-9': 'Ammonium perchlorate',
+  '7778-50-9': 'Potassium dichromate',
+  '7775-09-9': 'Sodium chlorate',
+  '7681-52-9': 'Sodium hypochlorite',
+  '10049-04-4': 'Chlorine dioxide',
+  '7782-50-5': 'Chlorine',
+  '7697-37-2': 'Nitric acid',
+  '7727-54-0': 'Ammonium persulfate',
+  '7761-88-8': 'Silver nitrate',
+  '7757-79-1': 'Potassium nitrate',
+  '7631-99-4': 'Sodium nitrate',
+  '1310-73-2': 'Sodium hydroxide',
+  '7664-93-9': 'Sulfuric acid (conc.)',
+  '7783-06-4': 'Hydrogen sulfide',
+};
+
+var AIR_REACTIVE = {
+  '7440-23-5': 'Sodium metal',
+  '7440-09-7': 'Potassium metal',
+  '7723-14-0': 'White/yellow phosphorus',
+  '7429-90-5': 'Aluminum powder (fine)',
+  '12604-58-9': 'Ferrocerium',
+  '75-44-5': 'Phosgene',
+  '7803-62-5': 'Silane',
+};
+
+// Known flash points by CAS (in deg F) for mixture estimation
+var FLASH_POINT_DB = {
+  '67-64-1': -4,     // Acetone
+  '71-43-2': 12,     // Benzene
+  '108-88-3': 40,    // Toluene
+  '1330-20-7': 81,   // Xylenes
+  '100-41-4': 59,    // Ethylbenzene
+  '78-93-3': 16,     // MEK
+  '67-56-1': 52,     // Methanol
+  '64-17-5': 55,     // Ethanol
+  '67-63-0': 53,     // Isopropanol
+  '110-54-3': -7,    // n-Hexane
+  '109-66-0': -57,   // n-Pentane
+  '67-66-3': -1,     // Chloroform (non-flammable but listed)
+  '75-09-2': -1,     // Methylene chloride
+  '127-18-4': -1,    // Tetrachloroethylene (none)
+  '141-78-6': 24,    // Ethyl acetate
+  '108-10-1': 62,    // MIBK
+  '108-90-7': 82,    // Chlorobenzene
+  '79-01-6': 90,     // TCE
+  '111-76-2': 143,   // 2-Butoxyethanol
+  '109-99-9': 6,     // THF
+  '75-05-8': 42,     // Acetonitrile
+  '110-86-1': 68,    // Pyridine
+  '91-20-3': 174,    // Naphthalene
+  '98-95-3': 190,    // Nitrobenzene
+  '108-95-2': 175,   // Phenol
+  '62-53-3': 158,    // Aniline
+  '50-00-0': 122,    // Formaldehyde (37% solution)
+  '71-36-3': 84,     // n-Butanol
+  '78-83-1': 82,     // Isobutanol
+  '107-21-1': 232,   // Ethylene glycol
+  '57-55-6': 210,    // Propylene glycol
+  '142-82-5': 25,    // n-Heptane
+  '111-65-9': 56,    // n-Octane
+};
+
+// Known pH values for common chemicals (pure or standard concentration)
+var PH_DB = {
+  '7664-93-9': 0.3,   // Sulfuric acid (conc.)
+  '7647-01-0': 0.1,   // Hydrochloric acid (conc.)
+  '7697-37-2': 0.5,   // Nitric acid (conc.)
+  '7664-39-3': 1.0,   // Hydrofluoric acid
+  '64-19-7': 2.4,     // Acetic acid
+  '7664-38-2': 1.5,   // Phosphoric acid
+  '1310-73-2': 14.0,  // Sodium hydroxide
+  '1310-58-3': 14.0,  // Potassium hydroxide
+  '1305-62-0': 12.4,  // Calcium hydroxide
+  '497-19-8': 11.6,   // Sodium carbonate
+  '7664-41-7': 11.6,  // Ammonia (conc.)
+  '7681-52-9': 12.0,  // Sodium hypochlorite
 };
 
 function suggestWasteCodes(result) {
@@ -1041,6 +1275,115 @@ function suggestWasteCodes(result) {
   result.caWasteCodes = caSuggested;
 }
 
+function estimateMixtureProps(result) {
+  result.estimatedFlashPoint = '';
+  result.estimatedPH = '';
+  result.uhcMatches = [];
+
+  // --- Flash Point Estimation ---
+  var fpComponents = [];
+  result.chemicals.forEach(function(chem) {
+    if (!chem.cas || !FLASH_POINT_DB[chem.cas]) return;
+    var pctMatch = (chem.percentage || '').match(/(\d+\.?\d*)/);
+    var pct = pctMatch ? parseFloat(pctMatch[1]) : 0;
+    if (pct > 0) {
+      fpComponents.push({ fp: FLASH_POINT_DB[chem.cas], pct: pct, name: chem.name });
+    }
+  });
+
+  if (fpComponents.length > 0) {
+    // Use lowest flash point component weighted by concentration
+    fpComponents.sort(function(a, b) { return a.fp - b.fp; });
+    var lowestFP = fpComponents[0];
+    // If dominant component (>50%), use its flash point
+    // Otherwise, estimate conservatively using lowest
+    if (lowestFP.pct > 50) {
+      result.estimatedFlashPoint = lowestFP.fp + '°F (est. from ' + lowestFP.name + ' at ' + lowestFP.pct + '%)';
+    } else if (lowestFP.pct > 10) {
+      result.estimatedFlashPoint = 'Est. near ' + lowestFP.fp + '°F (lowest component: ' + lowestFP.name + ' at ' + lowestFP.pct + '%)';
+    } else {
+      // Weighted average approach for small amounts
+      var totalPct = 0;
+      var weightedFP = 0;
+      fpComponents.forEach(function(c) { totalPct += c.pct; weightedFP += c.fp * c.pct; });
+      if (totalPct > 0) {
+        var avgFP = Math.round(weightedFP / totalPct);
+        result.estimatedFlashPoint = 'Est. ~' + avgFP + '°F (weighted avg of ' + fpComponents.length + ' components)';
+      }
+    }
+  }
+
+  // --- pH Estimation ---
+  var acidPH = null;
+  var basePH = null;
+  var maxAcidPct = 0;
+  var maxBasePct = 0;
+
+  result.chemicals.forEach(function(chem) {
+    if (!chem.cas || !PH_DB[chem.cas]) return;
+    var pctMatch = (chem.percentage || '').match(/(\d+\.?\d*)/);
+    var pct = pctMatch ? parseFloat(pctMatch[1]) : 0;
+    if (pct <= 0) return;
+    var knownPH = PH_DB[chem.cas];
+    if (knownPH < 7 && pct > maxAcidPct) { acidPH = knownPH; maxAcidPct = pct; }
+    if (knownPH > 7 && pct > maxBasePct) { basePH = knownPH; maxBasePct = pct; }
+  });
+
+  if (acidPH !== null && basePH === null) {
+    // Acid dominant
+    if (maxAcidPct > 50) result.estimatedPH = 'Est. pH ~' + (acidPH + 0.5).toFixed(1) + ' (concentrated acid, ' + maxAcidPct + '%)';
+    else if (maxAcidPct > 10) result.estimatedPH = 'Est. pH ~' + Math.min(acidPH + 2, 6).toFixed(1) + ' (dilute acid, ' + maxAcidPct + '%)';
+    else result.estimatedPH = 'Est. pH 4-6 (trace acid, ' + maxAcidPct + '%)';
+  } else if (basePH !== null && acidPH === null) {
+    if (maxBasePct > 50) result.estimatedPH = 'Est. pH ~' + (basePH - 0.5).toFixed(1) + ' (concentrated base, ' + maxBasePct + '%)';
+    else if (maxBasePct > 10) result.estimatedPH = 'Est. pH ~' + Math.max(basePH - 2, 8).toFixed(1) + ' (dilute base, ' + maxBasePct + '%)';
+    else result.estimatedPH = 'Est. pH 8-10 (trace base, ' + maxBasePct + '%)';
+  } else if (acidPH !== null && basePH !== null) {
+    result.estimatedPH = 'Mixed acid/base — test required (acid at ' + maxAcidPct + '%, base at ' + maxBasePct + '%)';
+  }
+
+  // --- UHC Matching ---
+  result.chemicals.forEach(function(chem) {
+    if (!chem.cas) return;
+    var uhc = UHC_LOOKUP[chem.cas];
+    if (uhc) {
+      result.uhcMatches.push({
+        name: uhc.name,
+        cas: chem.cas,
+        code: uhc.code,
+        percentage: chem.percentage,
+        wwStd: uhc.wwStd,
+        nwStd: uhc.nwStd,
+        units: uhc.units,
+        technology: uhc.technology
+      });
+    }
+  });
+
+  // --- Reactivity flag from chemical lookups ---
+  result.chemicals.forEach(function(chem) {
+    if (!chem.cas) return;
+    if (WATER_REACTIVE[chem.cas] && result.reactivityFlags.indexOf('Water-reactive') === -1) {
+      result.reactivityFlags.push('Water-reactive (' + WATER_REACTIVE[chem.cas] + ')');
+    }
+    if (OXIDIZER_CAS[chem.cas] && result.reactivityFlags.indexOf('Oxidizer') === -1) {
+      result.reactivityFlags.push('Oxidizer (' + OXIDIZER_CAS[chem.cas] + ')');
+    }
+    if (AIR_REACTIVE[chem.cas] && result.reactivityFlags.indexOf('Air-reactive / Pyrophoric') === -1) {
+      result.reactivityFlags.push('Air-reactive (' + AIR_REACTIVE[chem.cas] + ')');
+    }
+  });
+
+  // D003 Reactivity suggestion
+  if (result.reactivityFlags.some(function(f) { return f.includes('Water-reactive') || f.includes('Explosive') || f.includes('Shock'); })) {
+    if (result.epaWasteCodes.indexOf('D003') === -1) result.epaWasteCodes.push('D003');
+  }
+  // CA 133 for reactive waste
+  if (result.epaWasteCodes.indexOf('D003') !== -1 && result.caWasteCodes.indexOf('133') === -1) {
+    result.caWasteCodes.push('133');
+  }
+}
+
 app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
   if (!pdfParse) return res.status(500).json({ error: 'pdf-parse not installed' });
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
@@ -1060,7 +1403,14 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
     epaWasteCodes: [],
     caWasteCodes: [],
     hazardStatements: [],
-    sdsFiles: []
+    sdsFiles: [],
+    toxicity: [],
+    reactivityFlags: [],
+    incompatibles: '',
+    stabilityNotes: '',
+    estimatedFlashPoint: '',
+    estimatedPH: '',
+    uhcMatches: []
   };
 
   for (var i = 0; i < req.files.length; i++) {
@@ -1094,6 +1444,14 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
       parsed.epaWasteCodes.forEach(function(c) { if (mergedResult.epaWasteCodes.indexOf(c) === -1) mergedResult.epaWasteCodes.push(c); });
       parsed.caWasteCodes.forEach(function(c) { if (mergedResult.caWasteCodes.indexOf(c) === -1) mergedResult.caWasteCodes.push(c); });
       parsed.hazardStatements.forEach(function(h) { if (mergedResult.hazardStatements.indexOf(h) === -1) mergedResult.hazardStatements.push(h); });
+
+      // Merge toxicity
+      parsed.toxicity.forEach(function(t) { mergedResult.toxicity.push(t); });
+      // Merge reactivity flags
+      parsed.reactivityFlags.forEach(function(f) { if (mergedResult.reactivityFlags.indexOf(f) === -1) mergedResult.reactivityFlags.push(f); });
+      // Merge incompatibles
+      if (parsed.incompatibles && !mergedResult.incompatibles) mergedResult.incompatibles = parsed.incompatibles;
+      if (parsed.stabilityNotes && !mergedResult.stabilityNotes) mergedResult.stabilityNotes = parsed.stabilityNotes;
     } catch(e) {
       console.error('Error parsing SDS ' + file.originalname + ':', e.message);
       allResults.push({ fileName: file.originalname, error: e.message });
@@ -1102,6 +1460,8 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
 
   // Re-run waste code suggestions on merged result
   suggestWasteCodes(mergedResult);
+
+  estimateMixtureProps(mergedResult);
 
   res.json({ merged: mergedResult, individual: allResults });
 });
