@@ -897,6 +897,8 @@ function Bins({data}){
   const [ubForm,setUbForm]=useState(ubEmpty);
   const [showUbForm,setShowUbForm]=useState(false);
   const [ubEditId,setUbEditId]=useState(null);
+  const [showArchived,setShowArchived]=useState(false);
+  const [historyBin,setHistoryBin]=useState(null);
   const [newVendor,setNewVendor]=useState('');
   const today=new Date();
   const [reportMonth,setReportMonth]=useState(()=>today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0'));
@@ -904,6 +906,8 @@ function Bins({data}){
   const bins=data.bins||[];
   const vendors=data.vendors||[];
   const unbilled=data.unbilled||[];
+  const activeBins=bins.filter(b=>!b.archived);
+  const archivedBins=bins.filter(b=>b.archived);
   const custNames=(data.customers||[]).map(c=>c.name).filter(Boolean).sort();
   const driverNames=(data.drivers||[]).map(d=>d.name).filter(Boolean);
 
@@ -923,7 +927,10 @@ function Bins({data}){
     if(editId){await api('PUT','/bins/'+editId,payload);}else{await api('POST','/bins',payload);}
     setShowForm(false);setEditId(null);setForm(empty);
   };
-  const del=async(b)=>{if(!confirm('Delete bin '+b.binNumber+' / '+(b.customer||'no customer')+'?'))return;await api('DELETE','/bins/'+b.id);};
+  const archive=async(b)=>{if(!confirm('Archive bin '+b.binNumber+' / '+(b.customer||'no customer')+'?\n\nIt will be hidden from the active list and removed from billing, but kept in history. You can restore it anytime.'))return;await api('PUT','/bins/'+b.id,{archived:true});};
+  const restore=async(b)=>{await api('PUT','/bins/'+b.id,{archived:false});};
+  const hardDel=async(b)=>{if(!confirm('PERMANENTLY delete bin '+b.binNumber+' / '+(b.customer||'no customer')+'?\n\nThis cannot be undone and removes it from history too.'))return;await api('DELETE','/bins/'+b.id);};
+  const openHistory=(num)=>{if(num)setHistoryBin(num);};
   const quickReturn=async(b)=>{const d=prompt('Date returned to vendor (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;const patch={dateReturnedToVendor:d};if(!b.datePickedUp)patch.datePickedUp=d;await api('PUT','/bins/'+b.id,patch);};
   const quickInventory=async(b)=>{const d=prompt('Date put into our inventory / yard (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;const patch={dateToInventory:d};if(!b.datePickedUp)patch.datePickedUp=d;await api('PUT','/bins/'+b.id,patch);};
   const quickPickup=async(b)=>{const d=prompt('Date picked up from customer (YYYY-MM-DD):',(new Date()).toISOString().slice(0,10));if(!d)return;await api('PUT','/bins/'+b.id,{datePickedUp:d});};
@@ -944,7 +951,7 @@ function Bins({data}){
   const ubSetStatus=async(u,status)=>{await api('PUT','/unbilled/'+u.id,{status});};
 
   /* filtered table view */
-  const filtered=bins.filter(b=>{
+  const filtered=activeBins.filter(b=>{
     if(statusFilter!=='all'&&binStatus(b)!==statusFilter)return false;
     if(!search.trim())return true;
     const q=search.toLowerCase();
@@ -962,11 +969,12 @@ function Bins({data}){
     const now=new Date();now.setHours(12,0,0,0);
     const monthLabel=first.toLocaleDateString('en-US',{month:'long',year:'numeric'});
     /* chain placements of the same physical bin so vendor cost isn't double-counted */
+    const act=bins.filter(b=>!b.archived);
     const dropsByBin={};
-    bins.forEach(b=>{const d=pd(b.dateDropped);if(!d)return;(dropsByBin[b.binNumber]=dropsByBin[b.binNumber]||[]).push(d.getTime());});
+    act.forEach(b=>{const d=pd(b.dateDropped);if(!d)return;(dropsByBin[b.binNumber]=dropsByBin[b.binNumber]||[]).push(d.getTime());});
     Object.values(dropsByBin).forEach(a=>a.sort((x,y)=>x-y));
     const byCust={};
-    bins.forEach(b=>{
+    act.forEach(b=>{
       const drop=pd(b.dateDropped);if(!drop)return;
       const dailyRate=parseFloat(b.dailyRate)||0;
       const haulFee=parseFloat(b.haulFee)||0;
@@ -1045,7 +1053,7 @@ function Bins({data}){
 
   return(<div>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
-      <div className="stitle" style={{margin:0}}>Roll-Off Bin Tracking ({bins.length})</div>
+      <div className="stitle" style={{margin:0}}>Roll-Off Bin Tracking ({activeBins.length})</div>
       <button className="bp" onClick={openAdd}>+ Log Bin Movement</button>
     </div>
     <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Enter bins from the drivers' Daily Tickets as they drop, pick up, and return. Use the Monthly Billing Report below to bill customers.</div>
@@ -1069,7 +1077,7 @@ function Bins({data}){
         <tbody>
           {filtered.length===0&&<tr><td colSpan={11} style={{textAlign:'center',color:'var(--text-muted)',padding:24}}>No bins logged yet. Click "+ Log Bin Movement" to start.</td></tr>}
           {filtered.map(b=>{const s=binStatus(b);const sc=statusColor(s);return(<tr key={b.id}>
-            <td style={{fontWeight:700}}>{b.binNumber}</td>
+            <td style={{fontWeight:700}}><span onClick={()=>openHistory(b.binNumber)} style={{color:'var(--primary)',cursor:'pointer',textDecoration:'underline'}} title="View full history of this bin">{b.binNumber}</span></td>
             <td>{b.binSize}</td>
             <td>{b.customer||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
             <td>{b.vendor||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
@@ -1083,13 +1091,35 @@ function Bins({data}){
               {!b.datePickedUp&&<button className="ebtn" onClick={()=>quickPickup(b)}>Pick up</button>}
               {b.datePickedUp&&!b.dateReturnedToVendor&&!b.dateToInventory&&<button className="ebtn" onClick={()=>quickInventory(b)}>To Inventory</button>}
               {b.datePickedUp&&!b.dateReturnedToVendor&&<button className="ebtn" onClick={()=>quickReturn(b)}>To Vendor</button>}
+              <button className="ebtn" onClick={()=>openHistory(b.binNumber)}>History</button>
               <button className="ebtn" onClick={()=>openEdit(b)}>Edit</button>
-              <button className="ebtn" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>del(b)}>Del</button>
+              <button className="ebtn" style={{background:'#fef3c7',color:'#92400e'}} onClick={()=>archive(b)}>Archive</button>
             </td>
           </tr>);})}
         </tbody>
       </table>
     </div>
+
+    {/* ARCHIVED BINS */}
+    {archivedBins.length>0&&<div style={{marginTop:14}}>
+      <button className="ebtn" onClick={()=>setShowArchived(s=>!s)}>{showArchived?'Hide':'Show'} archived bins ({archivedBins.length})</button>
+      {showArchived&&<div className="rtable" style={{marginTop:8}}>
+        <table>
+          <thead><tr><th>Bin #</th><th>Size</th><th>Customer</th><th>Vendor</th><th>Dropped</th><th>Picked Up</th><th>Vendor / Inv</th><th></th></tr></thead>
+          <tbody>
+            {archivedBins.slice().sort((a,b)=>(b.dateDropped||'').localeCompare(a.dateDropped||'')).map(b=>(<tr key={b.id} style={{opacity:0.75}}>
+              <td style={{fontWeight:700}}><span onClick={()=>openHistory(b.binNumber)} style={{color:'var(--primary)',cursor:'pointer',textDecoration:'underline'}}>{b.binNumber}</span></td>
+              <td>{b.binSize}</td><td>{b.customer||'—'}</td><td>{b.vendor||'—'}</td><td>{b.dateDropped||'—'}</td><td>{b.datePickedUp||'—'}</td>
+              <td>{b.dateReturnedToVendor||(b.dateToInventory?'Inv '+b.dateToInventory:'—')}</td>
+              <td style={{whiteSpace:'nowrap'}}>
+                <button className="ebtn" onClick={()=>restore(b)}>Restore</button>
+                <button className="ebtn" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>hardDel(b)}>Delete</button>
+              </td>
+            </tr>))}
+          </tbody>
+        </table>
+      </div>}
+    </div>}
 
     {/* MONTHLY BILLING REPORT */}
     <div className="stitle" style={{marginTop:32}}>Monthly Billing Report</div>
@@ -1227,6 +1257,31 @@ function Bins({data}){
         </div>
       </div>
     </div>}
+
+    {/* BIN HISTORY MODAL */}
+    {historyBin&&(()=>{
+      const hist=bins.filter(b=>(b.binNumber||'')===historyBin).slice().sort((a,b)=>(a.dateDropped||'').localeCompare(b.dateDropped||''));
+      return <div className="overlay" onClick={()=>setHistoryBin(null)}>
+        <div className="modal" style={{width:780}} onClick={e=>e.stopPropagation()}>
+          <h2>Bin {historyBin} — History ({hist.length} {hist.length===1?'movement':'movements'})</h2>
+          <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>Every recorded placement of this bin, oldest first. Includes archived entries.</div>
+          <div className="rtable">
+            <table>
+              <thead><tr><th>Customer</th><th>Driver</th><th>Dropped</th><th>Picked Up</th><th>To Inv</th><th>To Vendor</th><th>Status</th></tr></thead>
+              <tbody>
+                {hist.length===0&&<tr><td colSpan={7} style={{textAlign:'center',color:'var(--text-muted)',padding:16}}>No records.</td></tr>}
+                {hist.map(b=>{const s=binStatus(b);const sc=statusColor(s);return(<tr key={b.id} style={{opacity:b.archived?0.6:1}}>
+                  <td>{b.customer||'—'}{b.archived?<span style={{fontSize:10,color:'#92400e',marginLeft:4}}>(archived)</span>:''}</td>
+                  <td>{b.driver||'—'}</td><td>{b.dateDropped||'—'}</td><td>{b.datePickedUp||'—'}</td><td>{b.dateToInventory||'—'}</td><td>{b.dateReturnedToVendor||'—'}</td>
+                  <td><span style={{background:sc.bg,color:sc.fg,padding:'2px 8px',borderRadius:10,fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>{s}</span></td>
+                </tr>);})}
+              </tbody>
+            </table>
+          </div>
+          <div className="mactions"><button className="bc" onClick={()=>setHistoryBin(null)}>Close</button></div>
+        </div>
+      </div>;
+    })()}
   </div>);
 }
 
