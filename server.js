@@ -1083,7 +1083,7 @@ function parseSDS(text) {
     }
     if (phMatch) result.pH = phMatch[1].trim();
 
-    var stateMatch = sec9.match(/(?:physical\s+state|form|appearance)[:\s]*([^\n]{3,30})/i);
+    var stateMatch = sec9.match(/(?:physical\s+state|\bform\b|\bappearance\b)[:\s]*([^\n]{3,30})/i);
     if (stateMatch) {
       var st = stateMatch[1].toLowerCase();
       if (st.includes('liquid')) result.physicalState = 'Liquid';
@@ -1411,13 +1411,23 @@ function suggestWasteCodes(result) {
   });
 
   // D001 - Ignitability (flash point < 140F / 60C)
-  if (result.flashPoint) {
-    var fpNum = parseFloat(result.flashPoint.replace(/[^\d.-]/g, ''));
-    var isFahrenheit = result.flashPoint.toLowerCase().includes('f') || !result.flashPoint.toLowerCase().includes('c');
-    if (!isNaN(fpNum)) {
-      if ((isFahrenheit && fpNum < 140) || (!isFahrenheit && fpNum < 60)) {
-        if (suggested.indexOf('D001') === -1) suggested.push('D001');
-        if (caSuggested.indexOf('131') === -1) caSuggested.push('131');
+  if (result.flashPointNumF != null) {
+    // Use pre-computed numeric °F value
+    if (result.flashPointNumF < 140) {
+      if (suggested.indexOf('D001') === -1) suggested.push('D001');
+      if (caSuggested.indexOf('131') === -1) caSuggested.push('131');
+    }
+  } else if (result.flashPoint) {
+    // Fallback: parse from string (extract first number only)
+    var fpFirstMatch = result.flashPoint.match(/(-?\d+\.?\d*)/);
+    if (fpFirstMatch) {
+      var fpNum = parseFloat(fpFirstMatch[1]);
+      var isFahrenheit = result.flashPoint.toLowerCase().indexOf('f') >= 0 || result.flashPoint.toLowerCase().indexOf('c') < 0;
+      if (!isNaN(fpNum)) {
+        if ((isFahrenheit && fpNum < 140) || (!isFahrenheit && fpNum < 60)) {
+          if (suggested.indexOf('D001') === -1) suggested.push('D001');
+          if (caSuggested.indexOf('131') === -1) caSuggested.push('131');
+        }
       }
     }
   }
