@@ -1746,6 +1746,8 @@ function WasteProfiles({data}) {
     pHValue: '', flashPoint: '', liquidPhases: '',
     containsRegulatedHazWaste: 'No', containsPCBs: 'No',
     regulatedToxicMaterial: 'No', radioactive: 'No', infectiousMedical: 'No',
+    // Signature
+    signatureName: 'Keith Higgins', signatureDate: '',
     // Auto-generated / SDS data
     profileNotes: '', sdsFiles: [],
     estimatedFlashPoint: '', estimatedPH: '',
@@ -2017,6 +2019,7 @@ function WasteProfiles({data}) {
         containsRegulatedHazWaste: p.containsRegulatedHazWaste || 'No',
         containsPCBs: p.containsPCBs || 'No', regulatedToxicMaterial: p.regulatedToxicMaterial || 'No',
         radioactive: p.radioactive || 'No', infectiousMedical: p.infectiousMedical || 'No',
+        signatureName: p.signatureName || 'Keith Higgins', signatureDate: p.signatureDate || '',
         profileNotes: p.profileNotes || '', sdsFiles: p.sdsFiles || [],
         estimatedFlashPoint: p.estimatedFlashPoint || '', estimatedPH: p.estimatedPH || '',
         toxicity: p.toxicity || [], reactivityFlags: p.reactivityFlags || [],
@@ -3512,6 +3515,18 @@ function WasteProfiles({data}) {
 
           <div className="mrow"><label>Profile Notes</label>
             <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={2} placeholder="Additional notes" /></div>
+
+          {/* ===== GENERATOR CERTIFICATION / SIGNATURE ===== */}
+          <div style={{ background: '#e5e7eb', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, marginTop: 12, borderBottom: '2px solid #374151' }}>Generator Certification</div>
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: '15px', fontStyle: 'italic' }}>
+            I hereby certify that all information submitted in this and all attached documents contain true and accurate descriptions of the waste.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Printed Name &amp; Title</label>
+              <input value={form.signatureName || ''} onChange={e => setForm({ ...form, signatureName: e.target.value })} placeholder="e.g. Keith Higgins, Operations Manager" style={{ fontSize: 12 }} /></div>
+            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Date</label>
+              <input type="date" value={form.signatureDate || ''} onChange={e => setForm({ ...form, signatureDate: e.target.value })} style={{ fontSize: 12 }} /></div>
+          </div>
 
           <div className="mactions" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
             <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
