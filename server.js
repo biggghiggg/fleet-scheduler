@@ -1411,14 +1411,14 @@ function suggestWasteCodes(result) {
   });
 
   // D001 - Ignitability (flash point < 140F / 60C)
+  var d001Triggered = false;
   if (result.flashPointNumF != null) {
-    // Use pre-computed numeric °F value
     if (result.flashPointNumF < 140) {
       if (suggested.indexOf('D001') === -1) suggested.push('D001');
       if (caSuggested.indexOf('131') === -1) caSuggested.push('131');
+      d001Triggered = true;
     }
   } else if (result.flashPoint) {
-    // Fallback: parse from string (extract first number only)
     var fpFirstMatch = result.flashPoint.match(/(-?\d+\.?\d*)/);
     if (fpFirstMatch) {
       var fpNum = parseFloat(fpFirstMatch[1]);
@@ -1427,21 +1427,56 @@ function suggestWasteCodes(result) {
         if ((isFahrenheit && fpNum < 140) || (!isFahrenheit && fpNum < 60)) {
           if (suggested.indexOf('D001') === -1) suggested.push('D001');
           if (caSuggested.indexOf('131') === -1) caSuggested.push('131');
+          d001Triggered = true;
         }
       }
     }
   }
+  // Fallback: if SDS didn't provide flash point, check chemicals against FLASH_POINT_DB
+  if (!d001Triggered) {
+    result.chemicals.forEach(function(chem) {
+      if (d001Triggered) return;
+      if (chem.cas && FLASH_POINT_DB[chem.cas] != null) {
+        var knownFP = FLASH_POINT_DB[chem.cas];
+        var pctMatch = (chem.percentage || '').match(/(\d+\.?\d*)/);
+        var pct = pctMatch ? parseFloat(pctMatch[1]) : 0;
+        if (pct >= 10 && knownFP < 140) {
+          if (suggested.indexOf('D001') === -1) suggested.push('D001');
+          if (caSuggested.indexOf('131') === -1) caSuggested.push('131');
+          d001Triggered = true;
+        }
+      }
+    });
+  }
 
   // D002 - Corrosivity (pH <= 2 or pH >= 12.5)
+  var d002Triggered = false;
   if (result.pH) {
     var phNum = parseFloat(result.pH);
     if (!isNaN(phNum)) {
       if (phNum <= 2 || phNum >= 12.5) {
         if (suggested.indexOf('D002') === -1) suggested.push('D002');
-        if (phNum <= 2 && caSuggested.indexOf('132') === -1) caSuggested.push('132');
-        if (phNum >= 12.5 && caSuggested.indexOf('132') === -1) caSuggested.push('132');
+        if (caSuggested.indexOf('132') === -1) caSuggested.push('132');
+        d002Triggered = true;
       }
     }
+  }
+  // Fallback: if SDS didn't provide pH, check chemicals against PH_DB lookup
+  if (!d002Triggered) {
+    result.chemicals.forEach(function(chem) {
+      if (d002Triggered) return;
+      if (chem.cas && PH_DB[chem.cas] != null) {
+        var knownPH = PH_DB[chem.cas];
+        // Only trigger if the chemical is present at significant concentration
+        var pctMatch = (chem.percentage || '').match(/(\d+\.?\d*)/);
+        var pct = pctMatch ? parseFloat(pctMatch[1]) : 0;
+        if (pct >= 10 && (knownPH <= 2 || knownPH >= 12.5)) {
+          if (suggested.indexOf('D002') === -1) suggested.push('D002');
+          if (caSuggested.indexOf('132') === -1) caSuggested.push('132');
+          d002Triggered = true;
+        }
+      }
+    });
   }
 
   // California waste codes based on physical state and content
