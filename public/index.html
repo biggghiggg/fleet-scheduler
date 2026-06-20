@@ -1978,7 +1978,7 @@ function WasteProfiles({data}) {
     setParsing(false);
   };
 
-  // Save profile
+  // Save profile — auto-create customer if generator name is new
   const save = async () => {
     if (!form.name.trim()) { alert('Please enter a profile name'); return; }
     const payload = { ...form };
@@ -1987,6 +1987,36 @@ function WasteProfiles({data}) {
     } else {
       await fetch('/api/profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     }
+
+    // Auto-create customer if generator name doesn't exist in customers list
+    if (form.customer && form.customer.trim()) {
+      const existing = (data.customers || []).find(function(c) {
+        return (c.name || '').toLowerCase() === form.customer.trim().toLowerCase();
+      });
+      if (!existing) {
+        var isEws = form.profileType === 'ews';
+        var newCust = { name: form.customer.trim() };
+        // Map generator info from profile to customer fields
+        if (isEws) {
+          if (form.generatorSiteAddress) newCust.address = form.generatorSiteAddress;
+          if (form.generatorCity) newCust.city = form.generatorCity;
+          if (form.generatorState) newCust.state = form.generatorState;
+          if (form.generatorZip) newCust.zip = form.generatorZip;
+          if (form.generatorPhone) newCust.phone = form.generatorPhone;
+          if (form.technicalContact) newCust.contact = form.technicalContact;
+        } else {
+          if (form.facilityAddress) newCust.address = form.facilityAddress;
+          if (form.generatorPhone) newCust.phone = form.generatorPhone;
+          if (form.technicalContact) newCust.contact = form.technicalContact;
+          if (form.generatorStatus) newCust.generatorStatus = form.generatorStatus;
+          if (form.naicsCodes) newCust.naicsCodes = form.naicsCodes;
+        }
+        if (form.epaId) newCust.epaId = form.epaId;
+        if (form.stateId) newCust.stateId = form.stateId;
+        await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newCust) });
+      }
+    }
+
     setShowForm(false); setEditId(null); setForm(emptyForm);
     loadProfiles();
   };
