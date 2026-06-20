@@ -754,12 +754,51 @@ function loadProfiles() {
 function saveProfiles(p) { fs.writeFileSync(PROFILES_FILE, JSON.stringify(p, null, 2)); }
 var profiles = loadProfiles();
 
+// PROFILE FIELD SUGGESTIONS — remember previously entered values
+var SUGGESTIONS_FILE = path.join(DATA_DIR, 'suggestions.json');
+var SUGGEST_FIELDS = [
+  'processGenerating', 'commonName', 'properShippingName', 'physicalDescription',
+  'color', 'odor', 'specialHandling', 'stateCodes', 'samplingSource', 'samplerName',
+  'sourceCode', 'formCode', 'containerType', 'containerOther', 'frequencyOther',
+  'methodOfShipment', 'physicalState', 'sdsProductName'
+];
+
+function loadSuggestions() {
+  try {
+    if (fs.existsSync(SUGGESTIONS_FILE)) return JSON.parse(fs.readFileSync(SUGGESTIONS_FILE, 'utf8'));
+  } catch(e) { console.error('Error loading suggestions:', e.message); }
+  return {};
+}
+function saveSuggestions(s) { fs.writeFileSync(SUGGESTIONS_FILE, JSON.stringify(s, null, 2)); }
+var suggestions = loadSuggestions();
+
+function extractSuggestions(profile) {
+  var changed = false;
+  SUGGEST_FIELDS.forEach(function(field) {
+    var val = (profile[field] || '').trim();
+    if (!val || val.length < 2) return;
+    if (!suggestions[field]) suggestions[field] = [];
+    // Case-insensitive dedup
+    var exists = suggestions[field].some(function(s) { return s.toLowerCase() === val.toLowerCase(); });
+    if (!exists) {
+      suggestions[field].push(val);
+      // Keep list manageable — max 50 per field
+      if (suggestions[field].length > 50) suggestions[field] = suggestions[field].slice(-50);
+      changed = true;
+    }
+  });
+  if (changed) saveSuggestions(suggestions);
+}
+
+app.get('/api/suggestions', function(req, res) { res.json(suggestions); });
+
 app.get('/api/profiles', function(req, res) { res.json(profiles); });
 
 app.post('/api/profiles', function(req, res) {
   var profile = Object.assign({}, req.body, { id: 'prof' + Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   profiles.push(profile);
   saveProfiles(profiles);
+  extractSuggestions(profile);
   res.json(profile);
 });
 
@@ -768,6 +807,7 @@ app.put('/api/profiles/:id', function(req, res) {
   if (idx === -1) return res.status(404).json({error:'Not found'});
   Object.assign(profiles[idx], req.body, { updatedAt: new Date().toISOString() });
   saveProfiles(profiles);
+  extractSuggestions(profiles[idx]);
   res.json(profiles[idx]);
 });
 
