@@ -797,8 +797,11 @@ app.get('/api/profiles', function(req, res) { res.json(profiles); });
 
 // Sync generator info from a profile back to the customer record
 function syncProfileToCustomer(profile) {
-  if (!profile.customer) return;
-  var cust = (data.customers || []).find(function(c) { return c.name === profile.customer; });
+  var custName = (profile.customer || '').trim();
+  if (!custName) return;
+  var cust = (data.customers || []).find(function(c) {
+    return c.name && c.name.trim().toLowerCase() === custName.toLowerCase();
+  });
   if (!cust) return;
   var changed = false;
   // Map of profile fields -> customer fields
@@ -813,15 +816,17 @@ function syncProfileToCustomer(profile) {
   ];
   fieldMap.forEach(function(pair) {
     var profileVal = (profile[pair[0]] || '').trim();
+    if (!profileVal) return;
     var custVal = (cust[pair[1]] || '').trim();
-    // Only update customer if profile has a value and customer doesn't
-    if (profileVal && !custVal) {
+    // Update customer if profile has a value that's different
+    if (profileVal !== custVal) {
       cust[pair[1]] = profileVal;
       changed = true;
     }
   });
   if (changed) {
     saveData(data);
+    broadcast({type:'full-sync',data:data});
   }
 }
 
