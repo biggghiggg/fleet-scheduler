@@ -81,6 +81,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 .modal h2{font-size:18px;margin-bottom:16px}
 .mrow{margin-bottom:12px}
 .mrow label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase}
+.ws-radio-group{display:flex;gap:10px;flex-wrap:wrap;padding:6px 0}
+.ws-radio-group span{font-size:12px !important;display:inline-flex !important;align-items:center;gap:4px;cursor:pointer;color:#374151 !important;font-weight:400 !important;text-transform:none !important;margin-bottom:0 !important}
 .mactions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
 .bp{background:var(--primary);color:#fff;font-weight:600;padding:8px 20px}
 .bd{background:var(--danger);color:#fff;font-weight:600;padding:8px 20px}
@@ -3143,17 +3145,16 @@ function WasteProfiles({data}) {
                     <div style={{ padding: '12px 10px', textAlign: 'center', color: '#9ca3af', fontSize: 11 }}>No saved profiles yet.</div>
                   ) : (
                     wasteStreams.map(function(ws) { return (
-                      <div key={ws.id} style={{ padding: '7px 10px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                        onClick={() => applyWasteStream(ws)}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <div>
+                      <div key={ws.id} style={{ padding: '7px 10px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div onClick={() => applyWasteStream(ws)} style={{ flex: 1, cursor: 'pointer', padding: '2px 0' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#059669' }}>{ws.name}</div>
                           <div style={{ fontSize: 10, color: '#6b7280' }}>
                             {[ws.properShippingName, ws.physicalState, ws.chemicals && ws.chemicals.length ? ws.chemicals.length + ' constituents' : ''].filter(Boolean).join(' | ')}
                           </div>
                         </div>
-                        <span onClick={(e) => deleteWasteStream(ws.id, e)} style={{ color: '#dc2626', cursor: 'pointer', fontSize: 14, fontWeight: 700, padding: '0 4px' }} title="Delete">&times;</span>
+                        <button onClick={(e) => deleteWasteStream(ws.id, e)} style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600, padding: '3px 8px', whiteSpace: 'nowrap', marginLeft: 8 }}>Delete</button>
                       </div>
                     ); })
                   )}
@@ -3401,9 +3402,9 @@ function WasteProfiles({data}) {
             {/* Physical State */}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>14. Physical State</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className="ws-radio-group">
                 {['Solid','Semi-Solid','Powder','Liquid','Other'].map(s => (
-                  <span key={s} onClick={() => setWsForm({ ...wsForm, physicalState: s })} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#374151', fontWeight: 400, textTransform: 'none' }}>
+                  <span key={s} onClick={() => setWsForm({ ...wsForm, physicalState: s })}>
                     <input type="radio" name="wsPhysical" checked={wsForm.physicalState === s} readOnly /> {s}
                   </span>
                 ))}
@@ -3413,9 +3414,9 @@ function WasteProfiles({data}) {
             {/* Method of Shipment */}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>15. Method of Shipment</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className="ws-radio-group">
                 {['DF','DM','TP','CF','CW','BA','TT','Commodity Pack'].map(m => (
-                  <span key={m} onClick={() => setWsForm({ ...wsForm, methodOfShipment: m })} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#374151', fontWeight: 400, textTransform: 'none' }}>
+                  <span key={m} onClick={() => setWsForm({ ...wsForm, methodOfShipment: m })}>
                     <input type="radio" name="wsShipment" checked={wsForm.methodOfShipment === m} readOnly /> {m}
                   </span>
                 ))}
@@ -3431,9 +3432,9 @@ function WasteProfiles({data}) {
             {/* Frequency */}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>16. Frequency of Shipment</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className="ws-radio-group">
                 {['One Time','Daily','Weekly','Monthly','Other'].map(f => (
-                  <span key={f} onClick={() => setWsForm({ ...wsForm, frequency: f })} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#374151', fontWeight: 400, textTransform: 'none' }}>
+                  <span key={f} onClick={() => setWsForm({ ...wsForm, frequency: f })}>
                     <input type="radio" name="wsFreq" checked={wsForm.frequency === f} readOnly /> {f}
                   </span>
                 ))}
