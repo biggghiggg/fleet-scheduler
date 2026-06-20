@@ -1306,11 +1306,11 @@ function Customers({data}){
   const [showForm,setShowForm]=useState(false);
   const [editId,setEditId]=useState(null);
   const [search,setSearch]=useState('');
-  const empty={name:'',address:'',city:'',state:'',zip:'',phone:'',email:'',contact:'',pricing:'',notes:''};
+  const empty={name:'',address:'',city:'',state:'',zip:'',phone:'',email:'',contact:'',pricing:'',notes:'',epaId:'',stateId:'',generatorStatus:'',naicsCodes:''};
   const [form,setForm]=useState(empty);
 
   const openAdd=()=>{setEditId(null);setForm(empty);setShowForm(true);};
-  const openEdit=(c)=>{setEditId(c.id);setForm({name:c.name||'',address:c.address||'',city:c.city||'',state:c.state||'',zip:c.zip||'',phone:c.phone||'',email:c.email||'',contact:c.contact||'',pricing:c.pricing||'',notes:c.notes||''});setShowForm(true);};
+  const openEdit=(c)=>{setEditId(c.id);setForm({name:c.name||'',address:c.address||'',city:c.city||'',state:c.state||'',zip:c.zip||'',phone:c.phone||'',email:c.email||'',contact:c.contact||'',pricing:c.pricing||'',notes:c.notes||'',epaId:c.epaId||'',stateId:c.stateId||'',generatorStatus:c.generatorStatus||'',naicsCodes:c.naicsCodes||''});setShowForm(true);};
   const save=async()=>{
     if(!form.name.trim()){alert('Customer name is required');return;}
     if(editId){await api('PUT','/customers/'+editId,form);}
@@ -1520,6 +1520,8 @@ function Customers({data}){
             {(c.address||c.city)&&<div style={{color:'#555'}}>Pickup: {[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ')}</div>}
             {c.phone&&<div style={{color:'#555'}}>Phone: {c.phone}</div>}
             {c.email&&<div style={{color:'#555'}}>Email: {c.email}</div>}
+            {c.epaId&&<div style={{color:'#555'}}>EPA: {c.epaId}</div>}
+            {c.generatorStatus&&<span style={{background:'#e9d5ff',padding:'1px 8px',borderRadius:4,fontWeight:600,color:'#6b21a8',fontSize:12}}>{c.generatorStatus}</span>}
           </div>
           {c.pricing&&<div style={{marginTop:8,padding:'8px 12px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,fontSize:13}}><strong>Pricing:</strong> {c.pricing}</div>}
           {c.notes&&<div style={{marginTop:6,fontSize:12,color:'#666'}}>{c.notes}</div>}
@@ -1549,6 +1551,21 @@ function Customers({data}){
             <input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="(559) 555-1234"/></div>
           <div className="mrow" style={{flex:1}}><label>Email</label>
             <input value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="email@company.com"/></div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <div className="mrow" style={{flex:1}}><label>EPA ID #</label>
+            <input value={form.epaId} onChange={e=>setForm({...form,epaId:e.target.value})} placeholder="e.g. CAD123456789"/></div>
+          <div className="mrow" style={{flex:1}}><label>State ID #</label>
+            <input value={form.stateId} onChange={e=>setForm({...form,stateId:e.target.value})} placeholder="State ID"/></div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <div className="mrow" style={{flex:1}}><label>Generator Status</label>
+            <select value={form.generatorStatus} onChange={e=>setForm({...form,generatorStatus:e.target.value})}>
+              <option value="">-- Select --</option>
+              <option value="CESQG">CESQG</option><option value="SQG">SQG</option><option value="LQG">LQG</option>
+            </select></div>
+          <div className="mrow" style={{flex:1}}><label>NAICS Codes</label>
+            <input value={form.naicsCodes} onChange={e=>setForm({...form,naicsCodes:e.target.value})} placeholder="e.g. 562211"/></div>
         </div>
         <div className="mrow"><label>Pricing Info</label>
           <textarea value={form.pricing} onChange={e=>setForm({...form,pricing:e.target.value})} rows={3} placeholder="e.g. Standard rate $85/hr, Overtime $120/hr, Minimum 4 hrs. Hazmat surcharge $50 per load. Net 30 terms."/></div>
@@ -1724,9 +1741,13 @@ function WasteProfiles({data}) {
         var mappedChemicals = (m.chemicals || []).map(function(c) {
           return { name: c.name || '', cas: c.cas || '', units: '%', tclp: false, totals: false, typical: c.percentage || '', min: '', max: '' };
         });
-        // Map flash point
+        // Map flash point — use numeric °F value from backend, or extract first number
         var fpVal = m.flashPoint || '';
-        var fpNum = parseFloat(String(fpVal).replace(/[^0-9.\-]/g, ''));
+        var fpNum = m.flashPointNumF != null ? m.flashPointNumF : NaN;
+        if (isNaN(fpNum)) {
+          var fpFirstNum = String(fpVal).match(/(-?\d+\.?\d*)/);
+          fpNum = fpFirstNum ? parseFloat(fpFirstNum[1]) : NaN;
+        }
         var fpBelow140 = !isNaN(fpNum) && fpNum < 140;
         // Map pH
         var phVal = m.pH || '';
@@ -1761,7 +1782,7 @@ function WasteProfiles({data}) {
           packingGroup: m.packingGroup || '',
           epaWasteCodes: epaCodes,
           caWasteCodes: m.caWasteCodes || [],
-          flashPointF: fpVal,
+          flashPointF: !isNaN(fpNum) ? String(fpNum) : fpVal,
           flashPointBelow140: fpBelow140,
           pHTypical: phVal,
           pHCategory: phCat,
@@ -1917,6 +1938,23 @@ function WasteProfiles({data}) {
   };
 
   const custNames = (data.customers || []).map(c => c.name).filter(Boolean).sort();
+
+  // Auto-fill generator info when a customer is selected
+  const onGeneratorChange = (val) => {
+    var updates = { customer: val };
+    var cust = (data.customers || []).find(function(c) { return c.name === val; });
+    if (cust) {
+      var addr = [cust.address, cust.city, cust.state, cust.zip].filter(Boolean).join(', ');
+      if (addr) updates.facilityAddress = addr;
+      if (cust.contact) updates.technicalContact = cust.contact;
+      if (cust.phone) updates.generatorPhone = cust.phone;
+      if (cust.epaId) updates.epaId = cust.epaId;
+      if (cust.stateId) updates.stateId = cust.stateId;
+      if (cust.naicsCodes) updates.naicsCodes = cust.naicsCodes;
+      if (cust.generatorStatus) updates.generatorStatus = cust.generatorStatus;
+    }
+    setForm(function(prev) { return Object.assign({}, prev, updates); });
+  };
 
   return (<div>
     {/* Header */}
@@ -2123,7 +2161,7 @@ function WasteProfiles({data}) {
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Profile Name *</label>
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Used Motor Oil, Waste Acetone" style={{fontSize:12}} autoFocus /></div>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Generator (Customer)</label>
-              <input list="profile-cust-list" value={form.customer} onChange={e => setForm({ ...form, customer: e.target.value })} placeholder="Link to customer" style={{fontSize:12}} />
+              <input list="profile-cust-list" value={form.customer} onChange={e => onGeneratorChange(e.target.value)} placeholder="Select or type customer name" style={{fontSize:12}} />
               <datalist id="profile-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist></div>
           </div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Facility Address</label>
