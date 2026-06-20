@@ -793,6 +793,37 @@ function extractSuggestions(profile) {
 
 app.get('/api/suggestions', function(req, res) { res.json(suggestions); });
 
+// WASTE STREAM PROFILES — reusable Section 3 templates
+var WASTE_STREAMS_FILE = path.join(DATA_DIR, 'wasteStreams.json');
+function loadWasteStreams() {
+  try {
+    if (fs.existsSync(WASTE_STREAMS_FILE)) return JSON.parse(fs.readFileSync(WASTE_STREAMS_FILE, 'utf8'));
+  } catch(e) { console.error('Error loading waste streams:', e.message); }
+  return [];
+}
+function saveWasteStreams(ws) { fs.writeFileSync(WASTE_STREAMS_FILE, JSON.stringify(ws, null, 2)); }
+var wasteStreams = loadWasteStreams();
+
+app.get('/api/waste-streams', function(req, res) { res.json(wasteStreams); });
+app.post('/api/waste-streams', function(req, res) {
+  var ws = Object.assign({}, req.body, { id: 'ws' + Date.now(), createdAt: new Date().toISOString() });
+  wasteStreams.push(ws);
+  saveWasteStreams(wasteStreams);
+  res.json(ws);
+});
+app.put('/api/waste-streams/:id', function(req, res) {
+  var idx = wasteStreams.findIndex(function(w) { return w.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({error:'Not found'});
+  Object.assign(wasteStreams[idx], req.body);
+  saveWasteStreams(wasteStreams);
+  res.json(wasteStreams[idx]);
+});
+app.delete('/api/waste-streams/:id', function(req, res) {
+  wasteStreams = wasteStreams.filter(function(w) { return w.id !== req.params.id; });
+  saveWasteStreams(wasteStreams);
+  res.json({ok:true});
+});
+
 app.get('/api/profiles', function(req, res) { res.json(profiles); });
 
 // Sync generator info from a profile back to the customer record
