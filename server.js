@@ -795,11 +795,42 @@ app.get('/api/suggestions', function(req, res) { res.json(suggestions); });
 
 app.get('/api/profiles', function(req, res) { res.json(profiles); });
 
+// Sync generator info from a profile back to the customer record
+function syncProfileToCustomer(profile) {
+  if (!profile.customer) return;
+  var cust = (data.customers || []).find(function(c) { return c.name === profile.customer; });
+  if (!cust) return;
+  var changed = false;
+  // Map of profile fields -> customer fields
+  var fieldMap = [
+    ['epaId', 'epaId'],
+    ['generatorSiteAddress', 'address'],
+    ['generatorCity', 'city'],
+    ['generatorState', 'state'],
+    ['generatorZip', 'zip'],
+    ['generatorPhone', 'phone'],
+    ['technicalContact', 'contact']
+  ];
+  fieldMap.forEach(function(pair) {
+    var profileVal = (profile[pair[0]] || '').trim();
+    var custVal = (cust[pair[1]] || '').trim();
+    // Only update customer if profile has a value and customer doesn't
+    if (profileVal && !custVal) {
+      cust[pair[1]] = profileVal;
+      changed = true;
+    }
+  });
+  if (changed) {
+    saveData(data);
+  }
+}
+
 app.post('/api/profiles', function(req, res) {
   var profile = Object.assign({}, req.body, { id: 'prof' + Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   profiles.push(profile);
   saveProfiles(profiles);
   extractSuggestions(profile);
+  syncProfileToCustomer(profile);
   res.json(profile);
 });
 
@@ -809,6 +840,7 @@ app.put('/api/profiles/:id', function(req, res) {
   Object.assign(profiles[idx], req.body, { updatedAt: new Date().toISOString() });
   saveProfiles(profiles);
   extractSuggestions(profiles[idx]);
+  syncProfileToCustomer(profiles[idx]);
   res.json(profiles[idx]);
 });
 
