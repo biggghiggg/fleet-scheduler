@@ -1682,7 +1682,6 @@ function WasteProfiles({data}) {
   const [search, setSearch] = useState('');
   const [parsing, setParsing] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
-  const [suggestions, setSuggestions] = useState({});
   const [wasteStreams, setWasteStreams] = useState([]);
   const [wsDropOpen, setWsDropOpen] = useState(false);
 
@@ -1762,23 +1761,14 @@ function WasteProfiles({data}) {
       setProfiles(p);
     } catch(e) { console.error('Load profiles error:', e); }
   };
-  const loadSuggestions = async () => {
-    try {
-      const r = await fetch('/api/suggestions');
-      const s = await r.json();
-      setSuggestions(s);
-    } catch(e) { console.error('Load suggestions error:', e); }
-  };
   const loadWasteStreams = async () => {
     try {
       const r = await fetch('/api/waste-streams');
       setWasteStreams(await r.json());
     } catch(e) { console.error('Load waste streams error:', e); }
   };
-  useEffect(() => { loadProfiles(); loadSuggestions(); loadWasteStreams(); }, []);
+  useEffect(() => { loadProfiles(); loadWasteStreams(); }, []);
 
-  // Helper: render a datalist for a field's suggestions
-  const sug = (field) => (suggestions[field] || []);
 
   // Waste stream mini-form state
   const [showWsForm, setShowWsForm] = useState(false);
@@ -1980,7 +1970,6 @@ function WasteProfiles({data}) {
     }
     setShowForm(false); setEditId(null); setForm(emptyForm);
     loadProfiles();
-    loadSuggestions();
   };
 
   const openEdit = (p) => {
@@ -2178,13 +2167,6 @@ function WasteProfiles({data}) {
   const ewsProfiles = filtered.filter(p => p.profileType === 'ews');
 
   return (<div>
-    {/* Suggestion datalists for auto-complete on text fields */}
-    {Object.keys(suggestions).map(field => (
-      <datalist key={field} id={'sug-' + field}>
-        {(suggestions[field] || []).map((v, i) => <option key={i} value={v} />)}
-      </datalist>
-    ))}
-
     {/* Shared Search Header */}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
       <div>
@@ -2602,7 +2584,7 @@ function WasteProfiles({data}) {
           {/* ===== SECTION B: SHIPPING INFORMATION ===== */}
           <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>B. SHIPPING INFORMATION</div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>US DOT Proper Shipping Name</label>
-            <input list="sug-properShippingName" value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste flammable liquid, n.o.s." style={{fontSize:12}} /></div>
+            <input value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste flammable liquid, n.o.s." style={{fontSize:12}} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Hazard Class</label>
               <select value={form.hazardClass} onChange={e => setForm({ ...form, hazardClass: e.target.value })} style={{fontSize:12}}>
@@ -2626,7 +2608,7 @@ function WasteProfiles({data}) {
               <option value="Bulk">Bulk</option><option value="Totes">Totes</option><option value="Pallet">Pallet</option>
               <option value="Boxes">Boxes</option><option value="Drums">Drums</option><option value="Other">Other</option>
             </select>
-            {form.containerType === 'Other' && <input list="sug-containerOther" value={form.containerOther} onChange={e => setForm({ ...form, containerOther: e.target.value })} placeholder="Specify container type" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
+            {form.containerType === 'Other' && <input value={form.containerOther} onChange={e => setForm({ ...form, containerOther: e.target.value })} placeholder="Specify container type" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
           </div>
           <div style={{marginBottom:8}}>
             <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Frequency</label>
@@ -2635,7 +2617,7 @@ function WasteProfiles({data}) {
               <option value="Year">Year</option><option value="Quarterly">Quarterly</option><option value="Monthly">Monthly</option>
               <option value="1 time">1 time</option><option value="Other">Other</option>
             </select>
-            {form.frequency === 'Other' && <input list="sug-frequencyOther" value={form.frequencyOther} onChange={e => setForm({ ...form, frequencyOther: e.target.value })} placeholder="Specify frequency" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
+            {form.frequency === 'Other' && <input value={form.frequencyOther} onChange={e => setForm({ ...form, frequencyOther: e.target.value })} placeholder="Specify frequency" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Shipment Size</label>
@@ -2656,11 +2638,11 @@ function WasteProfiles({data}) {
           {/* ===== SECTION C: GENERAL MATERIAL & REGULATORY INFORMATION ===== */}
           <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>C. GENERAL MATERIAL &amp; REGULATORY INFORMATION</div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Common Name</label>
-            <input list="sug-commonName" value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} placeholder="Common name of waste material" style={{fontSize:12}} /></div>
+            <input value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} placeholder="Common name of waste material" style={{fontSize:12}} /></div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Process Generating Waste</label>
-            <input list="sug-processGenerating" value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} placeholder="Describe the process that generates this waste" style={{fontSize:12}} /></div>
+            <input value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} placeholder="Describe the process that generates this waste" style={{fontSize:12}} /></div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Describe Physical Appearance</label>
-            <input list="sug-physicalDescription" value={form.physicalDescription} onChange={e => setForm({ ...form, physicalDescription: e.target.value })} placeholder="Physical description of waste" style={{fontSize:12}} /></div>
+            <input value={form.physicalDescription} onChange={e => setForm({ ...form, physicalDescription: e.target.value })} placeholder="Physical description of waste" style={{fontSize:12}} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Odor</label>
               <select value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} style={{fontSize:12}}>
@@ -2673,7 +2655,7 @@ function WasteProfiles({data}) {
                 <option value="Liquid">Liquid</option><option value="Sludge-Slurry">Sludge-Slurry</option><option value="Solid">Solid</option>
               </select></div>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Color</label>
-              <input list="sug-color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="e.g. Clear, Amber" style={{fontSize:12}} /></div>
+              <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="e.g. Clear, Amber" style={{fontSize:12}} /></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Liquid Phases</label>
@@ -2761,9 +2743,9 @@ function WasteProfiles({data}) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Source Code</label>
-              <input list="sug-sourceCode" value={form.sourceCode} onChange={e => setForm({ ...form, sourceCode: e.target.value })} placeholder="Source code" style={{fontSize:12}} /></div>
+              <input value={form.sourceCode} onChange={e => setForm({ ...form, sourceCode: e.target.value })} placeholder="Source code" style={{fontSize:12}} /></div>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Form Code</label>
-              <input list="sug-formCode" value={form.formCode} onChange={e => setForm({ ...form, formCode: e.target.value })} placeholder="Form code" style={{fontSize:12}} /></div>
+              <input value={form.formCode} onChange={e => setForm({ ...form, formCode: e.target.value })} placeholder="Form code" style={{fontSize:12}} /></div>
           </div>
 
           {/* ===== SECTION D: COMPOSITION ===== */}
@@ -3113,7 +3095,7 @@ function WasteProfiles({data}) {
           <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
             <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>9. Process Generating Waste:</em></strong>
-              <input list="sug-processGenerating" value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              <input value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
             </div>
             <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>10. Is the waste US EPA HAZARDOUS WASTE (40 CFR Part 261)?</em></strong>
@@ -3121,15 +3103,15 @@ function WasteProfiles({data}) {
             </div>
             <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>11. State Codes:</em></strong>
-              <input list="sug-stateCodes" value={form.stateCodes} onChange={e => setForm({ ...form, stateCodes: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              <input value={form.stateCodes} onChange={e => setForm({ ...form, stateCodes: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
             </div>
             <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>12. Common Waste Name:</em></strong>
-              <input list="sug-commonName" value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              <input value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
             </div>
             <div onClick={e => e.stopPropagation()} style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>13. US DOT Proper Shipping Name:</em></strong>
-              <input list="sug-properShippingName" value={form.properShippingName}
+              <input value={form.properShippingName}
                 onChange={e => setForm({ ...form, properShippingName: e.target.value })}
                 onFocus={() => setWsDropOpen(true)}
                 style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
@@ -3206,7 +3188,7 @@ function WasteProfiles({data}) {
             </div>
             <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>17. Special Handling Instructions:</em></strong>
-              <input list="sug-specialHandling" value={form.specialHandling} onChange={e => setForm({ ...form, specialHandling: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              <input value={form.specialHandling} onChange={e => setForm({ ...form, specialHandling: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
             </div>
             <div style={{ padding: '5px 10px' }}>
               <strong><em>18. Waste Composition:</em></strong> <span style={{ fontSize: 11, color: '#6b7280' }}>List all components with %</span>
@@ -3253,7 +3235,7 @@ function WasteProfiles({data}) {
             <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <strong style={{ whiteSpace: 'nowrap' }}><em>19. Sampling Source:</em></strong>
-                <input list="sug-samplingSource" value={form.samplingSource} onChange={e => setForm({ ...form, samplingSource: e.target.value })} placeholder="drum, stockpile, pond" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+                <input value={form.samplingSource} onChange={e => setForm({ ...form, samplingSource: e.target.value })} placeholder="drum, stockpile, pond" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <strong style={{ whiteSpace: 'nowrap' }}><em>19(a) Date Sampled/Lab ID:</em></strong>
@@ -3263,11 +3245,11 @@ function WasteProfiles({data}) {
             <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <strong style={{ whiteSpace: 'nowrap' }}><em>19(b). Sampler's Name &amp; Company:</em></strong>
-                <input list="sug-samplerName" value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+                <input value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <strong style={{ whiteSpace: 'nowrap' }}><em>SDS Product name:</em></strong>
-                <input list="sug-sdsProductName" value={form.sdsProductName} onChange={e => setForm({ ...form, sdsProductName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+                <input value={form.sdsProductName} onChange={e => setForm({ ...form, sdsProductName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
               </div>
             </div>
           </div>
