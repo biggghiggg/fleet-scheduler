@@ -755,6 +755,35 @@ function loadProfiles() {
 function saveProfiles(p) { fs.writeFileSync(PROFILES_FILE, JSON.stringify(p, null, 2)); }
 var profiles = loadProfiles();
 
+// SAVED SIGNERS — dropdown for signature names
+var SIGNERS_FILE = path.join(DATA_DIR, 'signers.json');
+function loadSigners() {
+  try {
+    if (fs.existsSync(SIGNERS_FILE)) return JSON.parse(fs.readFileSync(SIGNERS_FILE, 'utf8'));
+  } catch(e) { console.error('Error loading signers:', e.message); }
+  return [];
+}
+function saveSignersFile(s) { fs.writeFileSync(SIGNERS_FILE, JSON.stringify(s, null, 2)); }
+var signers = loadSigners();
+
+app.get('/api/signers', function(req, res) { res.json(signers); });
+app.post('/api/signers', function(req, res) {
+  var name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Name required' });
+  if (signers.indexOf(name) === -1) {
+    signers.push(name);
+    signers.sort();
+    saveSignersFile(signers);
+  }
+  res.json(signers);
+});
+app.delete('/api/signers/:name', function(req, res) {
+  var name = decodeURIComponent(req.params.name);
+  signers = signers.filter(function(s) { return s !== name; });
+  saveSignersFile(signers);
+  res.json(signers);
+});
+
 // WASTE STREAM PROFILES — reusable Section 3 templates
 var WASTE_STREAMS_FILE = path.join(DATA_DIR, 'wasteStreams.json');
 function loadWasteStreams() {
@@ -852,6 +881,10 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   if (!profile) return res.status(404).json({error:'Not found'});
 
   var doc = new PDFDocument({ size: 'LETTER', margins: { top: 40, bottom: 40, left: 50, right: 50 } });
+  var sigFontPath = path.join(__dirname, 'DancingScript-Regular.ttf');
+  if (fs.existsSync(sigFontPath)) {
+    doc.registerFont('Signature', sigFontPath);
+  }
   var buffers = [];
   doc.on('data', function(chunk) { buffers.push(chunk); });
   doc.on('end', function() {
@@ -1286,12 +1319,22 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   var sigName = profile.signatureName || '';
   var sigDate = profile.signatureDate || '';
   if (sigName) {
-    doc.font('Helvetica').fontSize(10).fillColor('#000')
-      .text(sigName, sigX2, y - 14, { width: sigLineLen2, align: 'center' });
+    // Cursive signature on the Signature line
+    var hasSigFont = fs.existsSync(sigFontPath);
+    if (hasSigFont) {
+      doc.font('Signature').fontSize(16).fillColor('#1a1a6e')
+        .text(sigName, sigX1, y - 20, { width: sigLineLen1, align: 'center', lineBreak: false });
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(13).fillColor('#1a1a6e')
+        .text(sigName, sigX1, y - 16, { width: sigLineLen1, align: 'center', lineBreak: false });
+    }
+    // Printed name on the Printed Name line
+    doc.font('Helvetica').fontSize(9).fillColor('#000')
+      .text(sigName, sigX2, y - 12, { width: sigLineLen2, align: 'center', lineBreak: false });
   }
   if (sigDate) {
-    doc.font('Helvetica').fontSize(10).fillColor('#000')
-      .text(sigDate, sigX3, y - 14, { width: sigLineLen3, align: 'center' });
+    doc.font('Helvetica').fontSize(9).fillColor('#000')
+      .text(sigDate, sigX3, y - 12, { width: sigLineLen3, align: 'center', lineBreak: false });
   }
 
   doc.lineWidth(0.75);
