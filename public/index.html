@@ -1680,6 +1680,8 @@ function WasteProfiles({data}) {
   const [parsing, setParsing] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [suggestions, setSuggestions] = useState({});
+  const [wasteStreams, setWasteStreams] = useState([]);
+  const [wsDropOpen, setWsDropOpen] = useState(false);
 
   const emptyForm = {
     profileType: 'use',
@@ -1764,10 +1766,82 @@ function WasteProfiles({data}) {
       setSuggestions(s);
     } catch(e) { console.error('Load suggestions error:', e); }
   };
-  useEffect(() => { loadProfiles(); loadSuggestions(); }, []);
+  const loadWasteStreams = async () => {
+    try {
+      const r = await fetch('/api/waste-streams');
+      setWasteStreams(await r.json());
+    } catch(e) { console.error('Load waste streams error:', e); }
+  };
+  useEffect(() => { loadProfiles(); loadSuggestions(); loadWasteStreams(); }, []);
 
   // Helper: render a datalist for a field's suggestions
   const sug = (field) => (suggestions[field] || []);
+
+  // Save current Section 3 fields as a reusable waste stream profile
+  const saveWasteStream = async () => {
+    var wsName = ((form.customer || '') + ' - ' + (form.commonName || form.properShippingName || 'Waste Stream')).trim();
+    var payload = {
+      name: wsName,
+      processGenerating: form.processGenerating || '',
+      stateCodes: form.stateCodes || '',
+      commonName: form.commonName || '',
+      properShippingName: form.properShippingName || '',
+      physicalState: form.physicalState || '',
+      methodOfShipment: form.methodOfShipment || '',
+      shipmentSize: form.shipmentSize || '',
+      shipmentQuantity: form.shipmentQuantity || '',
+      frequency: form.frequency || '',
+      specialHandling: form.specialHandling || '',
+      chemicals: form.chemicals || [],
+      sampleType: form.sampleType || '',
+      color: form.color || '',
+      odor: form.odor || '',
+      freeLiquidsPercent: form.freeLiquidsPercent || '',
+      percentSolids: form.percentSolids || '',
+      pHValue: form.pHValue || '',
+      flashPoint: form.flashPoint || '',
+      liquidPhases: form.liquidPhases || ''
+    };
+    await fetch('/api/waste-streams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    loadWasteStreams();
+    setWsDropOpen(false);
+    alert('Waste stream profile saved: ' + wsName);
+  };
+
+  // Apply a saved waste stream profile to current form
+  const applyWasteStream = (ws) => {
+    var autoName = ((form.customer || '') + ' - ' + (ws.commonName || ws.properShippingName || '')).trim();
+    setForm(function(prev) { return Object.assign({}, prev, {
+      name: prev.name || autoName,
+      processGenerating: ws.processGenerating || prev.processGenerating,
+      stateCodes: ws.stateCodes || prev.stateCodes,
+      commonName: ws.commonName || prev.commonName,
+      properShippingName: ws.properShippingName || prev.properShippingName,
+      physicalState: ws.physicalState || prev.physicalState,
+      methodOfShipment: ws.methodOfShipment || prev.methodOfShipment,
+      shipmentSize: ws.shipmentSize || prev.shipmentSize,
+      shipmentQuantity: ws.shipmentQuantity || prev.shipmentQuantity,
+      frequency: ws.frequency || prev.frequency,
+      specialHandling: ws.specialHandling || prev.specialHandling,
+      chemicals: ws.chemicals && ws.chemicals.length > 0 ? ws.chemicals : prev.chemicals,
+      sampleType: ws.sampleType || prev.sampleType,
+      color: ws.color || prev.color,
+      odor: ws.odor || prev.odor,
+      freeLiquidsPercent: ws.freeLiquidsPercent || prev.freeLiquidsPercent,
+      percentSolids: ws.percentSolids || prev.percentSolids,
+      pHValue: ws.pHValue || prev.pHValue,
+      flashPoint: ws.flashPoint || prev.flashPoint,
+      liquidPhases: ws.liquidPhases || prev.liquidPhases
+    }); });
+    setWsDropOpen(false);
+  };
+
+  const deleteWasteStream = async (id, e) => {
+    e.stopPropagation();
+    if (!confirm('Delete this waste stream profile?')) return;
+    await fetch('/api/waste-streams/' + id, { method: 'DELETE' });
+    loadWasteStreams();
+  };
 
   // Upload SDS and parse
   const uploadSDS = async (files) => {
@@ -2956,7 +3030,7 @@ function WasteProfiles({data}) {
     {/* =============== EWS Form Modal =============== */}
     {showForm && form.profileType === 'ews' && (
       <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
-        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 750, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', padding: 0 }}>
+        <div className="modal" onClick={e => { e.stopPropagation(); setWsDropOpen(false); }} style={{ width: 750, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', padding: 0 }}>
 
           {/* ===== HEADER — matches original form ===== */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '2px solid #059669' }}>
@@ -3054,9 +3128,43 @@ function WasteProfiles({data}) {
               <strong style={{ whiteSpace: 'nowrap' }}><em>12. Common Waste Name:</em></strong>
               <input list="sug-commonName" value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
             </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div onClick={e => e.stopPropagation()} style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>13. US DOT Proper Shipping Name:</em></strong>
-              <input list="sug-properShippingName" value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              <input list="sug-properShippingName" value={form.properShippingName}
+                onChange={e => setForm({ ...form, properShippingName: e.target.value })}
+                onFocus={() => setWsDropOpen(true)}
+                style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              {wsDropOpen && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxHeight: 260, overflowY: 'auto' }}>
+                  <div style={{ padding: '6px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>Waste Stream Profiles</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="bp" style={{ fontSize: 10, padding: '2px 8px', background: '#059669' }}
+                        onClick={(e) => { e.stopPropagation(); saveWasteStream(); }}>+ Save Current as Profile</button>
+                      <button style={{ fontSize: 10, padding: '2px 8px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        onClick={(e) => { e.stopPropagation(); setWsDropOpen(false); }}>Close</button>
+                    </div>
+                  </div>
+                  {wasteStreams.length === 0 ? (
+                    <div style={{ padding: '12px 10px', textAlign: 'center', color: '#9ca3af', fontSize: 11 }}>No saved waste stream profiles yet. Fill out Section 3 and click "Save Current as Profile" above.</div>
+                  ) : (
+                    wasteStreams.map(function(ws) { return (
+                      <div key={ws.id} style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        onClick={() => applyWasteStream(ws)}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#059669' }}>{ws.name}</div>
+                          <div style={{ fontSize: 10, color: '#6b7280' }}>
+                            {[ws.commonName, ws.properShippingName, ws.physicalState].filter(Boolean).join(' | ')}
+                          </div>
+                        </div>
+                        <span onClick={(e) => deleteWasteStream(ws.id, e)} style={{ color: '#dc2626', cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '0 4px' }}>&times;</span>
+                      </div>
+                    ); })
+                  )}
+                </div>
+              )}
             </div>
             <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>14. Physical State</em></strong>
