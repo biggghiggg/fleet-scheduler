@@ -1679,8 +1679,10 @@ function WasteProfiles({data}) {
   const [search, setSearch] = useState('');
   const [parsing, setParsing] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [suggestions, setSuggestions] = useState({});
 
   const emptyForm = {
+    profileType: 'use',
     // Profile identification
     name: '', customer: '',
     // A - Generator Information
@@ -1713,6 +1715,34 @@ function WasteProfiles({data}) {
     toxicity: [], reactivityFlags: [], incompatibles: '', stabilityNotes: '',
     estimatedFlashPoint: '', estimatedPH: '', uhcMatches: []
   };
+  const emptyEwsForm = {
+    profileType: 'ews',
+    name: '', customer: '',
+    // Generator Info
+    generatorSiteAddress: '', generatorCity: '', generatorState: '', generatorZip: '',
+    epaId: '', generatorMailingAddress: '', generatorMailingCity: '', generatorMailingCountry: '',
+    generatorMailingState: '', generatorMailingZip: '',
+    technicalContact: 'Keith Higgins', generatorPhone: '(559) 243-6169',
+    // Waste Properties
+    processGenerating: '', epaHazardous: 'No', stateCodes: '',
+    commonName: '', properShippingName: '',
+    physicalState: '', methodOfShipment: '', shipmentSize: '', shipmentQuantity: '',
+    frequency: '', specialHandling: 'WEAR CORRECT PPE',
+    // Composition
+    chemicals: [],
+    // Sampling
+    samplingSource: '', dateSampled: '', samplerName: '', sdsProductName: '',
+    // Characteristics
+    color: '', odor: '', freeLiquidsPercent: '', percentSolids: '',
+    pHValue: '', flashPoint: '', liquidPhases: '',
+    containsRegulatedHazWaste: 'No', containsPCBs: 'No',
+    regulatedToxicMaterial: 'No', radioactive: 'No', infectiousMedical: 'No',
+    // Auto-generated / SDS data
+    profileNotes: '', sdsFiles: [],
+    estimatedFlashPoint: '', estimatedPH: '',
+    toxicity: [], reactivityFlags: [], incompatibles: '', stabilityNotes: ''
+  };
+
   const [form, setForm] = useState(emptyForm);
   const [newEpaCode, setNewEpaCode] = useState('');
   const [newCaCode, setNewCaCode] = useState('');
@@ -1725,7 +1755,17 @@ function WasteProfiles({data}) {
       setProfiles(p);
     } catch(e) { console.error('Load profiles error:', e); }
   };
-  useEffect(() => { loadProfiles(); }, []);
+  const loadSuggestions = async () => {
+    try {
+      const r = await fetch('/api/suggestions');
+      const s = await r.json();
+      setSuggestions(s);
+    } catch(e) { console.error('Load suggestions error:', e); }
+  };
+  useEffect(() => { loadProfiles(); loadSuggestions(); }, []);
+
+  // Helper: render a datalist for a field's suggestions
+  const sug = (field) => (suggestions[field] || []);
 
   // Upload SDS and parse
   const uploadSDS = async (files) => {
@@ -1811,6 +1851,49 @@ function WasteProfiles({data}) {
     setParsing(false);
   };
 
+  // Upload SDS for EWS profiles
+  const uploadEwsSDS = async (files) => {
+    setParsing(true);
+    try {
+      const fd = new FormData();
+      Array.from(files).forEach(f => fd.append('files', f));
+      const r = await fetch('/api/sds/parse', { method: 'POST', body: fd });
+      const result = await r.json();
+      if (result.merged) {
+        var m = result.merged;
+        var mappedChemicals = (m.chemicals || []).map(function(c) {
+          return { name: c.name || '', cas: c.cas || '', percentage: c.percentage || '' };
+        });
+        var fpVal = m.flashPoint || '';
+        var fpNum = m.flashPointNumF != null ? m.flashPointNumF : NaN;
+        if (isNaN(fpNum)) {
+          var fpFirstNum = String(fpVal).match(/(-?\d+\.?\d*)/);
+          fpNum = fpFirstNum ? parseFloat(fpFirstNum[1]) : NaN;
+        }
+        setForm({
+          ...emptyEwsForm,
+          chemicals: mappedChemicals,
+          properShippingName: m.properShippingName || '',
+          physicalState: m.physicalState || '',
+          color: m.color || '',
+          odor: m.odor || '',
+          pHValue: m.pH || '',
+          flashPoint: !isNaN(fpNum) ? String(fpNum) + ' °F' : fpVal,
+          sdsFiles: m.sdsFiles || [],
+          estimatedFlashPoint: m.estimatedFlashPoint || '',
+          estimatedPH: m.estimatedPH || '',
+          toxicity: m.toxicity || [],
+          reactivityFlags: m.reactivityFlags || [],
+          incompatibles: m.incompatibles || '',
+          stabilityNotes: m.stabilityNotes || ''
+        });
+        setEditId(null);
+        setShowForm(true);
+      }
+    } catch(e) { alert('Error parsing SDS: ' + e.message); }
+    setParsing(false);
+  };
+
   // Save profile
   const save = async () => {
     if (!form.name.trim()) { alert('Please enter a profile name'); return; }
@@ -1822,11 +1905,48 @@ function WasteProfiles({data}) {
     }
     setShowForm(false); setEditId(null); setForm(emptyForm);
     loadProfiles();
+    loadSuggestions();
   };
 
   const openEdit = (p) => {
+    if (p.profileType === 'ews') {
+      setEditId(p.id);
+      setForm({
+        profileType: 'ews',
+        name: p.name || '', customer: p.customer || '',
+        generatorSiteAddress: p.generatorSiteAddress || '', generatorCity: p.generatorCity || '',
+        generatorState: p.generatorState || '', generatorZip: p.generatorZip || '',
+        epaId: p.epaId || '',
+        generatorMailingAddress: p.generatorMailingAddress || '',
+        generatorMailingCity: p.generatorMailingCity || '', generatorMailingCountry: p.generatorMailingCountry || '',
+        generatorMailingState: p.generatorMailingState || '', generatorMailingZip: p.generatorMailingZip || '',
+        technicalContact: p.technicalContact || 'Keith Higgins', generatorPhone: p.generatorPhone || '(559) 243-6169',
+        processGenerating: p.processGenerating || '', epaHazardous: p.epaHazardous || 'No',
+        stateCodes: p.stateCodes || '', commonName: p.commonName || '',
+        properShippingName: p.properShippingName || '', physicalState: p.physicalState || '',
+        methodOfShipment: p.methodOfShipment || '', shipmentSize: p.shipmentSize || '',
+        shipmentQuantity: p.shipmentQuantity || '', frequency: p.frequency || '',
+        specialHandling: p.specialHandling || 'WEAR CORRECT PPE',
+        chemicals: p.chemicals || [],
+        samplingSource: p.samplingSource || '', dateSampled: p.dateSampled || '',
+        samplerName: p.samplerName || '', sdsProductName: p.sdsProductName || '',
+        color: p.color || '', odor: p.odor || '',
+        freeLiquidsPercent: p.freeLiquidsPercent || '', percentSolids: p.percentSolids || '',
+        pHValue: p.pHValue || '', flashPoint: p.flashPoint || '', liquidPhases: p.liquidPhases || '',
+        containsRegulatedHazWaste: p.containsRegulatedHazWaste || 'No',
+        containsPCBs: p.containsPCBs || 'No', regulatedToxicMaterial: p.regulatedToxicMaterial || 'No',
+        radioactive: p.radioactive || 'No', infectiousMedical: p.infectiousMedical || 'No',
+        profileNotes: p.profileNotes || '', sdsFiles: p.sdsFiles || [],
+        estimatedFlashPoint: p.estimatedFlashPoint || '', estimatedPH: p.estimatedPH || '',
+        toxicity: p.toxicity || [], reactivityFlags: p.reactivityFlags || [],
+        incompatibles: p.incompatibles || '', stabilityNotes: p.stabilityNotes || ''
+      });
+      setShowForm(true);
+      return;
+    }
     setEditId(p.id);
     setForm({
+      profileType: p.profileType || 'use',
       name: p.name || '', customer: p.customer || '',
       // A
       generatorStatus: p.generatorStatus || '', epaId: p.epaId || '', stateId: p.stateId || '',
@@ -1881,6 +2001,10 @@ function WasteProfiles({data}) {
     setEditId(null); setForm(emptyForm); setShowForm(true);
   };
 
+  const openNewEws = () => {
+    setEditId(null); setForm(emptyEwsForm); setShowForm(true);
+  };
+
   const del = async (id) => {
     if (!confirm('Delete this profile?')) return;
     await fetch('/api/profiles/' + id, { method: 'DELETE' });
@@ -1897,6 +2021,9 @@ function WasteProfiles({data}) {
   };
   const removeChemical = (idx) => {
     setForm({ ...form, chemicals: form.chemicals.filter((_, i) => i !== idx) });
+  };
+  const addEwsChemical = () => {
+    setForm({ ...form, chemicals: [...form.chemicals, { name: '', cas: '', percentage: '' }] });
   };
 
   // Add/remove waste codes
@@ -1925,6 +2052,7 @@ function WasteProfiles({data}) {
     return (p.name || '').toLowerCase().includes(s) ||
       (p.customer || '').toLowerCase().includes(s) ||
       (p.unNumber || '').toLowerCase().includes(s) ||
+      (p.commonName || '').toLowerCase().includes(s) ||
       (p.properShippingName || '').toLowerCase().includes(s);
   }) : profiles;
 
@@ -1956,23 +2084,58 @@ function WasteProfiles({data}) {
     setForm(function(prev) { return Object.assign({}, prev, updates); });
   };
 
+  const onEwsGeneratorChange = (val) => {
+    var updates = { customer: val };
+    var cust = (data.customers || []).find(function(c) { return c.name === val; });
+    if (cust) {
+      if (cust.address) updates.generatorSiteAddress = cust.address;
+      if (cust.city) updates.generatorCity = cust.city;
+      if (cust.state) updates.generatorState = cust.state;
+      if (cust.zip) updates.generatorZip = cust.zip;
+      if (cust.epaId) updates.epaId = cust.epaId;
+      if (cust.contact) updates.technicalContact = cust.contact;
+      if (cust.phone) updates.generatorPhone = cust.phone;
+    }
+    setForm(function(prev) { return Object.assign({}, prev, updates); });
+  };
+
+  const useProfiles = filtered.filter(p => (p.profileType || 'use') === 'use');
+  const ewsProfiles = filtered.filter(p => p.profileType === 'ews');
+
   return (<div>
-    {/* Header */}
+    {/* Suggestion datalists for auto-complete on text fields */}
+    {Object.keys(suggestions).map(field => (
+      <datalist key={field} id={'sug-' + field}>
+        {(suggestions[field] || []).map((v, i) => <option key={i} value={v} />)}
+      </datalist>
+    ))}
+
+    {/* Shared Search Header */}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
       <div>
         <h2 style={{ margin: 0, fontSize: 20 }}>Waste Profiles</h2>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Upload SDS sheets to auto-generate waste profiles with suggested UN numbers, shipping names, and waste codes.</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Manage USE and EWS waste profiles. Upload SDS sheets to auto-generate profiles.</div>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search profiles..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, width: 200 }} />
-        <button className="bp" onClick={openNew} style={{ padding: '8px 16px' }}>+ New Profile</button>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search all profiles..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, width: 200 }} />
       </div>
     </div>
 
-    {/* SDS Upload Area */}
+    {/* =============== USE SECTION =============== */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+      <div>
+        <h3 style={{ margin: 0, fontSize: 17, color: '#7c3aed' }}>US Ecology (USE) Profiles</h3>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>RCRA/hazardous waste profiles for US Ecology disposal facilities.</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button className="bp" onClick={openNew} style={{ padding: '8px 16px' }}>+ New USE Profile</button>
+      </div>
+    </div>
+
+    {/* USE SDS Upload Area */}
     <div style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)', border: '2px dashed var(--primary)', textAlign: 'center' }}>
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>Upload SDS (Safety Data Sheets)</div>
-      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Upload one or more SDS PDFs to extract chemicals, UN numbers, and generate a suggested waste profile.</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary)', marginBottom: 8 }}>Upload SDS (Safety Data Sheets) - USE</div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Upload one or more SDS PDFs to extract chemicals, UN numbers, and generate a suggested USE waste profile.</div>
       <label style={{ display: 'inline-block', background: 'var(--primary)', color: '#fff', padding: '10px 24px', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
         {parsing ? 'Analyzing SDS...' : 'Choose SDS PDF(s)'}
         <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
@@ -1980,15 +2143,15 @@ function WasteProfiles({data}) {
       {parsing && <div style={{ marginTop: 8, color: 'var(--primary)', fontSize: 13 }}>Extracting chemical data from SDS...</div>}
     </div>
 
-    {/* Profiles List */}
-    {filtered.length === 0 && !showForm && (
+    {/* USE Profiles List */}
+    {useProfiles.length === 0 && !showForm && (
       <div style={{ textAlign: 'center', padding: 40, color: '#999', fontSize: 14 }}>
-        {search ? 'No profiles match your search.' : 'No profiles yet. Upload an SDS or click "+ New Profile" to get started.'}
+        {search ? 'No USE profiles match your search.' : 'No USE profiles yet. Upload an SDS or click "+ New USE Profile" to get started.'}
       </div>
     )}
 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {filtered.map(p => (
+      {useProfiles.map(p => (
         <div key={p.id} style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow)', borderLeft: '4px solid #7c3aed' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}>
@@ -2149,11 +2312,178 @@ function WasteProfiles({data}) {
       ))}
     </div>
 
-    {/* New/Edit Profile Modal */}
-    {showForm && (
+    {/* =============== EWS SECTION =============== */}
+    <div style={{ marginTop: 32, paddingTop: 24, borderTop: '3px solid #e5e7eb' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 17, color: '#059669' }}>Environmental Waste Solutions (EWS) Profiles</h3>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Non-RCRA, non-hazardous waste profiles for Environmental Waste Solutions.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="bp" onClick={openNewEws} style={{ padding: '8px 16px', background: '#059669' }}>+ New EWS Profile</button>
+        </div>
+      </div>
+
+      {/* EWS SDS Upload Area */}
+      <div style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)', border: '2px dashed #059669', textAlign: 'center' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#059669', marginBottom: 8 }}>Upload SDS (Safety Data Sheets) - EWS</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Upload one or more SDS PDFs to extract chemicals and generate a suggested EWS waste profile.</div>
+        <label style={{ display: 'inline-block', background: '#059669', color: '#fff', padding: '10px 24px', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
+          {parsing ? 'Analyzing SDS...' : 'Choose SDS PDF(s)'}
+          <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadEwsSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
+        </label>
+        {parsing && <div style={{ marginTop: 8, color: '#059669', fontSize: 13 }}>Extracting chemical data from SDS...</div>}
+      </div>
+
+      {/* EWS Profiles List */}
+      {ewsProfiles.length === 0 && !showForm && (
+        <div style={{ textAlign: 'center', padding: 40, color: '#999', fontSize: 14 }}>
+          {search ? 'No EWS profiles match your search.' : 'No EWS profiles yet. Upload an SDS or click "+ New EWS Profile" to get started.'}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {ewsProfiles.map(p => (
+          <div key={p.id} style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow)', borderLeft: '4px solid #059669' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#059669' }}>{p.name || 'Unnamed Profile'}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6, fontSize: 13 }}>
+                  {p.customer && <span style={{ color: 'var(--text-muted)' }}>Generator: <strong>{p.customer}</strong></span>}
+                  {p.commonName && <span style={{ color: '#555' }}>{p.commonName}</span>}
+                  {p.physicalState && <span style={{ background: '#e0e7ff', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#3730a3', fontSize: 12 }}>{p.physicalState}</span>}
+                  {p.properShippingName && <span style={{ color: '#555' }}>{p.properShippingName}</span>}
+                  <span style={{ background: '#dcfce7', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#166534', fontSize: 12 }}>NON-RCRA</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="bp" style={{ fontSize: 11, padding: '4px 10px', background: '#059669' }} onClick={() => openEdit(p)}>Edit</button>
+                <button style={{ background: '#fee2e2', color: 'var(--danger)', fontSize: 11, padding: '4px 10px' }} onClick={() => del(p.id)}>Delete</button>
+              </div>
+            </div>
+
+            {/* EWS Expanded view */}
+            {expandedId === p.id && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                {/* Generator Info */}
+                {(p.epaId || p.generatorSiteAddress || p.technicalContact || p.customer) && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: '#374151', marginBottom: 4 }}>Generator Information</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '4px 16px', fontSize: 13 }}>
+                      {p.customer && <div><strong>Generator:</strong> {p.customer}</div>}
+                      {p.generatorSiteAddress && <div><strong>Site Address:</strong> {p.generatorSiteAddress}{p.generatorCity ? ', ' + p.generatorCity : ''}{p.generatorState ? ', ' + p.generatorState : ''} {p.generatorZip || ''}</div>}
+                      {p.epaId && <div><strong>EPA ID:</strong> {p.epaId}</div>}
+                      {p.technicalContact && <div><strong>Contact:</strong> {p.technicalContact}</div>}
+                      {p.generatorPhone && <div><strong>Phone:</strong> {p.generatorPhone}</div>}
+                    </div>
+                  </div>
+                )}
+                {/* Waste Properties */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 13, marginBottom: 12 }}>
+                  {p.processGenerating && <div><strong>Process:</strong> {p.processGenerating}</div>}
+                  {p.commonName && <div><strong>Common Name:</strong> {p.commonName}</div>}
+                  {p.properShippingName && <div><strong>DOT Shipping Name:</strong> {p.properShippingName}</div>}
+                  {p.physicalState && <div><strong>Physical State:</strong> {p.physicalState}</div>}
+                  {p.methodOfShipment && <div><strong>Method of Shipment:</strong> {p.methodOfShipment}</div>}
+                  {p.shipmentSize && <div><strong>Shipment Size:</strong> {p.shipmentSize}</div>}
+                  {p.shipmentQuantity && <div><strong>Quantity:</strong> {p.shipmentQuantity}</div>}
+                  {p.frequency && <div><strong>Frequency:</strong> {p.frequency}</div>}
+                  {p.specialHandling && <div><strong>Special Handling:</strong> {p.specialHandling}</div>}
+                </div>
+                {/* Characteristics */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 13, marginBottom: 12 }}>
+                  {p.color && <div><strong>Color:</strong> {p.color}</div>}
+                  {p.odor && <div><strong>Odor:</strong> {p.odor}</div>}
+                  {p.pHValue && <div><strong>pH:</strong> {p.pHValue}</div>}
+                  {p.flashPoint && <div><strong>Flash Point:</strong> {p.flashPoint}</div>}
+                  {p.freeLiquidsPercent && <div><strong>Free Liquids %:</strong> {p.freeLiquidsPercent}</div>}
+                  {p.percentSolids && <div><strong>% Solids:</strong> {p.percentSolids}</div>}
+                  {p.liquidPhases && <div><strong>Liquid Phases:</strong> {p.liquidPhases}</div>}
+                </div>
+                {/* Yes/No flags */}
+                {(function() {
+                  var flags = [
+                    ['Regulated Haz Waste', p.containsRegulatedHazWaste],
+                    ['Contains PCBs', p.containsPCBs],
+                    ['Regulated Toxic', p.regulatedToxicMaterial],
+                    ['Radioactive', p.radioactive],
+                    ['Infectious/Medical', p.infectiousMedical]
+                  ].filter(function(x) { return x[1] && x[1] !== 'No'; });
+                  if (flags.length === 0) return null;
+                  return React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 } },
+                    flags.map(function(x, i) {
+                      return React.createElement('span', { key: i, style: { background: '#fee2e2', color: '#991b1b', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 } }, x[0] + ': ' + x[1]);
+                    })
+                  );
+                })()}
+                {/* Sampling Info */}
+                {(p.samplingSource || p.dateSampled || p.samplerName || p.sdsProductName) && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: '#374151', marginBottom: 4 }}>Sampling Information</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '4px 16px', fontSize: 13 }}>
+                      {p.samplingSource && <div><strong>Source:</strong> {p.samplingSource}</div>}
+                      {p.dateSampled && <div><strong>Date Sampled:</strong> {p.dateSampled}</div>}
+                      {p.samplerName && <div><strong>Sampler:</strong> {p.samplerName}</div>}
+                      {p.sdsProductName && <div><strong>SDS Product:</strong> {p.sdsProductName}</div>}
+                    </div>
+                  </div>
+                )}
+                {/* Composition */}
+                {p.chemicals && p.chemicals.length > 0 && (
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: '#059669' }}>Composition</div>
+                    <div className="rtable">
+                      <table>
+                        <thead><tr><th>Constituent</th><th>CAS #</th><th>%</th></tr></thead>
+                        <tbody>
+                          {p.chemicals.map((c, i) => (
+                            <tr key={i}>
+                              <td style={{ fontWeight: 600 }}>{c.name}</td>
+                              <td>{c.cas || '—'}</td>
+                              <td>{c.percentage || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                {/* Mixture estimates */}
+                {(p.estimatedFlashPoint || p.estimatedPH) && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 13, marginBottom: 8 }}>
+                    {p.estimatedFlashPoint && <div><strong>Est. Flash Point (mixture):</strong> {p.estimatedFlashPoint}</div>}
+                    {p.estimatedPH && <div><strong>Est. pH (mixture):</strong> {p.estimatedPH}</div>}
+                  </div>
+                )}
+                {/* Toxicity */}
+                {p.toxicity && p.toxicity.length > 0 && (
+                  <div style={{ marginBottom: 8, fontSize: 13 }}>
+                    <strong>Toxicity: </strong>
+                    {p.toxicity.map((t, i) => <span key={i} style={{ marginRight: 12 }}>{t.type} ({t.route}): {t.value}</span>)}
+                  </div>
+                )}
+                {p.profileNotes && <div style={{ marginTop: 8, padding: '8px 12px', background: '#fffbeb', borderRadius: 6, fontSize: 13, whiteSpace: 'pre-wrap' }}><strong>Notes:</strong> {p.profileNotes}</div>}
+                {p.sdsFiles && p.sdsFiles.length > 0 && (
+                  <div style={{ marginTop: 8, fontSize: 12 }}>
+                    <strong>SDS Files:</strong> {p.sdsFiles.map(f => f.name).join(', ')}
+                  </div>
+                )}
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                  Created: {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
+                  {p.updatedAt && p.updatedAt !== p.createdAt && <span> | Updated: {new Date(p.updatedAt).toLocaleDateString()}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* =============== USE Form Modal =============== */}
+    {showForm && form.profileType !== 'ews' && (
       <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
         <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 750, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
-          <h2>{editId ? 'Edit Profile' : 'New Waste Profile'}</h2>
+          <h2>{editId ? 'Edit USE Profile' : 'New USE Waste Profile'}</h2>
 
           {/* ===== SECTION A: GENERATOR INFORMATION ===== */}
           <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,borderBottom:'2px solid #374151'}}>A. GENERATOR INFORMATION</div>
@@ -2196,7 +2526,7 @@ function WasteProfiles({data}) {
           {/* ===== SECTION B: SHIPPING INFORMATION ===== */}
           <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>B. SHIPPING INFORMATION</div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>US DOT Proper Shipping Name</label>
-            <input value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste flammable liquid, n.o.s." style={{fontSize:12}} /></div>
+            <input list="sug-properShippingName" value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste flammable liquid, n.o.s." style={{fontSize:12}} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Hazard Class</label>
               <select value={form.hazardClass} onChange={e => setForm({ ...form, hazardClass: e.target.value })} style={{fontSize:12}}>
@@ -2220,7 +2550,7 @@ function WasteProfiles({data}) {
               <option value="Bulk">Bulk</option><option value="Totes">Totes</option><option value="Pallet">Pallet</option>
               <option value="Boxes">Boxes</option><option value="Drums">Drums</option><option value="Other">Other</option>
             </select>
-            {form.containerType === 'Other' && <input value={form.containerOther} onChange={e => setForm({ ...form, containerOther: e.target.value })} placeholder="Specify container type" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
+            {form.containerType === 'Other' && <input list="sug-containerOther" value={form.containerOther} onChange={e => setForm({ ...form, containerOther: e.target.value })} placeholder="Specify container type" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
           </div>
           <div style={{marginBottom:8}}>
             <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Frequency</label>
@@ -2229,7 +2559,7 @@ function WasteProfiles({data}) {
               <option value="Year">Year</option><option value="Quarterly">Quarterly</option><option value="Monthly">Monthly</option>
               <option value="1 time">1 time</option><option value="Other">Other</option>
             </select>
-            {form.frequency === 'Other' && <input value={form.frequencyOther} onChange={e => setForm({ ...form, frequencyOther: e.target.value })} placeholder="Specify frequency" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
+            {form.frequency === 'Other' && <input list="sug-frequencyOther" value={form.frequencyOther} onChange={e => setForm({ ...form, frequencyOther: e.target.value })} placeholder="Specify frequency" style={{fontSize:12,marginLeft:8,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',width:180}} />}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Shipment Size</label>
@@ -2250,11 +2580,11 @@ function WasteProfiles({data}) {
           {/* ===== SECTION C: GENERAL MATERIAL & REGULATORY INFORMATION ===== */}
           <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>C. GENERAL MATERIAL &amp; REGULATORY INFORMATION</div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Common Name</label>
-            <input value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} placeholder="Common name of waste material" style={{fontSize:12}} /></div>
+            <input list="sug-commonName" value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} placeholder="Common name of waste material" style={{fontSize:12}} /></div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Process Generating Waste</label>
-            <textarea value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} rows={2} placeholder="Describe the process that generates this waste" style={{fontSize:12}} /></div>
+            <input list="sug-processGenerating" value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} placeholder="Describe the process that generates this waste" style={{fontSize:12}} /></div>
           <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Describe Physical Appearance</label>
-            <input value={form.physicalDescription} onChange={e => setForm({ ...form, physicalDescription: e.target.value })} placeholder="Physical description of waste" style={{fontSize:12}} /></div>
+            <input list="sug-physicalDescription" value={form.physicalDescription} onChange={e => setForm({ ...form, physicalDescription: e.target.value })} placeholder="Physical description of waste" style={{fontSize:12}} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Odor</label>
               <select value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} style={{fontSize:12}}>
@@ -2267,7 +2597,7 @@ function WasteProfiles({data}) {
                 <option value="Liquid">Liquid</option><option value="Sludge-Slurry">Sludge-Slurry</option><option value="Solid">Solid</option>
               </select></div>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Color</label>
-              <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="e.g. Clear, Amber" style={{fontSize:12}} /></div>
+              <input list="sug-color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="e.g. Clear, Amber" style={{fontSize:12}} /></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Liquid Phases</label>
@@ -2355,9 +2685,9 @@ function WasteProfiles({data}) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Source Code</label>
-              <input value={form.sourceCode} onChange={e => setForm({ ...form, sourceCode: e.target.value })} placeholder="Source code" style={{fontSize:12}} /></div>
+              <input list="sug-sourceCode" value={form.sourceCode} onChange={e => setForm({ ...form, sourceCode: e.target.value })} placeholder="Source code" style={{fontSize:12}} /></div>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Form Code</label>
-              <input value={form.formCode} onChange={e => setForm({ ...form, formCode: e.target.value })} placeholder="Form code" style={{fontSize:12}} /></div>
+              <input list="sug-formCode" value={form.formCode} onChange={e => setForm({ ...form, formCode: e.target.value })} placeholder="Form code" style={{fontSize:12}} /></div>
           </div>
 
           {/* ===== SECTION D: COMPOSITION ===== */}
@@ -2614,7 +2944,274 @@ function WasteProfiles({data}) {
 
           <div className="mactions">
             <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
-            <button className="bp" onClick={save}>{editId ? 'Update Profile' : 'Save Profile'}</button>
+            <button className="bp" onClick={save}>{editId ? 'Update USE Profile' : 'Save USE Profile'}</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* =============== EWS Form Modal =============== */}
+    {showForm && form.profileType === 'ews' && (
+      <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 700, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+          <h2 style={{ color: '#059669' }}>{editId ? 'Edit EWS Profile' : 'New EWS Waste Profile'}</h2>
+
+          {/* ===== SECTION 1: BILLING INFORMATION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,borderBottom:'2px solid #374151'}}>1. BILLING INFORMATION</div>
+          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 12, marginBottom: 12, fontStyle: 'italic', fontSize: 13, color: '#6b7280' }}>
+            <div><strong>Billing Party:</strong> Independence Environmental Services</div>
+            <div><strong>Mailing Address:</strong> PO Box 12623 Fresno, CA 93778</div>
+            <div><strong>Contact:</strong> Keith Higgins</div>
+            <div><strong>Phone:</strong> (559) 243-6169</div>
+          </div>
+
+          {/* ===== SECTION 2: GENERATOR INFORMATION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>2. GENERATOR INFORMATION</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Profile Name *</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Waste Coolant, Used Absorbents" style={{fontSize:12}} autoFocus /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Generator Name</label>
+              <input list="ews-cust-list" value={form.customer} onChange={e => onEwsGeneratorChange(e.target.value)} placeholder="Select or type generator name" style={{fontSize:12}} />
+              <datalist id="ews-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist></div>
+          </div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Generator Site Address</label>
+            <input value={form.generatorSiteAddress} onChange={e => setForm({ ...form, generatorSiteAddress: e.target.value })} placeholder="Street address" style={{fontSize:12}} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>City</label>
+              <input value={form.generatorCity} onChange={e => setForm({ ...form, generatorCity: e.target.value })} placeholder="City" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>State</label>
+              <input value={form.generatorState} onChange={e => setForm({ ...form, generatorState: e.target.value })} placeholder="State" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Zip</label>
+              <input value={form.generatorZip} onChange={e => setForm({ ...form, generatorZip: e.target.value })} placeholder="Zip" style={{fontSize:12}} /></div>
+          </div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>EPA ID #</label>
+            <input value={form.epaId} onChange={e => setForm({ ...form, epaId: e.target.value })} placeholder="e.g. CAD123456789" style={{fontSize:12}} /></div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Generator Mailing Address (if different)</label>
+            <input value={form.generatorMailingAddress} onChange={e => setForm({ ...form, generatorMailingAddress: e.target.value })} placeholder="Mailing address" style={{fontSize:12}} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Mailing City</label>
+              <input value={form.generatorMailingCity} onChange={e => setForm({ ...form, generatorMailingCity: e.target.value })} placeholder="City" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Country</label>
+              <input value={form.generatorMailingCountry} onChange={e => setForm({ ...form, generatorMailingCountry: e.target.value })} placeholder="Country" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>State</label>
+              <input value={form.generatorMailingState} onChange={e => setForm({ ...form, generatorMailingState: e.target.value })} placeholder="State" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Zip</label>
+              <input value={form.generatorMailingZip} onChange={e => setForm({ ...form, generatorMailingZip: e.target.value })} placeholder="Zip" style={{fontSize:12}} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Contact Name</label>
+              <input value={form.technicalContact} onChange={e => setForm({ ...form, technicalContact: e.target.value })} placeholder="Contact name" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Phone</label>
+              <input value={form.generatorPhone} onChange={e => setForm({ ...form, generatorPhone: e.target.value })} placeholder="(xxx) xxx-xxxx" style={{fontSize:12}} /></div>
+          </div>
+
+          {/* ===== SECTION 3: WASTE PROPERTIES AND COMPOSITION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>3. WASTE PROPERTIES AND COMPOSITION</div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Process Generating Waste</label>
+            <input list="sug-processGenerating" value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} placeholder="Describe the process that generates this waste" style={{fontSize:12}} /></div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>EPA Hazardous Waste?</label>
+            <span style={{ background: '#dcfce7', padding: '3px 10px', borderRadius: 4, fontWeight: 600, color: '#166534', fontSize: 13 }}>No (Non-RCRA)</span>
+          </div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>State Codes</label>
+            <input list="sug-stateCodes" value={form.stateCodes} onChange={e => setForm({ ...form, stateCodes: e.target.value })} placeholder="State waste codes" style={{fontSize:12}} /></div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Common Waste Name</label>
+            <input list="sug-commonName" value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} placeholder="Common name of waste material" style={{fontSize:12}} /></div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>US DOT Proper Shipping Name</label>
+            <input list="sug-properShippingName" value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste, n.o.s." style={{fontSize:12}} /></div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Physical State</label>
+            <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+              {['Solid','Semi-Solid','Powder','Liquid','Other'].map(function(s) { return (
+                <label key={s} style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                  <input type="radio" name="ewsPhysicalState" value={s} checked={form.physicalState===s} onChange={e=>setForm({...form,physicalState:e.target.value})}/>{s}
+                </label>
+              ); })}
+            </div>
+          </div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Method of Shipment</label>
+            <select value={form.methodOfShipment} onChange={e => setForm({ ...form, methodOfShipment: e.target.value })} style={{fontSize:12}}>
+              <option value="">-- Select --</option>
+              <option value="DF">DF</option><option value="DM">DM</option><option value="TP">TP</option>
+              <option value="CF">CF</option><option value="CW">CW</option><option value="BA">BA</option>
+              <option value="TT">TT</option><option value="Commodity Pack">Commodity Pack</option>
+            </select></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Size</label>
+              <input value={form.shipmentSize} onChange={e => setForm({ ...form, shipmentSize: e.target.value })} placeholder="e.g. 55 gal" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Quantity</label>
+              <input value={form.shipmentQuantity} onChange={e => setForm({ ...form, shipmentQuantity: e.target.value })} placeholder="# of containers" style={{fontSize:12}} /></div>
+          </div>
+          <div style={{marginBottom:8}}>
+            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Frequency</label>
+            <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+              {['One Time','Daily','Weekly','Monthly','Other'].map(function(s) { return (
+                <label key={s} style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
+                  <input type="radio" name="ewsFrequency" value={s} checked={form.frequency===s} onChange={e=>setForm({...form,frequency:e.target.value})}/>{s}
+                </label>
+              ); })}
+            </div>
+          </div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Special Handling</label>
+            <input list="sug-specialHandling" value={form.specialHandling} onChange={e => setForm({ ...form, specialHandling: e.target.value })} placeholder="Special handling instructions" style={{fontSize:12}} /></div>
+
+          {/* EWS Composition Table */}
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#059669', marginBottom: 6, marginTop: 12 }}>Waste Composition</div>
+          <div style={{ marginBottom: 12 }}>
+            {form.chemicals.length > 0 ? (
+              <div className="rtable">
+                <table>
+                  <thead><tr>
+                    <th style={{fontSize:11}}>Constituent</th><th style={{fontSize:11}}>CAS #</th>
+                    <th style={{fontSize:11,width:70}}>%</th>
+                    <th style={{width:24}}></th>
+                  </tr></thead>
+                  <tbody>
+                    {form.chemicals.map((c, i) => (
+                      <tr key={i}>
+                        <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><input value={c.percentage || ''} onChange={e => updateChemical(i, 'percentage', e.target.value)} placeholder="%" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                        <td><span onClick={() => removeChemical(i)} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 700, fontSize: 13 }}>&times;</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: '#f8fafc', borderRadius: 6 }}>No constituents added. Upload an SDS to auto-extract or click the button below.</div>
+            )}
+            <div style={{marginTop:6}}>
+              <button className="bp" style={{ fontSize: 11, padding: '4px 10px', background: '#059669' }} onClick={addEwsChemical}>+ Add Constituent</button>
+            </div>
+          </div>
+
+          {/* ===== SECTION 4: SAMPLING INFORMATION ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>4. SAMPLING INFORMATION</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Sampling Source</label>
+              <input list="sug-samplingSource" value={form.samplingSource} onChange={e => setForm({ ...form, samplingSource: e.target.value })} placeholder="Source of sample" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Date Sampled / Lab ID</label>
+              <input value={form.dateSampled} onChange={e => setForm({ ...form, dateSampled: e.target.value })} placeholder="Date and/or Lab ID" style={{fontSize:12}} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Sampler's Name &amp; Company</label>
+              <input list="sug-samplerName" value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} placeholder="Name and company" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>SDS Product Name</label>
+              <input list="sug-sdsProductName" value={form.sdsProductName} onChange={e => setForm({ ...form, sdsProductName: e.target.value })} placeholder="Product name from SDS" style={{fontSize:12}} /></div>
+          </div>
+
+          {/* ===== SECTION 5: CHARACTERISTIC COMPONENTS ===== */}
+          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>5. CHARACTERISTIC COMPONENTS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Color</label>
+              <input list="sug-color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="Color" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Odor</label>
+              <input list="sug-odor" value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} placeholder="Odor" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Free Liquids %</label>
+              <input value={form.freeLiquidsPercent} onChange={e => setForm({ ...form, freeLiquidsPercent: e.target.value })} placeholder="%" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>% Solids</label>
+              <input value={form.percentSolids} onChange={e => setForm({ ...form, percentSolids: e.target.value })} placeholder="%" style={{fontSize:12}} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>pH</label>
+              <input value={form.pHValue} onChange={e => setForm({ ...form, pHValue: e.target.value })} placeholder="pH value" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Flash Point</label>
+              <input value={form.flashPoint} onChange={e => setForm({ ...form, flashPoint: e.target.value })} placeholder="e.g. 140 °F" style={{fontSize:12}} /></div>
+            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Liquid Phases</label>
+              <select value={form.liquidPhases} onChange={e => setForm({ ...form, liquidPhases: e.target.value })} style={{fontSize:12}}>
+                <option value="">-- Select --</option>
+                <option value="Single">Single</option><option value="Double Layer">Double Layer</option><option value="Multi-Layer">Multi-Layer</option>
+              </select></div>
+          </div>
+
+          {/* Yes/No questions */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'4px',marginBottom:12}}>
+            {[
+              ['containsRegulatedHazWaste', 'Contains regulated concentrations of listed haz wastes (40 CFR 261.31-.33)?'],
+              ['containsPCBs', 'Contains PCBs, halogens, or dioxins?'],
+              ['regulatedToxicMaterial', 'Regulated Toxic Material (State or Federal)?'],
+              ['radioactive', 'Radioactive (State or Federal)?'],
+              ['infectiousMedical', 'Infectious or Medical Waste (State or Federal)?']
+            ].map(function(pair) { return (
+              <div key={pair[0]} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid #f3f4f6'}}>
+                <span style={{fontSize:12,flex:1}}>{pair[1]}</span>
+                <span style={{display:'flex',gap:8,minWidth:80}}>
+                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
+                    <input type="radio" name={'ews_'+pair[0]} value="Yes" checked={form[pair[0]]==='Yes'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>Yes
+                  </label>
+                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
+                    <input type="radio" name={'ews_'+pair[0]} value="No" checked={form[pair[0]]==='No'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>No
+                  </label>
+                </span>
+              </div>
+            ); })}
+          </div>
+
+          {/* ===== AUTO-GENERATED SDS DATA ===== */}
+          {(form.estimatedFlashPoint || form.estimatedPH) && (
+            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 12, marginBottom: 12, marginTop: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 8 }}>Estimated Mixture Characteristics</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
+                {form.estimatedFlashPoint && <div><strong>Est. Flash Point:</strong> {form.estimatedFlashPoint}</div>}
+                {form.estimatedPH && <div><strong>Est. pH:</strong> {form.estimatedPH}</div>}
+              </div>
+              <div style={{ fontSize: 11, color: '#92400e', marginTop: 6, fontStyle: 'italic' }}>These are estimates based on SDS data. Actual testing is required for profile accuracy.</div>
+            </div>
+          )}
+
+          {(form.reactivityFlags.length > 0 || form.incompatibles || form.stabilityNotes) && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#b91c1c', marginBottom: 8 }}>Reactivity &amp; Hazard Flags</div>
+              {form.reactivityFlags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {form.reactivityFlags.map((f, i) => (
+                    <span key={i} style={{ background: '#fee2e2', border: '1px solid #f87171', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, color: '#991b1b' }}>{f}</span>
+                  ))}
+                </div>
+              )}
+              {form.incompatibles && <div style={{ fontSize: 13, marginBottom: 4 }}><strong>Incompatible Materials:</strong> {form.incompatibles}</div>}
+              {form.stabilityNotes && <div style={{ fontSize: 13 }}><strong>Stability / Conditions to Avoid:</strong> {form.stabilityNotes}</div>}
+            </div>
+          )}
+
+          {form.toxicity && form.toxicity.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#059669', marginBottom: 6 }}>Toxicity Data (from SDS)</div>
+              <div className="rtable">
+                <table>
+                  <thead><tr><th>Type</th><th>Route</th><th>Value</th></tr></thead>
+                  <tbody>
+                    {form.toxicity.map((t, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 600 }}>{t.type}</td>
+                        <td>{t.route}</td>
+                        <td>{t.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {form.sdsFiles && form.sdsFiles.length > 0 && (
+            <div style={{ marginBottom: 12, fontSize: 12 }}>
+              <label style={{ fontWeight: 700, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Source SDS Files</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                {form.sdsFiles.map((f, i) => (
+                  <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{f.name}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mrow"><label>Profile Notes</label>
+            <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={3} placeholder="Additional notes about this waste profile, handling instructions, etc." /></div>
+
+          <div className="mactions">
+            <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
+            <button className="bp" style={{ background: '#059669' }} onClick={save}>{editId ? 'Update EWS Profile' : 'Save EWS Profile'}</button>
           </div>
         </div>
       </div>
