@@ -1685,6 +1685,8 @@ function WasteProfiles({data}) {
   const [expandedId, setExpandedId] = useState(null);
   const [wasteStreams, setWasteStreams] = useState([]);
   const [wsDropOpen, setWsDropOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
+  const [expandedGens, setExpandedGens] = useState({});
 
   const emptyForm = {
     profileType: 'use',
@@ -1770,6 +1772,20 @@ function WasteProfiles({data}) {
   };
   useEffect(() => { loadProfiles(); loadWasteStreams(); }, []);
 
+  // Assign profile to a generator (customer)
+  const assignGenerator = async (profileId, customerName) => {
+    try {
+      await fetch('/api/profiles/' + profileId, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer: customerName })
+      });
+      loadProfiles();
+    } catch(e) { console.error('Assign generator error:', e); }
+  };
+
+  const toggleGen = (genName) => {
+    setExpandedGens(prev => ({ ...prev, [genName]: !prev[genName] }));
+  };
 
   // Waste stream mini-form state
   const [showWsForm, setShowWsForm] = useState(false);
@@ -2175,10 +2191,160 @@ function WasteProfiles({data}) {
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Manage USE and EWS waste profiles. Upload SDS sheets to auto-generate profiles.</div>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+          <button onClick={() => setViewMode('list')} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: viewMode === 'list' ? 'var(--primary)' : '#fff', color: viewMode === 'list' ? '#fff' : 'var(--text)' }}>By Type</button>
+          <button onClick={() => setViewMode('generator')} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 600, border: 'none', borderLeft: '1px solid var(--border)', cursor: 'pointer', background: viewMode === 'generator' ? 'var(--primary)' : '#fff', color: viewMode === 'generator' ? '#fff' : 'var(--text)' }}>By Generator</button>
+        </div>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search all profiles..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, width: 200 }} />
       </div>
     </div>
 
+    {/* =============== BY GENERATOR VIEW =============== */}
+    {viewMode === 'generator' && <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <button className="bp" onClick={openNew} style={{ padding: '8px 16px' }}>+ New USE Profile</button>
+      <button className="bp" onClick={openNewEws} style={{ padding: '8px 16px', background: '#059669' }}>+ New EWS Profile</button>
+      <label style={{ display: 'inline-block', background: '#7c3aed', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+        {parsing ? 'Analyzing...' : 'Upload SDS (USE)'}
+        <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
+      </label>
+      <label style={{ display: 'inline-block', background: '#059669', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+        {parsing ? 'Analyzing...' : 'Upload SDS (EWS)'}
+        <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadEwsSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
+      </label>
+    </div>}
+    {viewMode === 'generator' && (function() {
+      var genMap = {};
+      var unassigned = [];
+      filtered.forEach(function(p) {
+        if (p.customer) {
+          if (!genMap[p.customer]) genMap[p.customer] = [];
+          genMap[p.customer].push(p);
+        } else {
+          unassigned.push(p);
+        }
+      });
+      var genNames = Object.keys(genMap).sort();
+      return React.createElement('div', null,
+        genNames.map(function(gn) {
+          var gProfiles = genMap[gn];
+          var useCount = gProfiles.filter(function(p) { return (p.profileType || 'use') === 'use'; }).length;
+          var ewsCount = gProfiles.filter(function(p) { return p.profileType === 'ews'; }).length;
+          var isOpen = expandedGens[gn];
+          return React.createElement('div', { key: gn, style: { marginBottom: 10, background: 'var(--bg-white)', borderRadius: 10, boxShadow: 'var(--shadow)', overflow: 'hidden' } },
+            React.createElement('div', {
+              onClick: function() { toggleGen(gn); },
+              style: { padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isOpen ? '#f0f4ff' : 'var(--bg-white)', borderBottom: isOpen ? '2px solid var(--primary)' : 'none', transition: 'background 0.15s' }
+            },
+              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                React.createElement('span', { style: { fontSize: 18, fontWeight: 700, color: 'var(--primary)' } }, isOpen ? '▼' : '▶'),
+                React.createElement('div', null,
+                  React.createElement('div', { style: { fontWeight: 700, fontSize: 16 } }, gn),
+                  React.createElement('div', { style: { fontSize: 12, color: 'var(--text-muted)', marginTop: 2 } },
+                    gProfiles.length + ' profile' + (gProfiles.length !== 1 ? 's' : '') +
+                    (useCount ? ' · ' + useCount + ' USE' : '') +
+                    (ewsCount ? ' · ' + ewsCount + ' EWS' : '')
+                  )
+                )
+              ),
+              React.createElement('div', { style: { display: 'flex', gap: 6 } },
+                useCount > 0 && React.createElement('span', { style: { background: '#f3e8ff', color: '#7c3aed', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 } }, 'USE: ' + useCount),
+                ewsCount > 0 && React.createElement('span', { style: { background: '#dcfce7', color: '#059669', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 } }, 'EWS: ' + ewsCount)
+              )
+            ),
+            isOpen && React.createElement('div', { style: { padding: '12px 16px' } },
+              gProfiles.map(function(p) {
+                var isUse = (p.profileType || 'use') === 'use';
+                var color = isUse ? '#7c3aed' : '#059669';
+                return React.createElement('div', { key: p.id, style: { padding: '10px 12px', marginBottom: 8, borderRadius: 8, border: '1px solid var(--border)', borderLeft: '4px solid ' + color, background: expandedId === p.id ? '#fafbff' : '#fff' } },
+                  React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
+                    React.createElement('div', { style: { cursor: 'pointer', flex: 1 }, onClick: function() { setExpandedId(expandedId === p.id ? null : p.id); } },
+                      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                        React.createElement('span', { style: { fontWeight: 700, fontSize: 14, color: color } }, p.name || 'Unnamed Profile'),
+                        React.createElement('span', { style: { background: isUse ? '#f3e8ff' : '#dcfce7', color: color, padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 } }, isUse ? 'USE' : 'EWS')
+                      ),
+                      React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4, fontSize: 12 } },
+                        p.commonName && React.createElement('span', { style: { color: '#555' } }, p.commonName),
+                        p.properShippingName && React.createElement('span', { style: { color: '#555' } }, p.properShippingName),
+                        p.unNumber && React.createElement('span', { style: { background: '#fef3c7', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#92400e', fontSize: 11 } }, p.unNumber),
+                        p.hazardClass && React.createElement('span', { style: { background: '#fee2e2', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#b91c1c', fontSize: 11 } }, 'Class ' + p.hazardClass),
+                        p.physicalState && React.createElement('span', { style: { background: '#e0e7ff', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#3730a3', fontSize: 11 } }, p.physicalState),
+                        !isUse && React.createElement('span', { style: { background: '#dcfce7', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#166534', fontSize: 11 } }, 'NON-RCRA')
+                      )
+                    ),
+                    React.createElement('div', { style: { display: 'flex', gap: 6 } },
+                      !isUse && React.createElement('button', { className: 'bp', style: { fontSize: 11, padding: '4px 10px', background: '#2563eb' }, onClick: function() { window.open('/api/profiles/' + p.id + '/ews-pdf', '_blank'); } }, 'PDF'),
+                      React.createElement('button', { className: 'bp', style: { fontSize: 11, padding: '4px 10px', background: color }, onClick: function() { openEdit(p); } }, 'Edit'),
+                      React.createElement('button', { style: { background: '#fee2e2', color: 'var(--danger)', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer' }, onClick: function() { del(p.id); } }, 'Delete')
+                    )
+                  ),
+                  expandedId === p.id && React.createElement('div', { style: { marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 13 } },
+                    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '4px 16px', marginBottom: 8 } },
+                      p.epaId && React.createElement('div', null, React.createElement('strong', null, 'EPA ID: '), p.epaId),
+                      p.stateId && React.createElement('div', null, React.createElement('strong', null, 'State ID: '), p.stateId),
+                      p.generatorStatus && React.createElement('div', null, React.createElement('strong', null, 'Status: '), p.generatorStatus),
+                      p.containerType && React.createElement('div', null, React.createElement('strong', null, 'Container: '), p.containerType),
+                      p.frequency && React.createElement('div', null, React.createElement('strong', null, 'Frequency: '), p.frequency),
+                      p.flashPointF && React.createElement('div', null, React.createElement('strong', null, 'Flash Point: '), p.flashPointF),
+                      p.flashPoint && React.createElement('div', null, React.createElement('strong', null, 'Flash Point: '), p.flashPoint),
+                      p.pHTypical && React.createElement('div', null, React.createElement('strong', null, 'pH: '), p.pHTypical),
+                      p.pHValue && React.createElement('div', null, React.createElement('strong', null, 'pH: '), p.pHValue),
+                      p.odor && React.createElement('div', null, React.createElement('strong', null, 'Odor: '), p.odor),
+                      p.color && React.createElement('div', null, React.createElement('strong', null, 'Color: '), p.color)
+                    ),
+                    p.chemicals && p.chemicals.length > 0 && React.createElement('div', { style: { marginTop: 4 } },
+                      React.createElement('strong', { style: { fontSize: 12 } }, 'Composition (' + p.chemicals.length + '):'),
+                      React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 } },
+                        p.chemicals.map(function(c, i) {
+                          return React.createElement('span', { key: i, style: { background: '#f3f4f6', padding: '2px 8px', borderRadius: 4, fontSize: 11 } }, c.name + (c.percentage ? ' (' + c.percentage + ')' : c.typical ? ' (' + c.typical + ')' : ''));
+                        })
+                      )
+                    ),
+                    React.createElement('div', { style: { marginTop: 6, fontSize: 11, color: 'var(--text-muted)' } },
+                      'Created: ' + (p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—')
+                    )
+                  )
+                );
+              })
+            )
+          );
+        }),
+        unassigned.length > 0 && React.createElement('div', { style: { marginTop: 20, paddingTop: 16, borderTop: '2px dashed #e5e7eb' } },
+          React.createElement('h3', { style: { margin: '0 0 12px', fontSize: 15, color: '#9ca3af' } }, 'Unassigned Profiles (' + unassigned.length + ')'),
+          React.createElement('div', { style: { fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 } }, 'These profiles have no generator assigned. Use the dropdown to assign them.'),
+          unassigned.map(function(p) {
+            var isUse = (p.profileType || 'use') === 'use';
+            var color = isUse ? '#7c3aed' : '#059669';
+            return React.createElement('div', { key: p.id, style: { padding: '10px 12px', marginBottom: 8, borderRadius: 8, border: '1px dashed #d1d5db', borderLeft: '4px solid ' + color, background: '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 } },
+              React.createElement('div', { style: { flex: 1, minWidth: 200 } },
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                  React.createElement('span', { style: { fontWeight: 700, fontSize: 14, color: color } }, p.name || 'Unnamed Profile'),
+                  React.createElement('span', { style: { background: isUse ? '#f3e8ff' : '#dcfce7', color: color, padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 } }, isUse ? 'USE' : 'EWS')
+                ),
+                React.createElement('div', { style: { fontSize: 12, color: '#888', marginTop: 2 } },
+                  [p.commonName, p.properShippingName, p.unNumber].filter(Boolean).join(' · ') || 'No details'
+                )
+              ),
+              React.createElement('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+                React.createElement('select', {
+                  defaultValue: '',
+                  onChange: function(e) { if (e.target.value) assignGenerator(p.id, e.target.value); },
+                  style: { fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', minWidth: 160 }
+                },
+                  React.createElement('option', { value: '' }, 'Assign to Generator...'),
+                  custNames.map(function(cn, i) { return React.createElement('option', { key: i, value: cn }, cn); })
+                ),
+                React.createElement('button', { className: 'bp', style: { fontSize: 11, padding: '4px 10px', background: color }, onClick: function() { openEdit(p); } }, 'Edit')
+              )
+            );
+          })
+        ),
+        genNames.length === 0 && unassigned.length === 0 && React.createElement('div', { style: { textAlign: 'center', padding: 40, color: '#999', fontSize: 14 } },
+          search ? 'No profiles match your search.' : 'No profiles yet. Create a profile and assign it to a generator.'
+        )
+      );
+    })()}
+
+    {viewMode === 'list' && <>
     {/* =============== USE SECTION =============== */}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
       <div>
@@ -2537,6 +2703,7 @@ function WasteProfiles({data}) {
         ))}
       </div>
     </div>
+    </>}
 
     {/* =============== USE Form Modal =============== */}
     {showForm && form.profileType !== 'ews' && (
