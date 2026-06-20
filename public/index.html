@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RouteBoard</title>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
@@ -1687,6 +1688,7 @@ function WasteProfiles({data}) {
   const [wsDropOpen, setWsDropOpen] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [expandedGens, setExpandedGens] = useState({});
+  const [signers, setSigners] = useState([]);
 
   const emptyForm = {
     profileType: 'use',
@@ -1747,7 +1749,7 @@ function WasteProfiles({data}) {
     containsRegulatedHazWaste: 'No', containsPCBs: 'No',
     regulatedToxicMaterial: 'No', radioactive: 'No', infectiousMedical: 'No',
     // Signature
-    signatureName: 'Keith Higgins', signatureDate: '',
+    signatureName: '', signatureDate: '',
     // Auto-generated / SDS data
     profileNotes: '', sdsFiles: [],
     estimatedFlashPoint: '', estimatedPH: '',
@@ -1772,7 +1774,26 @@ function WasteProfiles({data}) {
       setWasteStreams(await r.json());
     } catch(e) { console.error('Load waste streams error:', e); }
   };
-  useEffect(() => { loadProfiles(); loadWasteStreams(); }, []);
+  const loadSigners = async () => {
+    try {
+      const r = await fetch('/api/signers');
+      setSigners(await r.json());
+    } catch(e) { console.error('Load signers error:', e); }
+  };
+  const addSigner = async (name) => {
+    if (!name || !name.trim()) return;
+    try {
+      const r = await fetch('/api/signers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
+      setSigners(await r.json());
+    } catch(e) { console.error('Add signer error:', e); }
+  };
+  const deleteSigner = async (name) => {
+    try {
+      const r = await fetch('/api/signers/' + encodeURIComponent(name), { method: 'DELETE' });
+      setSigners(await r.json());
+    } catch(e) { console.error('Delete signer error:', e); }
+  };
+  useEffect(() => { loadProfiles(); loadWasteStreams(); loadSigners(); }, []);
 
   // Assign profile to a generator (customer)
   const assignGenerator = async (profileId, customerName) => {
@@ -2017,6 +2038,11 @@ function WasteProfiles({data}) {
       }
     }
 
+    // Auto-save signer name if provided
+    if (form.signatureName && form.signatureName.trim()) {
+      addSigner(form.signatureName.trim());
+    }
+
     setShowForm(false); setEditId(null); setForm(emptyForm);
     loadProfiles();
   };
@@ -2049,7 +2075,7 @@ function WasteProfiles({data}) {
         containsRegulatedHazWaste: p.containsRegulatedHazWaste || 'No',
         containsPCBs: p.containsPCBs || 'No', regulatedToxicMaterial: p.regulatedToxicMaterial || 'No',
         radioactive: p.radioactive || 'No', infectiousMedical: p.infectiousMedical || 'No',
-        signatureName: p.signatureName || 'Keith Higgins', signatureDate: p.signatureDate || '',
+        signatureName: p.signatureName || '', signatureDate: p.signatureDate || '',
         profileNotes: p.profileNotes || '', sdsFiles: p.sdsFiles || [],
         estimatedFlashPoint: p.estimatedFlashPoint || '', estimatedPH: p.estimatedPH || '',
         toxicity: p.toxicity || [], reactivityFlags: p.reactivityFlags || [],
@@ -3551,12 +3577,31 @@ function WasteProfiles({data}) {
           <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: '15px', fontStyle: 'italic' }}>
             I hereby certify that all information submitted in this and all attached documents contain true and accurate descriptions of the waste.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Printed Name &amp; Title</label>
-              <input value={form.signatureName || ''} onChange={e => setForm({ ...form, signatureName: e.target.value })} placeholder="e.g. Keith Higgins, Operations Manager" style={{ fontSize: 12 }} /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Signer Name</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input list="signer-list" value={form.signatureName || ''} onChange={e => setForm({ ...form, signatureName: e.target.value })} placeholder="Type or select a name" style={{ fontSize: 12, flex: 1 }} />
+                <datalist id="signer-list">{signers.map((s, i) => <option key={i} value={s} />)}</datalist>
+              </div></div>
             <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Date</label>
               <input type="date" value={form.signatureDate || ''} onChange={e => setForm({ ...form, signatureDate: e.target.value })} style={{ fontSize: 12 }} /></div>
           </div>
+          {form.signatureName && <div style={{ background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 16px', marginBottom: 8, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>Signature Preview</div>
+            <div style={{ fontFamily: "'Dancing Script', cursive, serif", fontSize: 24, color: '#1a1a6e' }}>{form.signatureName}</div>
+          </div>}
+          {signers.length > 0 && <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Saved signers:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {signers.map((s, i) => (
+                <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                  onClick={() => setForm({ ...form, signatureName: s })}>
+                  {s}
+                  <span onClick={e => { e.stopPropagation(); if (confirm('Remove "' + s + '" from saved signers?')) deleteSigner(s); }} style={{ color: '#b91c1c', fontWeight: 700, cursor: 'pointer' }}>&times;</span>
+                </span>
+              ))}
+            </div>
+          </div>}
 
           <div className="mactions" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
             <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
