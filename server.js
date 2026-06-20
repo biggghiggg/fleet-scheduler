@@ -1282,6 +1282,18 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   var sigX2 = sigX1 + sigLineLen1 + sigGap;
   var sigX3 = sigX2 + sigLineLen2 + sigGap;
 
+  // Write signature data above the lines if available
+  var sigName = profile.signatureName || '';
+  var sigDate = profile.signatureDate || '';
+  if (sigName) {
+    doc.font('Helvetica').fontSize(10).fillColor('#000')
+      .text(sigName, sigX2, y - 14, { width: sigLineLen2, align: 'center' });
+  }
+  if (sigDate) {
+    doc.font('Helvetica').fontSize(10).fillColor('#000')
+      .text(sigDate, sigX3, y - 14, { width: sigLineLen3, align: 'center' });
+  }
+
   doc.lineWidth(0.75);
   doc.moveTo(sigX1, y).lineTo(sigX1 + sigLineLen1, y).stroke('#000');
   doc.moveTo(sigX2, y).lineTo(sigX2 + sigLineLen2, y).stroke('#000');
