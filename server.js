@@ -1040,7 +1040,7 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
 
   formRow('11. State Codes:', profile.stateCodes || '');
   formRow('12. Common Waste Name:', profile.commonName || '');
-  formRow('13. US DOT Proper Shipping Name:', profile.properShippingName || '');
+  formRow('13. US DOT Proper Shipping Name:', profile.properShippingName ? 'Waste ' + profile.properShippingName : '');
 
   // Row 14: Physical State checkboxes
   var ps = profile.physicalState || '';
