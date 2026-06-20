@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const multer = require('multer');
+var PDFDocument = require('pdfkit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -815,6 +816,264 @@ app.delete('/api/profiles/:id', function(req, res) {
   profiles = profiles.filter(function(p) { return p.id !== req.params.id; });
   saveProfiles(profiles);
   res.json({ok:true});
+});
+
+// ======== EWS PDF GENERATION ========
+app.get('/api/profiles/:id/ews-pdf', function(req, res) {
+  var profile = profiles.find(function(p) { return p.id === req.params.id; });
+  if (!profile) return res.status(404).json({error:'Not found'});
+
+  var doc = new PDFDocument({ size: 'LETTER', margins: { top: 40, bottom: 40, left: 42, right: 42 } });
+  var buffers = [];
+  doc.on('data', function(chunk) { buffers.push(chunk); });
+  doc.on('end', function() {
+    var pdfData = Buffer.concat(buffers);
+    var safeName = (profile.name || 'EWS-Profile').replace(/[^a-zA-Z0-9_-]/g, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '.pdf"');
+    res.send(pdfData);
+  });
+
+  var W = 528; // usable width (612 - 42*2)
+  var LM = 42; // left margin
+  var y = 40;
+
+  // Helper: draw text in a box row
+  function formRow(label, value, opts) {
+    opts = opts || {};
+    var rowH = opts.height || 18;
+    doc.rect(LM, y, W, rowH).stroke('#999');
+    doc.font('Helvetica-BoldOblique').fontSize(9).text(label, LM + 4, y + 4, { width: W - 8, continued: false });
+    if (value) {
+      var labelW = doc.widthOfString(label) + 8;
+      doc.font('Helvetica').fontSize(9).text(value, LM + labelW + 4, y + 4, { width: W - labelW - 12 });
+    }
+    y += rowH;
+  }
+
+  // ===== HEADER =====
+  var isNew = profile.profileIsNew !== 'Recertification';
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#cc0000')
+    .text(isNew ? '[X] New Profile    [ ] Recertification' : '[ ] New Profile    [X] Recertification', LM, y, { width: W, align: 'left' });
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#059669')
+    .text('EWS', LM, y, { width: W, align: 'right' });
+  y += 18;
+  doc.fillColor('#000').font('Helvetica-Bold').fontSize(14)
+    .text('GENERATOR WASTE PROFILE SHEET', LM, y, { width: W, align: 'center' });
+  y += 20;
+  doc.font('Helvetica-BoldOblique').fontSize(8).fillColor('#cc0000')
+    .text('Please carefully read instructions before completing this form. All sections MUST be completed.', LM, y, { width: W, align: 'center' });
+  y += 14;
+  doc.fillColor('#000');
+
+  // ===== SECTION 1: BILLING =====
+  doc.font('Helvetica-Bold').fontSize(11).text('1.    Billing Information', LM, y); y += 16;
+  formRow('1. Billing Party Name: Independence Environmental Services', '');
+  formRow('2. Mailing Address: PO Box 12623 Fresno, CA 93778', '');
+  formRow('3. Contact: Keith Higgins', '');
+  formRow('4. Phone: (559) 243-6169', '');
+  y += 6;
+
+  // ===== SECTION 2: GENERATOR =====
+  doc.font('Helvetica-Bold').fontSize(11).text('2.    Generator Information', LM, y); y += 16;
+  formRow('1. Generator Name:', profile.customer || '');
+  formRow('2. Generator Site Address:', profile.generatorSiteAddress || '');
+
+  // City / State / Zip row
+  doc.rect(LM, y, W, 18).stroke('#999');
+  var thirdW = Math.floor(W / 3);
+  doc.rect(LM + thirdW, y, 1, 18).stroke('#ccc');
+  doc.rect(LM + thirdW * 2, y, 1, 18).stroke('#ccc');
+  doc.font('Helvetica-BoldOblique').fontSize(9).text('3. City:', LM + 4, y + 4);
+  doc.font('Helvetica').text(profile.generatorCity || '', LM + 46, y + 4, { width: thirdW - 50 });
+  doc.font('Helvetica-BoldOblique').text('State:', LM + thirdW + 4, y + 4);
+  doc.font('Helvetica').text(profile.generatorState || '', LM + thirdW + 38, y + 4, { width: thirdW - 42 });
+  doc.font('Helvetica-BoldOblique').text('Zip:', LM + thirdW * 2 + 4, y + 4);
+  doc.font('Helvetica').text(profile.generatorZip || '', LM + thirdW * 2 + 26, y + 4, { width: thirdW - 30 });
+  y += 18;
+
+  formRow('4. Generator US EPA Identification Number:', profile.epaId || '');
+  formRow('5. Generator Mailing Address (if Different):', profile.generatorMailingAddress || '');
+
+  // Mailing City / Country / State / Zip row
+  doc.rect(LM, y, W, 18).stroke('#999');
+  var qW = Math.floor(W / 4);
+  doc.rect(LM + qW, y, 1, 18).stroke('#ccc');
+  doc.rect(LM + qW * 2, y, 1, 18).stroke('#ccc');
+  doc.rect(LM + qW * 3, y, 1, 18).stroke('#ccc');
+  doc.font('Helvetica-BoldOblique').fontSize(9).text('6. City:', LM + 4, y + 4);
+  doc.font('Helvetica').text(profile.generatorMailingCity || '', LM + 42, y + 4, { width: qW - 46 });
+  doc.font('Helvetica-BoldOblique').text('Country:', LM + qW + 4, y + 4);
+  doc.font('Helvetica').text(profile.generatorMailingCountry || '', LM + qW + 50, y + 4, { width: qW - 54 });
+  doc.font('Helvetica-BoldOblique').text('State:', LM + qW * 2 + 4, y + 4);
+  doc.font('Helvetica').text(profile.generatorMailingState || '', LM + qW * 2 + 38, y + 4, { width: qW - 42 });
+  doc.font('Helvetica-BoldOblique').text('Zip:', LM + qW * 3 + 4, y + 4);
+  doc.font('Helvetica').text(profile.generatorMailingZip || '', LM + qW * 3 + 26, y + 4, { width: qW - 30 });
+  y += 18;
+
+  formRow('7. Generator Contact Name:', profile.technicalContact || 'Keith Higgins');
+  formRow('8. Phone Number:', profile.generatorPhone || '(559) 243-6169');
+  y += 6;
+
+  // ===== SECTION 3: WASTE PROPERTIES =====
+  doc.font('Helvetica-Bold').fontSize(11).text('3.    Waste Properties and Composition', LM, y); y += 16;
+  formRow('9. Process Generating Waste:', profile.processGenerating || '', { height: 28 });
+  formRow('10. Is the waste US EPA HAZARDOUS WASTE (40 CFR Part 261)?', 'No');
+  formRow('11. State Codes:', profile.stateCodes || '');
+  formRow('12. Common Waste Name:', profile.commonName || '');
+  formRow('13. US DOT Proper Shipping Name:', profile.properShippingName || '');
+
+  // 14. Physical State
+  var ps = profile.physicalState || '';
+  var psText = '14. Physical State     ';
+  ['Solid', 'Semi-Solid', 'Powder', 'Liquid', 'Other'].forEach(function(s) {
+    psText += (ps === s ? '[X] ' : '[ ] ') + s + '  ';
+  });
+  doc.rect(LM, y, W, 18).stroke('#999');
+  doc.font('Helvetica-BoldOblique').fontSize(9).text(psText, LM + 4, y + 4, { width: W - 8 });
+  y += 18;
+
+  // 15. Method of Shipment
+  var ms = profile.methodOfShipment || '';
+  doc.rect(LM, y, W, 28).stroke('#999');
+  doc.font('Helvetica-BoldOblique').fontSize(9)
+    .text('15. Method of Shipment', LM + 4, y + 3);
+  doc.font('Helvetica').text('Size: ' + (profile.shipmentSize || '___') + '   Quantity: ' + (profile.shipmentQuantity || '___'), LM + 180, y + 3);
+  var msLine = '';
+  ['DF', 'DM', 'TP', 'CF', 'CW', 'BA', 'TT', 'Commodity Pack'].forEach(function(s) {
+    msLine += (ms === s ? '[X] ' : '[ ] ') + s + '  ';
+  });
+  doc.font('Helvetica').fontSize(8).text(msLine, LM + 4, y + 16, { width: W - 8 });
+  y += 28;
+
+  // 16. Frequency
+  var freq = profile.frequency || '';
+  var freqText = '16. Frequency of Shipment     ';
+  ['One Time', 'Daily', 'Weekly', 'Monthly', 'Other'].forEach(function(s) {
+    freqText += (freq === s ? '[X] ' : '[ ] ') + s + '  ';
+  });
+  doc.rect(LM, y, W, 18).stroke('#999');
+  doc.font('Helvetica-BoldOblique').fontSize(9).text(freqText, LM + 4, y + 4, { width: W - 8 });
+  y += 18;
+
+  formRow('17. Special Handling Instructions:', profile.specialHandling || 'WEAR CORRECT PPE');
+
+  // 18. Waste Composition
+  var chems = profile.chemicals || [];
+  var compH = Math.max(30, 14 + chems.length * 12);
+  doc.rect(LM, y, W, compH).stroke('#999');
+  doc.font('Helvetica-BoldOblique').fontSize(9).text('18. Waste Composition: List all components with %', LM + 4, y + 3);
+  var cy = y + 14;
+  chems.forEach(function(c) {
+    doc.font('Helvetica').fontSize(8)
+      .text((c.name || '') + (c.cas ? ' (' + c.cas + ')' : '') + (c.percentage ? ' - ' + c.percentage + '%' : ''), LM + 20, cy, { width: W - 28 });
+    cy += 12;
+  });
+  y += compH;
+  y += 6;
+
+  // ===== SECTION 4: SAMPLING =====
+  doc.font('Helvetica-Bold').fontSize(11).text('4.    Sampling Information', LM, y); y += 16;
+
+  // Sample Type row
+  var st = profile.sampleType || '';
+  var stText = 'Sample Type:   ';
+  ['Grab Sample', 'Composite Sample', 'Process/Generator Knowledge', 'SDS', 'Field Test'].forEach(function(s) {
+    stText += (st === s ? '[X] ' : '[ ] ') + s + '  ';
+  });
+  doc.rect(LM, y, W, 18).stroke('#999');
+  doc.font('Helvetica-BoldOblique').fontSize(8).text(stText, LM + 4, y + 5, { width: W - 8 });
+  y += 18;
+
+  // 19. Sampling Source / 19(a) Date
+  doc.rect(LM, y, W, 18).stroke('#999');
+  var halfW = Math.floor(W / 2);
+  doc.rect(LM + halfW, y, 1, 18).stroke('#ccc');
+  doc.font('Helvetica-BoldOblique').fontSize(9).text('19. Sampling Source:', LM + 4, y + 4);
+  doc.font('Helvetica').text(profile.samplingSource || '', LM + 120, y + 4, { width: halfW - 124 });
+  doc.font('Helvetica-BoldOblique').text('19(a) Date Sampled/Lab ID:', LM + halfW + 4, y + 4);
+  doc.font('Helvetica').text(profile.dateSampled || '', LM + halfW + 155, y + 4, { width: halfW - 159 });
+  y += 18;
+
+  // 19(b) Sampler / SDS Product name
+  doc.rect(LM, y, W, 18).stroke('#999');
+  doc.rect(LM + halfW, y, 1, 18).stroke('#ccc');
+  doc.font('Helvetica-BoldOblique').fontSize(9).text('19(b). Sampler\'s Name & Company:', LM + 4, y + 4);
+  doc.font('Helvetica').text(profile.samplerName || '', LM + 195, y + 4, { width: halfW - 199 });
+  doc.font('Helvetica-BoldOblique').text('SDS Product name:', LM + halfW + 4, y + 4);
+  doc.font('Helvetica').text(profile.sdsProductName || '', LM + halfW + 110, y + 4, { width: halfW - 114 });
+  y += 18;
+  y += 6;
+
+  // ===== SECTION 5: CHARACTERISTIC COMPONENTS =====
+  doc.font('Helvetica-Bold').fontSize(11).text('5.    Characteristic Components', LM, y); y += 16;
+
+  // 7-column characteristics row
+  var colW = Math.floor(W / 7);
+  doc.rect(LM, y, W, 36).stroke('#999');
+  var charFields = [
+    ['COLOR:', profile.color],
+    ['ODOR:', profile.odor],
+    ['FREE LIQUIDS %', profile.freeLiquidsPercent],
+    ['% SOLIDS:', profile.percentSolids],
+    ['pH:', profile.pHValue],
+    ['Flash Point:', profile.flashPoint],
+    ['Liquid Phases', profile.liquidPhases]
+  ];
+  charFields.forEach(function(cf, i) {
+    var cx = LM + i * colW;
+    if (i > 0) doc.rect(cx, y, 1, 36).stroke('#ccc');
+    doc.font('Helvetica-Bold').fontSize(7).text(cf[0], cx + 3, y + 3, { width: colW - 6 });
+    doc.font('Helvetica').fontSize(8).text(cf[1] || '', cx + 3, y + 15, { width: colW - 6 });
+  });
+  y += 36;
+
+  // Yes/No questions
+  var yesNoQs = [
+    ['containsRegulatedHazWaste', 'Does this waste contain regulated concentrations of listed hazardous wastes defined by § 40 CFR 261.31.261.32.261.33 including RCRA F Listed Solvents'],
+    ['containsPCBs', 'Does this waste contain any PCB\'s halogens or dioxins?'],
+    ['regulatedToxicMaterial', 'Is this a regulated Toxic Material as defined by State or Federal Regulations'],
+    ['radioactive', 'Does this waste exhibit any characteristics of Radioactivity as defined by State or Federal Regulations?'],
+    ['infectiousMedical', 'Does this waste contain any Infectious or Medical Waste as defined by State or Federal Regulations?']
+  ];
+  yesNoQs.forEach(function(q) {
+    var ans = profile[q[0]] || 'No';
+    var rH = 22;
+    doc.rect(LM, y, W, rH).stroke('#999');
+    doc.rect(LM + W - 60, y, 1, rH).stroke('#ccc');
+    doc.font('Helvetica-BoldOblique').fontSize(7).text(q[1], LM + 4, y + 3, { width: W - 68 });
+    doc.font('Helvetica-Bold').fontSize(9).text(ans, LM + W - 56, y + 6, { width: 52, align: 'center' });
+    y += rH;
+  });
+  y += 8;
+
+  // Payment terms
+  doc.font('Helvetica').fontSize(7).text(
+    'Payment on this project is due net 30 days, unless agreed otherwise in writing. Certificates will be issued once payment for the above job is paid in full. Client/generator will be responsible for all the collection fees and late payment charges. Environmental Waste Solutions (EWS) reserves the right to test all or any inbound loads before acceptance.',
+    LM, y, { width: W }
+  );
+  y += 30;
+
+  // Generator Certification
+  doc.font('Helvetica-Bold').fontSize(9).text('Generator Certification', LM, y, { underline: true });
+  y += 14;
+  doc.font('Helvetica').fontSize(7).text(
+    'I hereby certify that all information submitted in this and all attached documents contain true and accurate descriptions of the waste. Any sample submitted is representative as defined in 40 CFR 261 - Appendix 1 or by using an equivalent method. All relevant information regarding known or suspected hazards in possession of the generator has been disclosed. I authorize EWS to obtain a sample from any waste shipment for purposes of identifying the waste or recertification.',
+    LM, y, { width: W }
+  );
+  y += 42;
+
+  // Signature line
+  doc.moveTo(LM, y).lineTo(LM + 200, y).stroke('#000');
+  doc.moveTo(LM + 220, y).lineTo(LM + 420, y).stroke('#000');
+  doc.moveTo(LM + 440, y).lineTo(LM + W, y).stroke('#000');
+  y += 4;
+  doc.font('Helvetica-Bold').fontSize(8)
+    .text('Signature', LM, y, { width: 200, align: 'center' })
+    .text('Printed (or typed) name and title', LM + 220, y, { width: 200, align: 'center' })
+    .text('Date', LM + 440, y, { width: W - 440, align: 'center' });
+
+  doc.end();
 });
 
 // SDS PARSING
