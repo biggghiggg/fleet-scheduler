@@ -789,6 +789,7 @@ function parseSDS(text) {
     hazardClass: '',
     packingGroup: '',
     flashPoint: '',
+    flashPointNumF: null,
     pH: '',
     physicalState: '',
     color: '',
@@ -805,27 +806,36 @@ function parseSDS(text) {
   // Normalize text
   var t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // Extract sections
+  // Extract sections - prioritize "SECTION N" format, fall back to "N." at line start
   function getSection(num) {
-    var patterns = [
-      new RegExp('(?:SECTION\\s+' + num + '[:\\s.-]+|' + num + '\\s*[.)]\\s*)', 'i'),
-    ];
     var startIdx = -1;
-    for (var p = 0; p < patterns.length; p++) {
-      var m = t.search(patterns[p]);
-      if (m !== -1) { startIdx = m; break; }
+    // First try "SECTION N" (most reliable)
+    var sectionMatch = t.search(new RegExp('SECTION\\s+' + num + '\\b', 'i'));
+    if (sectionMatch !== -1) {
+      startIdx = sectionMatch;
+    } else {
+      // Fallback: "N." or "N)" at start of line (for SDSs that don't use "SECTION" keyword)
+      var lineMatch = t.search(new RegExp('(?:^|\\n)\\s*' + num + '\\s*[.)]\\s+[A-Z]', 'im'));
+      if (lineMatch !== -1) startIdx = lineMatch;
     }
     if (startIdx === -1) return '';
     var nextSection = num + 1;
-    var endPatterns = [
-      new RegExp('(?:SECTION\\s+' + nextSection + '[:\\s.-]+|' + nextSection + '\\s*[.)]\\s*)', 'i'),
-      /(?:SECTION\s+\d+[:\s.-]+)/i
-    ];
+    // Find end: next section header
     var endIdx = t.length;
-    for (var p = 0; p < endPatterns.length; p++) {
-      var sub = t.substring(startIdx + 10);
-      var em = sub.search(endPatterns[p]);
-      if (em !== -1) { endIdx = startIdx + 10 + em; break; }
+    var sub = t.substring(startIdx + 5);
+    var nextMatch = sub.search(new RegExp('SECTION\\s+' + nextSection + '\\b', 'i'));
+    if (nextMatch !== -1) {
+      endIdx = startIdx + 5 + nextMatch;
+    } else {
+      // Try next "SECTION N" for any N
+      var anyNext = sub.search(new RegExp('SECTION\\s+\\d+\\b', 'i'));
+      if (anyNext !== -1) {
+        endIdx = startIdx + 5 + anyNext;
+      } else {
+        // Fallback: "N." at line start
+        var lineNext = sub.search(new RegExp('(?:^|\\n)\\s*' + nextSection + '\\s*[.)]\\s+[A-Z]', 'im'));
+        if (lineNext !== -1) endIdx = startIdx + 5 + lineNext;
+      }
     }
     return t.substring(startIdx, endIdx);
   }
@@ -1026,10 +1036,51 @@ function parseSDS(text) {
   // Section 9: Physical properties
   var sec9 = getSection(9);
   if (sec9) {
-    var fpMatch = sec9.match(/(?:flash\s*point)[:\s]*([^\n]{3,40})/i);
-    if (fpMatch) result.flashPoint = fpMatch[1].trim();
+    // Flash point extraction — handle various formats:
+    // "Flash point : 40 °C" or "Flash point (°C)39.4" or "Flash point: 103 °F"
+    // pdf-parse may concatenate: "Flash point (°C)39.4TasteNot Available"
+    var fpMatch = sec9.match(/flash\s*point\s*(?:\([^)]*\))?\s*[:\s]*([^\n]{2,60})/i);
+    if (!fpMatch) {
+      fpMatch = sec9.match(/flash\s*point[^:]*:\s*([^\n]{2,60})/i);
+    }
+    if (fpMatch) {
+      var fpFullMatch = fpMatch[0];
+      var fpRaw = fpMatch[1].trim();
+      // Check just the first 20 chars for "no data" / "not applicable" (avoid false positives
+      // from concatenated next-field text like "39.4TasteNot Available")
+      var fpCheck = fpRaw.substring(0, 20);
+      if (!/^[\s:]*(?:no\s+data|not\s+a(?:vail|pplic)|none|n\/?a\b)/i.test(fpCheck)) {
+        // Extract numeric value — grab the first number in the raw text
+        var fpNumMatch = fpRaw.match(/(-?\d+\.?\d*)/);
+        if (fpNumMatch) {
+          var fpNumber = parseFloat(fpNumMatch[1]);
+          // Detect Celsius vs Fahrenheit from the full match (including unit in parens)
+          var isCelsius = /°?\s*C(?:\b|[^a-z]|$)/i.test(fpFullMatch);
+          var isFahrenheit = /°?\s*F(?:\b|[^a-z]|$)/i.test(fpRaw);
+          if (!isCelsius && !isFahrenheit) {
+            isCelsius = fpNumber < 100;
+          }
+          if (isCelsius) {
+            var fpF = Math.round(fpNumber * 9 / 5 + 32);
+            result.flashPoint = fpF + ' °F (' + fpNumber + ' °C)';
+            result.flashPointNumF = fpF;
+          } else {
+            result.flashPoint = fpNumber + ' °F';
+            result.flashPointNumF = fpNumber;
+          }
+        } else {
+          result.flashPoint = fpRaw;
+        }
+      }
+    }
 
-    var phMatch = sec9.match(/(?:^|\s)pH[:\s]*(\d+\.?\d*(?:\s*[-–]\s*\d+\.?\d*)?)/im);
+    // pH extraction — handle "pH (as supplied)\n2.4" and "pH: 2.4" and "pH\n:\n2.4"
+    var phMatch = sec9.match(/(?:^|\s)pH\s*(?:\([^)]*\))?\s*[:\s]*(\d+\.?\d*(?:\s*[-–]\s*\d+\.?\d*)?)/im);
+    if (!phMatch) {
+      // Try: "pH" on one line, number on next line
+      var phLineMatch = sec9.match(/\bpH\b[^\d\n]*\n\s*(\d+\.?\d*)/im);
+      if (phLineMatch) phMatch = phLineMatch;
+    }
     if (phMatch) result.pH = phMatch[1].trim();
 
     var stateMatch = sec9.match(/(?:physical\s+state|form|appearance)[:\s]*([^\n]{3,30})/i);
@@ -1323,6 +1374,12 @@ var FLASH_POINT_DB = {
   '57-55-6': 210,    // Propylene glycol
   '142-82-5': 25,    // n-Heptane
   '111-65-9': 56,    // n-Octane
+  '64-19-7': 103,    // Acetic acid (39.4°C)
+  '85-44-9': 305,    // Phthalic anhydride
+  '100-41-4': 59,    // Ethylbenzene
+  '1330-20-7': 81,   // Xylenes (mixed)
+  '71-23-8': 59,     // n-Propanol
+  '123-86-4': 72,    // n-Butyl acetate
 };
 
 // Known pH values for common chemicals (pure or standard concentration)
@@ -1403,13 +1460,20 @@ function estimateMixtureProps(result) {
   result.uhcMatches = [];
 
   // --- Flash Point Estimation ---
+  // Uses FLASH_POINT_DB lookup first, then falls back to SDS Section 9 value per chemical
   var fpComponents = [];
   result.chemicals.forEach(function(chem) {
-    if (!chem.cas || !FLASH_POINT_DB[chem.cas]) return;
+    var fp = null;
+    if (chem.cas && FLASH_POINT_DB[chem.cas]) {
+      fp = FLASH_POINT_DB[chem.cas];
+    } else if (chem.sdsFlashPointF != null) {
+      fp = chem.sdsFlashPointF;
+    }
+    if (fp == null) return;
     var pctMatch = (chem.percentage || '').match(/(\d+\.?\d*)/);
     var pct = pctMatch ? parseFloat(pctMatch[1]) : 0;
     if (pct > 0) {
-      fpComponents.push({ fp: FLASH_POINT_DB[chem.cas], pct: pct, name: chem.name });
+      fpComponents.push({ fp: fp, pct: pct, name: chem.name, fromSDS: !FLASH_POINT_DB[chem.cas] });
     }
   });
 
@@ -1518,6 +1582,7 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
     hazardClass: '',
     packingGroup: '',
     flashPoint: '',
+    flashPointNumF: null,
     pH: '',
     physicalState: '',
     color: '',
@@ -1546,7 +1611,9 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
       mergedResult.sdsFiles.push({ id: 'sds' + Date.now() + i, name: file.originalname, filename: file.filename });
 
       // Merge chemicals (avoid duplicates by CAS)
+      // Tag each chemical with its SDS flash point for mixture estimation
       parsed.chemicals.forEach(function(c) {
+        if (parsed.flashPointNumF != null) c.sdsFlashPointF = parsed.flashPointNumF;
         var exists = mergedResult.chemicals.some(function(mc) { return mc.cas && mc.cas === c.cas; });
         if (!exists) mergedResult.chemicals.push(c);
       });
@@ -1556,7 +1623,10 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
       if (!mergedResult.properShippingName && parsed.properShippingName) mergedResult.properShippingName = parsed.properShippingName;
       if (!mergedResult.hazardClass && parsed.hazardClass) mergedResult.hazardClass = parsed.hazardClass;
       if (!mergedResult.packingGroup && parsed.packingGroup) mergedResult.packingGroup = parsed.packingGroup;
-      if (!mergedResult.flashPoint && parsed.flashPoint) mergedResult.flashPoint = parsed.flashPoint;
+      if (!mergedResult.flashPoint && parsed.flashPoint) {
+        mergedResult.flashPoint = parsed.flashPoint;
+        mergedResult.flashPointNumF = parsed.flashPointNumF;
+      }
       if (!mergedResult.pH && parsed.pH) mergedResult.pH = parsed.pH;
       if (!mergedResult.physicalState && parsed.physicalState) mergedResult.physicalState = parsed.physicalState;
       if (!mergedResult.color && parsed.color) mergedResult.color = parsed.color;
