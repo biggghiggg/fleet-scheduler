@@ -1718,6 +1718,7 @@ function WasteProfiles({data}) {
   const emptyEwsForm = {
     profileType: 'ews',
     name: '', customer: '',
+    profileIsNew: 'New Profile',
     // Generator Info
     generatorSiteAddress: '', generatorCity: '', generatorState: '', generatorZip: '',
     epaId: '', generatorMailingAddress: '', generatorMailingCity: '', generatorMailingCountry: '',
@@ -1731,6 +1732,7 @@ function WasteProfiles({data}) {
     // Composition
     chemicals: [],
     // Sampling
+    sampleType: '',
     samplingSource: '', dateSampled: '', samplerName: '', sdsProductName: '',
     // Characteristics
     color: '', odor: '', freeLiquidsPercent: '', percentSolids: '',
@@ -2357,6 +2359,7 @@ function WasteProfiles({data}) {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
+                <button className="bp" style={{ fontSize: 11, padding: '4px 10px', background: '#2563eb' }} onClick={() => window.open('/api/profiles/' + p.id + '/ews-pdf', '_blank')}>PDF</button>
                 <button className="bp" style={{ fontSize: 11, padding: '4px 10px', background: '#059669' }} onClick={() => openEdit(p)}>Edit</button>
                 <button style={{ background: '#fee2e2', color: 'var(--danger)', fontSize: 11, padding: '4px 10px' }} onClick={() => del(p.id)}>Delete</button>
               </div>
@@ -2953,195 +2956,256 @@ function WasteProfiles({data}) {
     {/* =============== EWS Form Modal =============== */}
     {showForm && form.profileType === 'ews' && (
       <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
-        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 700, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
-          <h2 style={{ color: '#059669' }}>{editId ? 'Edit EWS Profile' : 'New EWS Waste Profile'}</h2>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 750, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', padding: 0 }}>
+
+          {/* ===== HEADER — matches original form ===== */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '2px solid #059669' }}>
+            <div style={{ display: 'flex', gap: 16 }}>
+              {['New Profile', 'Recertification'].map(function(t) { return (
+                <label key={t} style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                  <input type="radio" name="ewsProfileIsNew" value={t} checked={form.profileIsNew === t} onChange={e => setForm({ ...form, profileIsNew: e.target.value })} />{t}
+                </label>
+              ); })}
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: '#059669', letterSpacing: 1 }}>EWS</div>
+          </div>
+          <div style={{ textAlign: 'center', fontWeight: 800, fontSize: 15, padding: '8px 16px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>GENERATOR WASTE PROFILE SHEET</div>
+          <div style={{ padding: '6px 16px', fontSize: 11, fontStyle: 'italic', color: '#b91c1c', textAlign: 'center', borderBottom: '1px solid #e5e7eb' }}>Please carefully read instructions before completing this form. All sections MUST be completed.</div>
+
+          <div style={{ padding: '12px 16px' }}>
+
+          {/* Profile Name — RouteBoard internal field */}
+          <div className="mrow" style={{ marginBottom: 8 }}><label style={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>Profile Name *</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Waste Coolant, Used Absorbents (internal name)" style={{ fontSize: 12 }} autoFocus /></div>
 
           {/* ===== SECTION 1: BILLING INFORMATION ===== */}
-          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,borderBottom:'2px solid #374151'}}>1. BILLING INFORMATION</div>
-          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 12, marginBottom: 12, fontStyle: 'italic', fontSize: 13, color: '#6b7280' }}>
-            <div><strong>Billing Party:</strong> Independence Environmental Services</div>
-            <div><strong>Mailing Address:</strong> PO Box 12623 Fresno, CA 93778</div>
-            <div><strong>Contact:</strong> Keith Higgins</div>
-            <div><strong>Phone:</strong> (559) 243-6169</div>
+          <div style={{ background: '#e5e7eb', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #374151' }}>1. Billing Information</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '4px 10px', borderBottom: '1px solid #e5e7eb' }}><strong><em>1. Billing Party Name:</em></strong> <em>Independence Environmental Services</em></div>
+            <div style={{ padding: '4px 10px', borderBottom: '1px solid #e5e7eb' }}><strong><em>2. Mailing Address:</em></strong> <em>PO Box 12623 Fresno, CA 93778</em></div>
+            <div style={{ padding: '4px 10px', borderBottom: '1px solid #e5e7eb' }}><strong><em>3. Contact:</em></strong> <em>Keith Higgins</em></div>
+            <div style={{ padding: '4px 10px' }}><strong><em>4. Phone:</em></strong> <em>(559) 243-6169</em></div>
           </div>
 
           {/* ===== SECTION 2: GENERATOR INFORMATION ===== */}
-          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>2. GENERATOR INFORMATION</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Profile Name *</label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Waste Coolant, Used Absorbents" style={{fontSize:12}} autoFocus /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Generator Name</label>
-              <input list="ews-cust-list" value={form.customer} onChange={e => onEwsGeneratorChange(e.target.value)} placeholder="Select or type generator name" style={{fontSize:12}} />
-              <datalist id="ews-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist></div>
-          </div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Generator Site Address</label>
-            <input value={form.generatorSiteAddress} onChange={e => setForm({ ...form, generatorSiteAddress: e.target.value })} placeholder="Street address" style={{fontSize:12}} /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>City</label>
-              <input value={form.generatorCity} onChange={e => setForm({ ...form, generatorCity: e.target.value })} placeholder="City" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>State</label>
-              <input value={form.generatorState} onChange={e => setForm({ ...form, generatorState: e.target.value })} placeholder="State" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Zip</label>
-              <input value={form.generatorZip} onChange={e => setForm({ ...form, generatorZip: e.target.value })} placeholder="Zip" style={{fontSize:12}} /></div>
-          </div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>EPA ID #</label>
-            <input value={form.epaId} onChange={e => setForm({ ...form, epaId: e.target.value })} placeholder="e.g. CAD123456789" style={{fontSize:12}} /></div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Generator Mailing Address (if different)</label>
-            <input value={form.generatorMailingAddress} onChange={e => setForm({ ...form, generatorMailingAddress: e.target.value })} placeholder="Mailing address" style={{fontSize:12}} /></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Mailing City</label>
-              <input value={form.generatorMailingCity} onChange={e => setForm({ ...form, generatorMailingCity: e.target.value })} placeholder="City" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Country</label>
-              <input value={form.generatorMailingCountry} onChange={e => setForm({ ...form, generatorMailingCountry: e.target.value })} placeholder="Country" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>State</label>
-              <input value={form.generatorMailingState} onChange={e => setForm({ ...form, generatorMailingState: e.target.value })} placeholder="State" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Zip</label>
-              <input value={form.generatorMailingZip} onChange={e => setForm({ ...form, generatorMailingZip: e.target.value })} placeholder="Zip" style={{fontSize:12}} /></div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Contact Name</label>
-              <input value={form.technicalContact} onChange={e => setForm({ ...form, technicalContact: e.target.value })} placeholder="Contact name" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Phone</label>
-              <input value={form.generatorPhone} onChange={e => setForm({ ...form, generatorPhone: e.target.value })} placeholder="(xxx) xxx-xxxx" style={{fontSize:12}} /></div>
+          <div style={{ background: '#e5e7eb', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #374151' }}>2. Generator Information</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>1. Generator Name:</em></strong>
+              <input list="ews-cust-list" value={form.customer} onChange={e => onEwsGeneratorChange(e.target.value)} placeholder="Select or type generator name" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              <datalist id="ews-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>2. Generator Site Address:</em></strong>
+              <input value={form.generatorSiteAddress} onChange={e => setForm({ ...form, generatorSiteAddress: e.target.value })} placeholder="" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong style={{ whiteSpace: 'nowrap' }}><em>3. City:</em></strong>
+                <input value={form.generatorCity} onChange={e => setForm({ ...form, generatorCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong><em>State:</em></strong>
+                <input value={form.generatorState} onChange={e => setForm({ ...form, generatorState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong><em>Zip:</em></strong>
+                <input value={form.generatorZip} onChange={e => setForm({ ...form, generatorZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>4. Generator US EPA Identification Number:</em></strong>
+              <input value={form.epaId} onChange={e => setForm({ ...form, epaId: e.target.value })} placeholder="" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>5. Generator Mailing Address (if Different):</em></strong>
+              <input value={form.generatorMailingAddress} onChange={e => setForm({ ...form, generatorMailingAddress: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong style={{ whiteSpace: 'nowrap' }}><em>6. City:</em></strong>
+                <input value={form.generatorMailingCity} onChange={e => setForm({ ...form, generatorMailingCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong><em>Country:</em></strong>
+                <input value={form.generatorMailingCountry} onChange={e => setForm({ ...form, generatorMailingCountry: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong><em>State:</em></strong>
+                <input value={form.generatorMailingState} onChange={e => setForm({ ...form, generatorMailingState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong><em>Zip:</em></strong>
+                <input value={form.generatorMailingZip} onChange={e => setForm({ ...form, generatorMailingZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>7. Generator Contact Name:</em></strong>
+              <input value={form.technicalContact} onChange={e => setForm({ ...form, technicalContact: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>8. Phone Number:</em></strong>
+              <input value={form.generatorPhone} onChange={e => setForm({ ...form, generatorPhone: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
           </div>
 
           {/* ===== SECTION 3: WASTE PROPERTIES AND COMPOSITION ===== */}
-          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>3. WASTE PROPERTIES AND COMPOSITION</div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Process Generating Waste</label>
-            <input list="sug-processGenerating" value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} placeholder="Describe the process that generates this waste" style={{fontSize:12}} /></div>
-          <div style={{marginBottom:8}}>
-            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>EPA Hazardous Waste?</label>
-            <span style={{ background: '#dcfce7', padding: '3px 10px', borderRadius: 4, fontWeight: 600, color: '#166534', fontSize: 13 }}>No (Non-RCRA)</span>
-          </div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>State Codes</label>
-            <input list="sug-stateCodes" value={form.stateCodes} onChange={e => setForm({ ...form, stateCodes: e.target.value })} placeholder="State waste codes" style={{fontSize:12}} /></div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Common Waste Name</label>
-            <input list="sug-commonName" value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} placeholder="Common name of waste material" style={{fontSize:12}} /></div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>US DOT Proper Shipping Name</label>
-            <input list="sug-properShippingName" value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste, n.o.s." style={{fontSize:12}} /></div>
-          <div style={{marginBottom:8}}>
-            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Physical State</label>
-            <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
-              {['Solid','Semi-Solid','Powder','Liquid','Other'].map(function(s) { return (
-                <label key={s} style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
-                  <input type="radio" name="ewsPhysicalState" value={s} checked={form.physicalState===s} onChange={e=>setForm({...form,physicalState:e.target.value})}/>{s}
-                </label>
-              ); })}
+          <div style={{ background: '#e5e7eb', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #374151' }}>3. Waste Properties and Composition</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>9. Process Generating Waste:</em></strong>
+              <input list="sug-processGenerating" value={form.processGenerating} onChange={e => setForm({ ...form, processGenerating: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
             </div>
-          </div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Method of Shipment</label>
-            <select value={form.methodOfShipment} onChange={e => setForm({ ...form, methodOfShipment: e.target.value })} style={{fontSize:12}}>
-              <option value="">-- Select --</option>
-              <option value="DF">DF</option><option value="DM">DM</option><option value="TP">TP</option>
-              <option value="CF">CF</option><option value="CW">CW</option><option value="BA">BA</option>
-              <option value="TT">TT</option><option value="Commodity Pack">Commodity Pack</option>
-            </select></div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Size</label>
-              <input value={form.shipmentSize} onChange={e => setForm({ ...form, shipmentSize: e.target.value })} placeholder="e.g. 55 gal" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Quantity</label>
-              <input value={form.shipmentQuantity} onChange={e => setForm({ ...form, shipmentQuantity: e.target.value })} placeholder="# of containers" style={{fontSize:12}} /></div>
-          </div>
-          <div style={{marginBottom:8}}>
-            <label style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Frequency</label>
-            <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
-              {['One Time','Daily','Weekly','Monthly','Other'].map(function(s) { return (
-                <label key={s} style={{fontSize:12,display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}}>
-                  <input type="radio" name="ewsFrequency" value={s} checked={form.frequency===s} onChange={e=>setForm({...form,frequency:e.target.value})}/>{s}
-                </label>
-              ); })}
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>10. Is the waste US EPA HAZARDOUS WASTE (40 CFR Part 261)?</em></strong>
+              <span style={{ background: '#dcfce7', padding: '2px 10px', borderRadius: 4, fontWeight: 700, color: '#166534', fontSize: 12 }}>No</span>
             </div>
-          </div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>Special Handling</label>
-            <input list="sug-specialHandling" value={form.specialHandling} onChange={e => setForm({ ...form, specialHandling: e.target.value })} placeholder="Special handling instructions" style={{fontSize:12}} /></div>
-
-          {/* EWS Composition Table */}
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#059669', marginBottom: 6, marginTop: 12 }}>Waste Composition</div>
-          <div style={{ marginBottom: 12 }}>
-            {form.chemicals.length > 0 ? (
-              <div className="rtable">
-                <table>
-                  <thead><tr>
-                    <th style={{fontSize:11}}>Constituent</th><th style={{fontSize:11}}>CAS #</th>
-                    <th style={{fontSize:11,width:70}}>%</th>
-                    <th style={{width:24}}></th>
-                  </tr></thead>
-                  <tbody>
-                    {form.chemicals.map((c, i) => (
-                      <tr key={i}>
-                        <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                        <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                        <td><input value={c.percentage || ''} onChange={e => updateChemical(i, 'percentage', e.target.value)} placeholder="%" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                        <td><span onClick={() => removeChemical(i)} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 700, fontSize: 13 }}>&times;</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>11. State Codes:</em></strong>
+              <input list="sug-stateCodes" value={form.stateCodes} onChange={e => setForm({ ...form, stateCodes: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>12. Common Waste Name:</em></strong>
+              <input list="sug-commonName" value={form.commonName} onChange={e => setForm({ ...form, commonName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>13. US DOT Proper Shipping Name:</em></strong>
+              <input list="sug-properShippingName" value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>14. Physical State</em></strong>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {['Solid', 'Semi-Solid', 'Powder', 'Liquid', 'Other'].map(function(s) { return (
+                  <label key={s} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form.physicalState === s} onChange={() => setForm({ ...form, physicalState: form.physicalState === s ? '' : s })} style={{ width: 13, height: 13 }} />{s}
+                  </label>
+                ); })}
               </div>
-            ) : (
-              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: '#f8fafc', borderRadius: 6 }}>No constituents added. Upload an SDS to auto-extract or click the button below.</div>
-            )}
-            <div style={{marginTop:6}}>
-              <button className="bp" style={{ fontSize: 11, padding: '4px 10px', background: '#059669' }} onClick={addEwsChemical}>+ Add Constituent</button>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <strong style={{ whiteSpace: 'nowrap' }}><em>15. Method of Shipment</em></strong>
+                <span style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                  <span style={{ fontSize: 12 }}><em>Size</em> <input value={form.shipmentSize} onChange={e => setForm({ ...form, shipmentSize: e.target.value })} style={{ width: 60, fontSize: 12, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></span>
+                  <span style={{ fontSize: 12 }}><em>Quantity</em> <input value={form.shipmentQuantity} onChange={e => setForm({ ...form, shipmentQuantity: e.target.value })} style={{ width: 40, fontSize: 12, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></span>
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {['DF', 'DM', 'TP', 'CF', 'CW', 'BA', 'TT', 'Commodity Pack'].map(function(s) { return (
+                  <label key={s} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form.methodOfShipment === s} onChange={() => setForm({ ...form, methodOfShipment: form.methodOfShipment === s ? '' : s })} style={{ width: 13, height: 13 }} />{s}
+                  </label>
+                ); })}
+              </div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>16. Frequency of Shipment</em></strong>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {['One Time', 'Daily', 'Weekly', 'Monthly', 'Other'].map(function(s) { return (
+                  <label key={s} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form.frequency === s} onChange={() => setForm({ ...form, frequency: form.frequency === s ? '' : s })} style={{ width: 13, height: 13 }} />{s}
+                  </label>
+                ); })}
+              </div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>17. Special Handling Instructions:</em></strong>
+              <input list="sug-specialHandling" value={form.specialHandling} onChange={e => setForm({ ...form, specialHandling: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px' }}>
+              <strong><em>18. Waste Composition:</em></strong> <span style={{ fontSize: 11, color: '#6b7280' }}>List all components with %</span>
+              <div style={{ marginTop: 6 }}>
+                {form.chemicals.length > 0 ? (
+                  <div className="rtable">
+                    <table>
+                      <thead><tr>
+                        <th style={{ fontSize: 11 }}>Constituent</th><th style={{ fontSize: 11 }}>CAS #</th>
+                        <th style={{ fontSize: 11, width: 70 }}>%</th>
+                        <th style={{ width: 24 }}></th>
+                      </tr></thead>
+                      <tbody>
+                        {form.chemicals.map((c, i) => (
+                          <tr key={i}>
+                            <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><input value={c.percentage || ''} onChange={e => updateChemical(i, 'percentage', e.target.value)} placeholder="%" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><span onClick={() => removeChemical(i)} style={{ cursor: 'pointer', color: '#dc2626', fontWeight: 700, fontSize: 13 }}>&times;</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ padding: 8, textAlign: 'center', color: 'var(--text-muted)', fontSize: 11, background: '#f8fafc', borderRadius: 4 }}>No constituents. Upload an SDS or add manually.</div>
+                )}
+                <button className="bp" style={{ fontSize: 11, padding: '3px 8px', background: '#059669', marginTop: 4 }} onClick={addEwsChemical}>+ Add Constituent</button>
+              </div>
             </div>
           </div>
 
           {/* ===== SECTION 4: SAMPLING INFORMATION ===== */}
-          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>4. SAMPLING INFORMATION</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Sampling Source</label>
-              <input list="sug-samplingSource" value={form.samplingSource} onChange={e => setForm({ ...form, samplingSource: e.target.value })} placeholder="Source of sample" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Date Sampled / Lab ID</label>
-              <input value={form.dateSampled} onChange={e => setForm({ ...form, dateSampled: e.target.value })} placeholder="Date and/or Lab ID" style={{fontSize:12}} /></div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Sampler's Name &amp; Company</label>
-              <input list="sug-samplerName" value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} placeholder="Name and company" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>SDS Product Name</label>
-              <input list="sug-sdsProductName" value={form.sdsProductName} onChange={e => setForm({ ...form, sdsProductName: e.target.value })} placeholder="Product name from SDS" style={{fontSize:12}} /></div>
+          <div style={{ background: '#e5e7eb', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #374151' }}>4. Sampling Information</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <strong style={{ whiteSpace: 'nowrap' }}><em>Sample Type:</em></strong>
+              {['Grab Sample', 'Composite Sample', 'Process/Generator Knowledge', 'SDS', 'Field Test'].map(function(s) { return (
+                <label key={s} style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.sampleType === s} onChange={() => setForm({ ...form, sampleType: form.sampleType === s ? '' : s })} style={{ width: 13, height: 13 }} />{s}
+                </label>
+              ); })}
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <strong style={{ whiteSpace: 'nowrap' }}><em>19. Sampling Source:</em></strong>
+                <input list="sug-samplingSource" value={form.samplingSource} onChange={e => setForm({ ...form, samplingSource: e.target.value })} placeholder="drum, stockpile, pond" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <strong style={{ whiteSpace: 'nowrap' }}><em>19(a) Date Sampled/Lab ID:</em></strong>
+                <input value={form.dateSampled} onChange={e => setForm({ ...form, dateSampled: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              </div>
+            </div>
+            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <strong style={{ whiteSpace: 'nowrap' }}><em>19(b). Sampler's Name &amp; Company:</em></strong>
+                <input list="sug-samplerName" value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <strong style={{ whiteSpace: 'nowrap' }}><em>SDS Product name:</em></strong>
+                <input list="sug-sdsProductName" value={form.sdsProductName} onChange={e => setForm({ ...form, sdsProductName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              </div>
+            </div>
           </div>
 
           {/* ===== SECTION 5: CHARACTERISTIC COMPONENTS ===== */}
-          <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>5. CHARACTERISTIC COMPONENTS</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Color</label>
-              <input list="sug-color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} placeholder="Color" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Odor</label>
-              <input list="sug-odor" value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} placeholder="Odor" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Free Liquids %</label>
-              <input value={form.freeLiquidsPercent} onChange={e => setForm({ ...form, freeLiquidsPercent: e.target.value })} placeholder="%" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>% Solids</label>
-              <input value={form.percentSolids} onChange={e => setForm({ ...form, percentSolids: e.target.value })} placeholder="%" style={{fontSize:12}} /></div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>pH</label>
-              <input value={form.pHValue} onChange={e => setForm({ ...form, pHValue: e.target.value })} placeholder="pH value" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Flash Point</label>
-              <input value={form.flashPoint} onChange={e => setForm({ ...form, flashPoint: e.target.value })} placeholder="e.g. 140 °F" style={{fontSize:12}} /></div>
-            <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Liquid Phases</label>
-              <select value={form.liquidPhases} onChange={e => setForm({ ...form, liquidPhases: e.target.value })} style={{fontSize:12}}>
-                <option value="">-- Select --</option>
-                <option value="Single">Single</option><option value="Double Layer">Double Layer</option><option value="Multi-Layer">Multi-Layer</option>
-              </select></div>
-          </div>
-
-          {/* Yes/No questions */}
-          <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'4px',marginBottom:12}}>
-            {[
-              ['containsRegulatedHazWaste', 'Contains regulated concentrations of listed haz wastes (40 CFR 261.31-.33)?'],
-              ['containsPCBs', 'Contains PCBs, halogens, or dioxins?'],
-              ['regulatedToxicMaterial', 'Regulated Toxic Material (State or Federal)?'],
-              ['radioactive', 'Radioactive (State or Federal)?'],
-              ['infectiousMedical', 'Infectious or Medical Waste (State or Federal)?']
-            ].map(function(pair) { return (
-              <div key={pair[0]} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid #f3f4f6'}}>
-                <span style={{fontSize:12,flex:1}}>{pair[1]}</span>
-                <span style={{display:'flex',gap:8,minWidth:80}}>
-                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
-                    <input type="radio" name={'ews_'+pair[0]} value="Yes" checked={form[pair[0]]==='Yes'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>Yes
+          <div style={{ background: '#e5e7eb', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #374151' }}>5. Characteristic Components</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            {/* Row of 7 fields matching the original table header */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr 1fr', borderBottom: '1px solid #d1d5db' }}>
+              {[
+                ['COLOR:', 'color', form.color, 'color'],
+                ['ODOR:', 'odor', form.odor, 'odor'],
+                ['FREE LIQUIDS %', 'freeLiquidsPercent', form.freeLiquidsPercent, null],
+                ['% SOLIDS:', 'percentSolids', form.percentSolids, null],
+                ['pH:', 'pHValue', form.pHValue, null],
+                ['Flash Point:', 'flashPoint', form.flashPoint, null]
+              ].map(function(arr) { return (
+                <div key={arr[1]} style={{ padding: '4px 6px', borderRight: '1px solid #e5e7eb' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 2 }}>{arr[0]}</div>
+                  <input list={arr[3] ? 'sug-' + arr[3] : undefined} value={arr[2]} onChange={e => setForm({ ...form, [arr[1]]: e.target.value })} style={{ fontSize: 11, width: '100%', border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                </div>
+              ); })}
+              <div style={{ padding: '4px 6px' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 2 }}>Liquid Phases</div>
+                {['Single', 'Double Layer', 'Multi-Layer'].map(function(s) { return (
+                  <label key={s} style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', lineHeight: '16px' }}>
+                    <input type="checkbox" checked={form.liquidPhases === s} onChange={() => setForm({ ...form, liquidPhases: form.liquidPhases === s ? '' : s })} style={{ width: 11, height: 11 }} />{s}
                   </label>
-                  <label style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:2,cursor:'pointer'}}>
-                    <input type="radio" name={'ews_'+pair[0]} value="No" checked={form[pair[0]]==='No'} onChange={e=>setForm({...form,[pair[0]]:e.target.value})}/>No
+                ); })}
+              </div>
+            </div>
+
+            {/* Yes/No questions — matching original form exactly */}
+            {[
+              ['containsRegulatedHazWaste', 'Does this waste contain regulated concentrations of listed hazardous wastes defined by § 40 CFR 261.31.261.32.261.33 including RCRA F Listed Solvents'],
+              ['containsPCBs', 'Does this waste contain any PCB\'s halogens or dioxins?'],
+              ['regulatedToxicMaterial', 'Is this a regulated Toxic Material as defined by State or Federal Regulations'],
+              ['radioactive', 'Does this waste exhibit any characteristics of Radioactivity as defined by State or Federal Regulations?'],
+              ['infectiousMedical', 'Does this waste contain any Infectious or Medical Waste as defined by State or Federal Regulations?']
+            ].map(function(pair) { return (
+              <div key={pair[0]} style={{ display: 'flex', alignItems: 'center', padding: '4px 10px', borderBottom: '1px solid #e5e7eb' }}>
+                <span style={{ fontSize: 11, flex: 1, lineHeight: '14px' }}><strong><em>{pair[1]}</em></strong></span>
+                <span style={{ display: 'flex', gap: 8, minWidth: 70 }}>
+                  <label style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
+                    <input type="radio" name={'ews_' + pair[0]} value="Yes" checked={form[pair[0]] === 'Yes'} onChange={e => setForm({ ...form, [pair[0]]: e.target.value })} />Yes
+                  </label>
+                  <label style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
+                    <input type="radio" name={'ews_' + pair[0]} value="No" checked={form[pair[0]] === 'No'} onChange={e => setForm({ ...form, [pair[0]]: e.target.value })} />No
                   </label>
                 </span>
               </div>
@@ -3150,20 +3214,20 @@ function WasteProfiles({data}) {
 
           {/* ===== AUTO-GENERATED SDS DATA ===== */}
           {(form.estimatedFlashPoint || form.estimatedPH) && (
-            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 12, marginBottom: 12, marginTop: 12 }}>
+            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 8 }}>Estimated Mixture Characteristics</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
                 {form.estimatedFlashPoint && <div><strong>Est. Flash Point:</strong> {form.estimatedFlashPoint}</div>}
                 {form.estimatedPH && <div><strong>Est. pH:</strong> {form.estimatedPH}</div>}
               </div>
-              <div style={{ fontSize: 11, color: '#92400e', marginTop: 6, fontStyle: 'italic' }}>These are estimates based on SDS data. Actual testing is required for profile accuracy.</div>
+              <div style={{ fontSize: 11, color: '#92400e', marginTop: 6, fontStyle: 'italic' }}>Estimates based on SDS data. Actual testing required for profile accuracy.</div>
             </div>
           )}
 
-          {(form.reactivityFlags.length > 0 || form.incompatibles || form.stabilityNotes) && (
+          {(form.reactivityFlags && form.reactivityFlags.length > 0 || form.incompatibles || form.stabilityNotes) && (
             <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: '#b91c1c', marginBottom: 8 }}>Reactivity &amp; Hazard Flags</div>
-              {form.reactivityFlags.length > 0 && (
+              {form.reactivityFlags && form.reactivityFlags.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                   {form.reactivityFlags.map((f, i) => (
                     <span key={i} style={{ background: '#fee2e2', border: '1px solid #f87171', padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, color: '#991b1b' }}>{f}</span>
@@ -3172,26 +3236,6 @@ function WasteProfiles({data}) {
               )}
               {form.incompatibles && <div style={{ fontSize: 13, marginBottom: 4 }}><strong>Incompatible Materials:</strong> {form.incompatibles}</div>}
               {form.stabilityNotes && <div style={{ fontSize: 13 }}><strong>Stability / Conditions to Avoid:</strong> {form.stabilityNotes}</div>}
-            </div>
-          )}
-
-          {form.toxicity && form.toxicity.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#059669', marginBottom: 6 }}>Toxicity Data (from SDS)</div>
-              <div className="rtable">
-                <table>
-                  <thead><tr><th>Type</th><th>Route</th><th>Value</th></tr></thead>
-                  <tbody>
-                    {form.toxicity.map((t, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 600 }}>{t.type}</td>
-                        <td>{t.route}</td>
-                        <td>{t.value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
           )}
 
@@ -3207,11 +3251,16 @@ function WasteProfiles({data}) {
           )}
 
           <div className="mrow"><label>Profile Notes</label>
-            <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={3} placeholder="Additional notes about this waste profile, handling instructions, etc." /></div>
+            <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={2} placeholder="Additional notes" /></div>
 
-          <div className="mactions">
+          <div className="mactions" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
             <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
-            <button className="bp" style={{ background: '#059669' }} onClick={save}>{editId ? 'Update EWS Profile' : 'Save EWS Profile'}</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {editId && <button className="bp" style={{ background: '#2563eb' }} onClick={() => { window.open('/api/profiles/' + editId + '/ews-pdf', '_blank'); }}>Download PDF</button>}
+              <button className="bp" style={{ background: '#059669' }} onClick={save}>{editId ? 'Update EWS Profile' : 'Save EWS Profile'}</button>
+            </div>
+          </div>
+
           </div>
         </div>
       </div>
