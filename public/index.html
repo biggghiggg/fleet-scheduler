@@ -1777,61 +1777,57 @@ function WasteProfiles({data}) {
   // Helper: render a datalist for a field's suggestions
   const sug = (field) => (suggestions[field] || []);
 
-  // Save current Section 3 fields as a reusable waste stream profile
-  const saveWasteStream = async () => {
-    var wsName = ((form.customer || '') + ' - ' + (form.commonName || form.properShippingName || 'Waste Stream')).trim();
-    var payload = {
-      name: wsName,
-      processGenerating: form.processGenerating || '',
-      stateCodes: form.stateCodes || '',
-      commonName: form.commonName || '',
-      properShippingName: form.properShippingName || '',
-      physicalState: form.physicalState || '',
-      methodOfShipment: form.methodOfShipment || '',
-      shipmentSize: form.shipmentSize || '',
-      shipmentQuantity: form.shipmentQuantity || '',
-      frequency: form.frequency || '',
-      specialHandling: form.specialHandling || '',
-      chemicals: form.chemicals || [],
-      sampleType: form.sampleType || '',
-      color: form.color || '',
-      odor: form.odor || '',
-      freeLiquidsPercent: form.freeLiquidsPercent || '',
-      percentSolids: form.percentSolids || '',
-      pHValue: form.pHValue || '',
-      flashPoint: form.flashPoint || '',
-      liquidPhases: form.liquidPhases || ''
-    };
-    await fetch('/api/waste-streams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    loadWasteStreams();
-    setWsDropOpen(false);
-    alert('Waste stream profile saved: ' + wsName);
+  // Waste stream mini-form state
+  const [showWsForm, setShowWsForm] = useState(false);
+  const emptyWs = {
+    name: '', processGenerating: '', stateCodes: '', commonName: '', properShippingName: '',
+    physicalState: '', methodOfShipment: '', shipmentSize: '', shipmentQuantity: '',
+    frequency: '', specialHandling: 'WEAR CORRECT PPE', chemicals: [],
+    color: '', odor: '', freeLiquidsPercent: '', percentSolids: '',
+    pHValue: '', flashPoint: '', liquidPhases: ''
+  };
+  const [wsForm, setWsForm] = useState(emptyWs);
+
+  const addWsChemical = () => setWsForm({ ...wsForm, chemicals: [...wsForm.chemicals, { name: '', cas: '', percentage: '' }] });
+  const updateWsChemical = (i, field, val) => {
+    var c = [...wsForm.chemicals]; c[i] = { ...c[i], [field]: val }; setWsForm({ ...wsForm, chemicals: c });
+  };
+  const removeWsChemical = (i) => {
+    var c = [...wsForm.chemicals]; c.splice(i, 1); setWsForm({ ...wsForm, chemicals: c });
   };
 
-  // Apply a saved waste stream profile to current form
+  const saveWasteStream = async () => {
+    if (!wsForm.commonName && !wsForm.properShippingName) { alert('Please enter at least a Common Waste Name or Proper Shipping Name'); return; }
+    var payload = { ...wsForm };
+    if (!payload.name) payload.name = (payload.commonName || payload.properShippingName || 'Waste Stream');
+    await fetch('/api/waste-streams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    loadWasteStreams();
+    setShowWsForm(false);
+    setWsForm(emptyWs);
+  };
+
   const applyWasteStream = (ws) => {
     var autoName = ((form.customer || '') + ' - ' + (ws.commonName || ws.properShippingName || '')).trim();
     setForm(function(prev) { return Object.assign({}, prev, {
       name: prev.name || autoName,
-      processGenerating: ws.processGenerating || prev.processGenerating,
-      stateCodes: ws.stateCodes || prev.stateCodes,
-      commonName: ws.commonName || prev.commonName,
-      properShippingName: ws.properShippingName || prev.properShippingName,
-      physicalState: ws.physicalState || prev.physicalState,
-      methodOfShipment: ws.methodOfShipment || prev.methodOfShipment,
-      shipmentSize: ws.shipmentSize || prev.shipmentSize,
-      shipmentQuantity: ws.shipmentQuantity || prev.shipmentQuantity,
-      frequency: ws.frequency || prev.frequency,
-      specialHandling: ws.specialHandling || prev.specialHandling,
+      processGenerating: ws.processGenerating || '',
+      stateCodes: ws.stateCodes || '',
+      commonName: ws.commonName || '',
+      properShippingName: ws.properShippingName || '',
+      physicalState: ws.physicalState || '',
+      methodOfShipment: ws.methodOfShipment || '',
+      shipmentSize: ws.shipmentSize || '',
+      shipmentQuantity: ws.shipmentQuantity || '',
+      frequency: ws.frequency || '',
+      specialHandling: ws.specialHandling || 'WEAR CORRECT PPE',
       chemicals: ws.chemicals && ws.chemicals.length > 0 ? ws.chemicals : prev.chemicals,
-      sampleType: ws.sampleType || prev.sampleType,
-      color: ws.color || prev.color,
-      odor: ws.odor || prev.odor,
-      freeLiquidsPercent: ws.freeLiquidsPercent || prev.freeLiquidsPercent,
-      percentSolids: ws.percentSolids || prev.percentSolids,
-      pHValue: ws.pHValue || prev.pHValue,
-      flashPoint: ws.flashPoint || prev.flashPoint,
-      liquidPhases: ws.liquidPhases || prev.liquidPhases
+      color: ws.color || '',
+      odor: ws.odor || '',
+      freeLiquidsPercent: ws.freeLiquidsPercent || '',
+      percentSolids: ws.percentSolids || '',
+      pHValue: ws.pHValue || '',
+      flashPoint: ws.flashPoint || '',
+      liquidPhases: ws.liquidPhases || ''
     }); });
     setWsDropOpen(false);
   };
@@ -3135,33 +3131,37 @@ function WasteProfiles({data}) {
                 onFocus={() => setWsDropOpen(true)}
                 style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
               {wsDropOpen && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxHeight: 260, overflowY: 'auto' }}>
-                  <div style={{ padding: '6px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>Waste Stream Profiles</span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="bp" style={{ fontSize: 10, padding: '2px 8px', background: '#059669' }}
-                        onClick={(e) => { e.stopPropagation(); saveWasteStream(); }}>+ Save Current as Profile</button>
-                      <button style={{ fontSize: 10, padding: '2px 8px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                        onClick={(e) => { e.stopPropagation(); setWsDropOpen(false); }}>Close</button>
-                    </div>
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxHeight: 300, overflowY: 'auto' }}>
+                  <div onClick={() => { setWsDropOpen(false); setWsForm(emptyWs); setShowWsForm(true); }}
+                    style={{ padding: '8px 10px', borderBottom: '2px solid #059669', background: '#f0fdf4', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#f0fdf4'}>
+                    <span style={{ fontSize: 16, color: '#059669', fontWeight: 700 }}>+</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>Add New Waste Stream Profile</span>
                   </div>
                   {wasteStreams.length === 0 ? (
-                    <div style={{ padding: '12px 10px', textAlign: 'center', color: '#9ca3af', fontSize: 11 }}>No saved waste stream profiles yet. Fill out Section 3 and click "Save Current as Profile" above.</div>
+                    <div style={{ padding: '12px 10px', textAlign: 'center', color: '#9ca3af', fontSize: 11 }}>No saved profiles yet.</div>
                   ) : (
                     wasteStreams.map(function(ws) { return (
-                      <div key={ws.id} style={{ padding: '6px 10px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      <div key={ws.id} style={{ padding: '7px 10px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                         onClick={() => applyWasteStream(ws)}
                         onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                         <div>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#059669' }}>{ws.name}</div>
                           <div style={{ fontSize: 10, color: '#6b7280' }}>
-                            {[ws.commonName, ws.properShippingName, ws.physicalState].filter(Boolean).join(' | ')}
+                            {[ws.properShippingName, ws.physicalState, ws.chemicals && ws.chemicals.length ? ws.chemicals.length + ' constituents' : ''].filter(Boolean).join(' | ')}
                           </div>
                         </div>
-                        <span onClick={(e) => deleteWasteStream(ws.id, e)} style={{ color: '#dc2626', cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '0 4px' }}>&times;</span>
+                        <span onClick={(e) => deleteWasteStream(ws.id, e)} style={{ color: '#dc2626', cursor: 'pointer', fontSize: 14, fontWeight: 700, padding: '0 4px' }} title="Delete">&times;</span>
                       </div>
                     ); })
+                  )}
+                  {wasteStreams.length > 0 && (
+                    <div style={{ padding: '4px 10px', textAlign: 'right' }}>
+                      <button style={{ fontSize: 10, padding: '2px 8px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        onClick={() => setWsDropOpen(false)}>Close</button>
+                    </div>
                   )}
                 </div>
               )}
@@ -3373,6 +3373,116 @@ function WasteProfiles({data}) {
         </div>
       </div>
     )}
+
+    {/* =============== Waste Stream Profile Mini Form =============== */}
+    {showWsForm && (
+      <div className="overlay" onClick={() => setShowWsForm(false)}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 650, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', padding: 0 }}>
+          <div style={{ background: '#059669', color: '#fff', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ fontSize: 15 }}>New Waste Stream Profile</strong>
+            <button onClick={() => setShowWsForm(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>&times;</button>
+          </div>
+          <div style={{ padding: 16 }}>
+            {/* Profile Name */}
+            <div className="mrow"><label>Profile Name</label>
+              <input value={wsForm.name} onChange={e => setWsForm({ ...wsForm, name: e.target.value })} placeholder="Auto-generated if blank" /></div>
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '8px 12px', margin: '8px 0', fontSize: 12, fontWeight: 700, color: '#059669' }}>Section 3: Waste Properties and Composition</div>
+
+            <div className="mrow"><label>9. Process Generating Waste</label>
+              <input value={wsForm.processGenerating} onChange={e => setWsForm({ ...wsForm, processGenerating: e.target.value })} /></div>
+            <div className="mrow"><label>11. State Codes</label>
+              <input value={wsForm.stateCodes} onChange={e => setWsForm({ ...wsForm, stateCodes: e.target.value })} /></div>
+            <div className="mrow"><label>12. Common Waste Name</label>
+              <input value={wsForm.commonName} onChange={e => setWsForm({ ...wsForm, commonName: e.target.value })} /></div>
+            <div className="mrow"><label>13. US DOT Proper Shipping Name</label>
+              <input value={wsForm.properShippingName} onChange={e => setWsForm({ ...wsForm, properShippingName: e.target.value })} /></div>
+
+            {/* Physical State */}
+            <div className="mrow"><label>14. Physical State</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['Solid','Semi-Solid','Powder','Liquid','Other'].map(s => (
+                  <label key={s} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <input type="radio" name="wsPhysical" checked={wsForm.physicalState === s} onChange={() => setWsForm({ ...wsForm, physicalState: s })} /> {s}
+                  </label>
+                ))}
+              </div></div>
+
+            {/* Method of Shipment */}
+            <div className="mrow"><label>15. Method of Shipment</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {['DF','DM','TP','CF','CW','BA','TT','Commodity Pack'].map(m => (
+                  <label key={m} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <input type="radio" name="wsShipment" checked={wsForm.methodOfShipment === m} onChange={() => setWsForm({ ...wsForm, methodOfShipment: m })} /> {m}
+                  </label>
+                ))}
+              </div></div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div className="mrow" style={{ flex: 1 }}><label>Size</label>
+                <input value={wsForm.shipmentSize} onChange={e => setWsForm({ ...wsForm, shipmentSize: e.target.value })} /></div>
+              <div className="mrow" style={{ flex: 1 }}><label>Quantity</label>
+                <input value={wsForm.shipmentQuantity} onChange={e => setWsForm({ ...wsForm, shipmentQuantity: e.target.value })} /></div>
+            </div>
+
+            {/* Frequency */}
+            <div className="mrow"><label>16. Frequency of Shipment</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['One Time','Daily','Weekly','Monthly','Other'].map(f => (
+                  <label key={f} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <input type="radio" name="wsFreq" checked={wsForm.frequency === f} onChange={() => setWsForm({ ...wsForm, frequency: f })} /> {f}
+                  </label>
+                ))}
+              </div></div>
+
+            <div className="mrow"><label>17. Special Handling Instructions</label>
+              <input value={wsForm.specialHandling} onChange={e => setWsForm({ ...wsForm, specialHandling: e.target.value })} /></div>
+
+            {/* Waste Composition - chemicals */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '8px 12px', margin: '8px 0', fontSize: 12, fontWeight: 700, color: '#059669' }}>18. Waste Composition (Chemicals / Constituents)</div>
+            {wsForm.chemicals.map((c, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4, alignItems: 'center' }}>
+                <input value={c.name} onChange={e => updateWsChemical(i, 'name', e.target.value)} placeholder="Chemical name" style={{ flex: 2, padding: '4px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }} />
+                <input value={c.cas} onChange={e => updateWsChemical(i, 'cas', e.target.value)} placeholder="CAS #" style={{ flex: 1, padding: '4px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }} />
+                <input value={c.percentage} onChange={e => updateWsChemical(i, 'percentage', e.target.value)} placeholder="%" style={{ width: 50, padding: '4px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12 }} />
+                <button onClick={() => removeWsChemical(i)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>&times;</button>
+              </div>
+            ))}
+            <button onClick={addWsChemical} style={{ fontSize: 11, padding: '4px 10px', background: '#e5e7eb', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#374151', marginBottom: 8 }}>+ Add Chemical</button>
+
+            {/* Characteristics */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '8px 12px', margin: '8px 0', fontSize: 12, fontWeight: 700, color: '#059669' }}>Characteristic Components</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+              <div className="mrow"><label style={{ fontSize: 11 }}>Color</label>
+                <input value={wsForm.color} onChange={e => setWsForm({ ...wsForm, color: e.target.value })} /></div>
+              <div className="mrow"><label style={{ fontSize: 11 }}>Odor</label>
+                <input value={wsForm.odor} onChange={e => setWsForm({ ...wsForm, odor: e.target.value })} /></div>
+              <div className="mrow"><label style={{ fontSize: 11 }}>pH</label>
+                <input value={wsForm.pHValue} onChange={e => setWsForm({ ...wsForm, pHValue: e.target.value })} /></div>
+              <div className="mrow"><label style={{ fontSize: 11 }}>Flash Point</label>
+                <input value={wsForm.flashPoint} onChange={e => setWsForm({ ...wsForm, flashPoint: e.target.value })} /></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div className="mrow"><label style={{ fontSize: 11 }}>Free Liquids %</label>
+                <input value={wsForm.freeLiquidsPercent} onChange={e => setWsForm({ ...wsForm, freeLiquidsPercent: e.target.value })} /></div>
+              <div className="mrow"><label style={{ fontSize: 11 }}>% Solids</label>
+                <input value={wsForm.percentSolids} onChange={e => setWsForm({ ...wsForm, percentSolids: e.target.value })} /></div>
+              <div className="mrow"><label style={{ fontSize: 11 }}>Liquid Phases</label>
+                <select value={wsForm.liquidPhases} onChange={e => setWsForm({ ...wsForm, liquidPhases: e.target.value })} style={{ padding: '4px 6px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 12, width: '100%' }}>
+                  <option value="">Select...</option>
+                  <option>Single</option><option>Double Layer</option><option>Multi-Layer</option>
+                </select></div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
+              <button className="bc" onClick={() => setShowWsForm(false)}>Cancel</button>
+              <button className="bp" style={{ background: '#059669' }} onClick={saveWasteStream}>Save Waste Stream Profile</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
   </div>);
 }
 
