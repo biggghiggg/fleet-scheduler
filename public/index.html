@@ -2584,11 +2584,8 @@ function WasteProfiles({data}) {
 
           {/* ===== SECTION B: SHIPPING INFORMATION ===== */}
           <div style={{background:'#e5e7eb',padding:'6px 10px',fontWeight:700,fontSize:14,marginBottom:8,marginTop:12,borderBottom:'2px solid #374151'}}>B. SHIPPING INFORMATION</div>
-          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>US DOT Proper Shipping Name per 49 CFR 172.205(i)</label>
-            <div style={{display:'flex',alignItems:'center',gap:0}}>
-              <span style={{fontSize:12,fontWeight:700,padding:'7px 4px 7px 10px',background:'#fef2f2',border:'1px solid var(--border)',borderRight:'none',borderRadius:'6px 0 0 6px',whiteSpace:'nowrap',color:'#b91c1c'}}>Waste</span>
-              <input value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Flammable liquid, n.o.s." style={{fontSize:12,borderRadius:'0 6px 6px 0'}} />
-            </div></div>
+          <div className="mrow" style={{marginBottom:8}}><label style={{fontSize:13}}>US DOT Proper Shipping Name</label>
+            <input value={form.properShippingName} onChange={e => setForm({ ...form, properShippingName: e.target.value })} placeholder="e.g. Waste Acetone" style={{fontSize:12}} /></div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
             <div className="mrow" style={{marginBottom:0}}><label style={{fontSize:13}}>Hazard Class</label>
               <select value={form.hazardClass} onChange={e => setForm({ ...form, hazardClass: e.target.value })} style={{fontSize:12}}>
@@ -3115,7 +3112,6 @@ function WasteProfiles({data}) {
             </div>
             <div onClick={e => e.stopPropagation()} style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
               <strong style={{ whiteSpace: 'nowrap' }}><em>13. US DOT Proper Shipping Name:</em></strong>
-              <span style={{fontSize:11,fontWeight:700,color:'#b91c1c',marginLeft:4}}>Waste</span>
               <input value={form.properShippingName}
                 onChange={e => setForm({ ...form, properShippingName: e.target.value })}
                 onFocus={() => setWsDropOpen(true)}
@@ -3384,11 +3380,8 @@ function WasteProfiles({data}) {
               <input value={wsForm.stateCodes} onChange={e => setWsForm({ ...wsForm, stateCodes: e.target.value })} /></div>
             <div className="mrow"><label>12. Common Waste Name</label>
               <input value={wsForm.commonName} onChange={e => setWsForm({ ...wsForm, commonName: e.target.value })} /></div>
-            <div className="mrow"><label>13. US DOT Proper Shipping Name per 49 CFR 172.205(i)</label>
-              <div style={{display:'flex',alignItems:'center',gap:0}}>
-                <span style={{fontSize:12,fontWeight:700,padding:'7px 4px 7px 10px',background:'#fef2f2',border:'1px solid var(--border)',borderRight:'none',borderRadius:'6px 0 0 6px',whiteSpace:'nowrap',color:'#b91c1c'}}>Waste</span>
-                <input value={wsForm.properShippingName} onChange={e => setWsForm({ ...wsForm, properShippingName: e.target.value })} placeholder="e.g. Flammable liquid, n.o.s." style={{borderRadius:'0 6px 6px 0'}} />
-              </div></div>
+            <div className="mrow"><label>13. US DOT Proper Shipping Name</label>
+              <input value={wsForm.properShippingName} onChange={e => setWsForm({ ...wsForm, properShippingName: e.target.value })} /></div>
 
             {/* Physical State */}
             <div style={{ marginBottom: 12 }}>
