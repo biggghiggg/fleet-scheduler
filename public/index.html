@@ -3399,24 +3399,28 @@ function WasteProfiles({data}) {
               <input value={wsForm.properShippingName} onChange={e => setWsForm({ ...wsForm, properShippingName: e.target.value })} /></div>
 
             {/* Physical State */}
-            <div className="mrow"><label>14. Physical State</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>14. Physical State</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {['Solid','Semi-Solid','Powder','Liquid','Other'].map(s => (
-                  <label key={s} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <input type="radio" name="wsPhysical" checked={wsForm.physicalState === s} onChange={() => setWsForm({ ...wsForm, physicalState: s })} /> {s}
-                  </label>
+                  <span key={s} onClick={() => setWsForm({ ...wsForm, physicalState: s })} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#374151', fontWeight: 400, textTransform: 'none' }}>
+                    <input type="radio" name="wsPhysical" checked={wsForm.physicalState === s} readOnly /> {s}
+                  </span>
                 ))}
-              </div></div>
+              </div>
+            </div>
 
             {/* Method of Shipment */}
-            <div className="mrow"><label>15. Method of Shipment</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>15. Method of Shipment</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {['DF','DM','TP','CF','CW','BA','TT','Commodity Pack'].map(m => (
-                  <label key={m} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <input type="radio" name="wsShipment" checked={wsForm.methodOfShipment === m} onChange={() => setWsForm({ ...wsForm, methodOfShipment: m })} /> {m}
-                  </label>
+                  <span key={m} onClick={() => setWsForm({ ...wsForm, methodOfShipment: m })} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#374151', fontWeight: 400, textTransform: 'none' }}>
+                    <input type="radio" name="wsShipment" checked={wsForm.methodOfShipment === m} readOnly /> {m}
+                  </span>
                 ))}
-              </div></div>
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <div className="mrow" style={{ flex: 1 }}><label>Size</label>
                 <input value={wsForm.shipmentSize} onChange={e => setWsForm({ ...wsForm, shipmentSize: e.target.value })} /></div>
@@ -3425,14 +3429,16 @@ function WasteProfiles({data}) {
             </div>
 
             {/* Frequency */}
-            <div className="mrow"><label>16. Frequency of Shipment</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>16. Frequency of Shipment</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {['One Time','Daily','Weekly','Monthly','Other'].map(f => (
-                  <label key={f} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <input type="radio" name="wsFreq" checked={wsForm.frequency === f} onChange={() => setWsForm({ ...wsForm, frequency: f })} /> {f}
-                  </label>
+                  <span key={f} onClick={() => setWsForm({ ...wsForm, frequency: f })} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#374151', fontWeight: 400, textTransform: 'none' }}>
+                    <input type="radio" name="wsFreq" checked={wsForm.frequency === f} readOnly /> {f}
+                  </span>
                 ))}
-              </div></div>
+              </div>
+            </div>
 
             <div className="mrow"><label>17. Special Handling Instructions</label>
               <input value={wsForm.specialHandling} onChange={e => setWsForm({ ...wsForm, specialHandling: e.target.value })} /></div>
