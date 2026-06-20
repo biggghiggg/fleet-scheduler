@@ -1040,7 +1040,7 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
 
   formRow('11. State Codes:', profile.stateCodes || '');
   formRow('12. Common Waste Name:', profile.commonName || '');
-  formRow('13. US DOT Proper Shipping Name:', profile.properShippingName ? 'Waste ' + profile.properShippingName : '');
+  formRow('13. US DOT Proper Shipping Name:', profile.properShippingName || '');
 
   // Row 14: Physical State checkboxes
   var ps = profile.physicalState || '';
@@ -1536,7 +1536,13 @@ function parseSDS(text) {
     if (unMatch) result.unNumber = 'UN' + unMatch[1];
 
     var shipMatch = sec14.match(/(?:proper\s+shipping\s+name|shipping\s+name)[:\s]*([^\n]+)/i);
-    if (shipMatch) result.properShippingName = shipMatch[1].trim().replace(/^[:\s]+/, '');
+    if (shipMatch) {
+      var shipName = shipMatch[1].trim().replace(/^[:\s]+/, '');
+      if (shipName && !/^waste\s/i.test(shipName)) {
+        shipName = 'Waste ' + shipName;
+      }
+      result.properShippingName = shipName;
+    }
 
     var hcMatch = sec14.match(/(?:hazard\s+class|class)[:\s]*(\d+\.?\d*)/i);
     if (hcMatch) result.hazardClass = hcMatch[1];
