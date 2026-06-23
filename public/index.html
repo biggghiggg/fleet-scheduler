@@ -1689,6 +1689,7 @@ function WasteProfiles({data}) {
   const [viewMode, setViewMode] = useState('list');
   const [expandedGens, setExpandedGens] = useState({});
   const [signers, setSigners] = useState([]);
+  const [showAssigned, setShowAssigned] = useState(false);
 
   const emptyForm = {
     profileType: 'use',
@@ -2239,8 +2240,12 @@ function WasteProfiles({data}) {
     setForm(function(prev) { return Object.assign({}, prev, updates); });
   };
 
-  const useProfiles = filtered.filter(p => (p.profileType || 'use') === 'use');
-  const ewsProfiles = filtered.filter(p => p.profileType === 'ews');
+  const allUse = filtered.filter(p => (p.profileType || 'use') === 'use');
+  const allEws = filtered.filter(p => p.profileType === 'ews');
+  const assignedCount = filtered.filter(p => p.customer && p.customer.trim()).length;
+  const unassignedCount = filtered.length - assignedCount;
+  const useProfiles = showAssigned ? allUse : allUse.filter(p => !p.customer || !p.customer.trim());
+  const ewsProfiles = showAssigned ? allEws : allEws.filter(p => !p.customer || !p.customer.trim());
 
   return (<div>
     {/* Shared Search Header */}
@@ -2404,6 +2409,18 @@ function WasteProfiles({data}) {
     })()}
 
     {viewMode === 'list' && <>
+    {/* =============== INBOX BANNER =============== */}
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, padding: '10px 14px', background: showAssigned ? '#eff6ff' : '#f0fdf4', borderRadius: 8, border: showAssigned ? '1px solid #bfdbfe' : '1px solid #bbf7d0' }}>
+      <div style={{ fontSize: 13 }}>
+        {showAssigned
+          ? <span><strong>{filtered.length}</strong> total profile{filtered.length !== 1 ? 's' : ''} ({assignedCount} assigned to generators, {unassignedCount} unassigned)</span>
+          : <span><strong>{unassignedCount}</strong> unassigned profile{unassignedCount !== 1 ? 's' : ''}{assignedCount > 0 && <span style={{ color: '#6b7280' }}> &mdash; {assignedCount} assigned to generators (hidden)</span>}</span>
+        }
+      </div>
+      <button onClick={() => setShowAssigned(!showAssigned)} style={{ padding: '5px 12px', fontSize: 12, fontWeight: 600, border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: showAssigned ? 'var(--primary)' : '#fff', color: showAssigned ? '#fff' : 'var(--text)' }}>
+        {showAssigned ? 'Show Unassigned Only' : 'Show All Profiles'}
+      </button>
+    </div>
     {/* =============== USE SECTION =============== */}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
       <div>
@@ -2429,7 +2446,7 @@ function WasteProfiles({data}) {
     {/* USE Profiles List */}
     {useProfiles.length === 0 && !showForm && (
       <div style={{ textAlign: 'center', padding: 40, color: '#999', fontSize: 14 }}>
-        {search ? 'No USE profiles match your search.' : 'No USE profiles yet. Upload an SDS or click "+ New USE Profile" to get started.'}
+        {search ? 'No USE profiles match your search.' : !showAssigned && allUse.length > 0 ? 'All USE profiles are assigned to generators. Click "Show All Profiles" to see them.' : 'No USE profiles yet. Upload an SDS or click "+ New USE Profile" to get started.'}
       </div>
     )}
 
@@ -2621,7 +2638,7 @@ function WasteProfiles({data}) {
       {/* EWS Profiles List */}
       {ewsProfiles.length === 0 && !showForm && (
         <div style={{ textAlign: 'center', padding: 40, color: '#999', fontSize: 14 }}>
-          {search ? 'No EWS profiles match your search.' : 'No EWS profiles yet. Upload an SDS or click "+ New EWS Profile" to get started.'}
+          {search ? 'No EWS profiles match your search.' : !showAssigned && allEws.length > 0 ? 'All EWS profiles are assigned to generators. Click "Show All Profiles" to see them.' : 'No EWS profiles yet. Upload an SDS or click "+ New EWS Profile" to get started.'}
         </div>
       )}
 
