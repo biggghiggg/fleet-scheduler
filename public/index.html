@@ -1757,6 +1757,73 @@ function WasteProfiles({data}) {
     toxicity: [], reactivityFlags: [], incompatibles: '', stabilityNotes: ''
   };
 
+  const emptyPrrForm = {
+    profileType: 'prr',
+    name: '', customer: '',
+    // 1. Generator Information
+    generator: '', siteAddress: '', siteCity: '', siteState: '', siteZip: '',
+    mailingAddress: '', mailingCity: '', mailingState: '', mailingZip: '',
+    epaId: '', stateId: '', emergencyPhone: '',
+    // 2. Customer BillTo
+    billToName: '', billingAddress: '', billingCity: '', billingState: '', billingZip: '',
+    // 3. Profile Information
+    profileName: '',
+    // 5. Generating Process & Material Composition
+    profileDescription: '', processGeneratingWaste: '',
+    chemicals: [],
+    // 6. Physical & Chemical Properties
+    color: '', odor: '', odorSelection: '', odorOther: '',
+    pH: '', pHCustom: '',
+    toc: '', flashPoint: '', flashPointOther: '', flashPointMethod: '',
+    viscosity: '', viscosityOther: '', boilingPoint: '',
+    btuValue: '', btuValueOther: '', specificGravity: '', phasesLayers: '',
+    // Physical state percentages
+    physSolid: '', physLiquid: '', physSludge: '', physGas: '', physAsh: '', physPowder: '',
+    // Other Properties checkboxes
+    propExplosive: false, propRadioactive: false, propThermallyUnstable: false,
+    propShockSensitive: false, propPyrophoric: false, propOxidizer: false,
+    propWaterReactive: false, propAirReactive: false, propPolymerizable: false,
+    propPolymerizableInhibited: false, propAsbestosFriable: false, propAsbestosNonFriable: false,
+    propMetalFines: false, propOrganicPeroxides: false, propDioxins: false,
+    propFurans: false, propNORM: false, propBiohazard: false,
+    propPesticides: false, propNone: false, propReactiveCyanides: false, propReactiveSulfides: false,
+    // 7. Metals
+    metalsTotalOrTCLP: 'total',
+    arsenic: '', barium: '', cadmium: '', chromium: '', chromiumHex: '',
+    mercury: '', lead: '', selenium: '', silver: '', copper: '',
+    nickel: '', zinc: '', thallium: '', metalOther: '',
+    // 8. Other Components
+    cyanides: '', sulfides: '', amines: '', pcbs: '', phenolics: '',
+    // BTU/lb
+    btuLb: '', btuLbOther: '',
+    // 9. Regulatory Information
+    restrictedUnderLDR: '', lessThan500VOC: '', ldrSubcategory: '',
+    uhcs: '', usepaHazWaste: '', stateHazWaste: '',
+    altStandardsSoil: '', stateCodeRequired: '',
+    rcraExempt: '', exemptReason: '',
+    solidWasteExcluded: false,
+    fListed: '', fListedCodes: '', kListed: '', kListedCodes: '',
+    pListed: '', pListedCodes: '', uListed: '', uListedCodes: '',
+    ignitableD001: '', corrosiveD002: '', reactiveD003: '', toxicD004D043: '',
+    federalUniversalWaste: '', stateUniversalWaste: '', usedOil: '',
+    halogenContent: '', recycleReuse: '', productCoProduct: '',
+    cerclaRegulated: '', benzeneNESHAP: '', tscaPCB: '',
+    haloOrgCompound: '', medicalWaste: '',
+    epaSourceCode: '', epaFormCode: '', originCode: '',
+    determination: '', analysisDate: '',
+    sampleCertification: false, sampleGuidelines: '',
+    sampleType: '', sampleDate: '', sampleIds: '', samplerName: '',
+    // 10. Shipping
+    volumeToShip: '', volumeUnit: '', frequency: '',
+    combinationPackage: '', transportation: '',
+    // 11. DOT Information
+    usdotHazMaterial: '', usdotShippingName: '',
+    // Certification / Signature
+    signatureName: '', signatureDate: '', signatureTitle: '',
+    // Notes
+    profileNotes: ''
+  };
+
   const [form, setForm] = useState(emptyForm);
   const [newEpaCode, setNewEpaCode] = useState('');
   const [newCaCode, setNewCaCode] = useState('');
@@ -2000,6 +2067,33 @@ function WasteProfiles({data}) {
     setParsing(false);
   };
 
+  // Upload SDS for PRR profiles
+  const uploadPrrSDS = async (files) => {
+    setParsing(true);
+    try {
+      const fd = new FormData();
+      Array.from(files).forEach(f => fd.append('files', f));
+      const r = await fetch('/api/sds/parse', { method: 'POST', body: fd });
+      const result = await r.json();
+      if (result.merged) {
+        var m = result.merged;
+        var mappedChemicals = (m.chemicals || []).map(function(c) {
+          return { tri: false, name: c.name || '', cas: c.cas || '', typical: c.percentage || '', min: '', max: '', unitType: 'Wt %' };
+        });
+        setForm({
+          ...emptyPrrForm,
+          chemicals: mappedChemicals,
+          color: m.color || '',
+          odor: m.odor || '',
+          profileNotes: m.stabilityNotes ? 'Stability: ' + m.stabilityNotes : ''
+        });
+        setEditId(null);
+        setShowForm(true);
+      }
+    } catch(e) { alert('Error parsing SDS: ' + e.message); }
+    setParsing(false);
+  };
+
   // Save profile — auto-create customer if generator name is new
   const save = async () => {
     if (!form.name.trim()) { alert('Please enter a profile name'); return; }
@@ -2017,6 +2111,7 @@ function WasteProfiles({data}) {
       });
       if (!existing) {
         var isEws = form.profileType === 'ews';
+        var isPrr = form.profileType === 'prr';
         var newCust = { name: form.customer.trim() };
         // Map generator info from profile to customer fields
         if (isEws) {
@@ -2026,6 +2121,12 @@ function WasteProfiles({data}) {
           if (form.generatorZip) newCust.zip = form.generatorZip;
           if (form.generatorPhone) newCust.phone = form.generatorPhone;
           if (form.technicalContact) newCust.contact = form.technicalContact;
+        } else if (isPrr) {
+          if (form.siteAddress) newCust.address = form.siteAddress;
+          if (form.siteCity) newCust.city = form.siteCity;
+          if (form.siteState) newCust.state = form.siteState;
+          if (form.siteZip) newCust.zip = form.siteZip;
+          if (form.emergencyPhone) newCust.phone = form.emergencyPhone;
         } else {
           if (form.facilityAddress) newCust.address = form.facilityAddress;
           if (form.generatorPhone) newCust.phone = form.generatorPhone;
@@ -2049,6 +2150,19 @@ function WasteProfiles({data}) {
   };
 
   const openEdit = (p) => {
+    if (p.profileType === 'prr') {
+      setEditId(p.id);
+      const base = {};
+      Object.keys(emptyPrrForm).forEach(k => {
+        if (Array.isArray(emptyPrrForm[k])) base[k] = p[k] || [];
+        else if (typeof emptyPrrForm[k] === 'boolean') base[k] = p[k] || false;
+        else base[k] = p[k] || '';
+      });
+      base.profileType = 'prr';
+      setForm(base);
+      setShowForm(true);
+      return;
+    }
     if (p.profileType === 'ews') {
       setEditId(p.id);
       setForm({
@@ -2146,6 +2260,12 @@ function WasteProfiles({data}) {
     setEditId(null); setForm(emptyEwsForm); setShowForm(true);
   };
 
+  const openNewPrr = () => {
+    setForm({...emptyPrrForm});
+    setEditId(null);
+    setShowForm(true);
+  };
+
   const del = async (id) => {
     if (!confirm('Delete this profile?')) return;
     await fetch('/api/profiles/' + id, { method: 'DELETE' });
@@ -2165,6 +2285,9 @@ function WasteProfiles({data}) {
   };
   const addEwsChemical = () => {
     setForm({ ...form, chemicals: [...form.chemicals, { name: '', cas: '', percentage: '' }] });
+  };
+  const addPrrChemical = () => {
+    setForm({ ...form, chemicals: [...form.chemicals, { tri: false, name: '', cas: '', typical: '', min: '', max: '', unitType: 'Wt %' }] });
   };
 
   // Add/remove waste codes
@@ -2240,19 +2363,35 @@ function WasteProfiles({data}) {
     setForm(function(prev) { return Object.assign({}, prev, updates); });
   };
 
+  const onPrrGeneratorChange = (val) => {
+    var updates = { customer: val };
+    var cust = (data.customers || []).find(function(c) { return c.name === val; });
+    if (cust) {
+      if (cust.address) updates.siteAddress = cust.address;
+      if (cust.city) updates.siteCity = cust.city;
+      if (cust.state) updates.siteState = cust.state;
+      if (cust.zip) updates.siteZip = cust.zip;
+      if (cust.epaId) updates.epaId = cust.epaId;
+      if (cust.phone) updates.emergencyPhone = cust.phone;
+    }
+    setForm(function(prev) { return Object.assign({}, prev, updates); });
+  };
+
   const allUse = filtered.filter(p => (p.profileType || 'use') === 'use');
   const allEws = filtered.filter(p => p.profileType === 'ews');
+  const allPrr = filtered.filter(p => p.profileType === 'prr');
   const assignedCount = filtered.filter(p => p.customer && p.customer.trim()).length;
   const unassignedCount = filtered.length - assignedCount;
   const useProfiles = showAssigned ? allUse : allUse.filter(p => !p.customer || !p.customer.trim());
   const ewsProfiles = showAssigned ? allEws : allEws.filter(p => !p.customer || !p.customer.trim());
+  const prrProfiles = showAssigned ? allPrr : allPrr.filter(p => !p.customer || !p.customer.trim());
 
   return (<div>
     {/* Shared Search Header */}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
       <div>
         <h2 style={{ margin: 0, fontSize: 20 }}>Waste Profiles</h2>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Manage USE and EWS waste profiles. Upload SDS sheets to auto-generate profiles.</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Manage USE, EWS, and PRR waste profiles. Upload SDS sheets to auto-generate profiles.</div>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
@@ -2267,6 +2406,7 @@ function WasteProfiles({data}) {
     {viewMode === 'generator' && <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
       <button className="bp" onClick={openNew} style={{ padding: '8px 16px' }}>+ New USE Profile</button>
       <button className="bp" onClick={openNewEws} style={{ padding: '8px 16px', background: '#059669' }}>+ New EWS Profile</button>
+      <button className="bp" onClick={openNewPrr} style={{ padding: '8px 16px', background: '#c2410c' }}>+ New PRR Profile</button>
       <label style={{ display: 'inline-block', background: '#7c3aed', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
         {parsing ? 'Analyzing...' : 'Upload SDS (USE)'}
         <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
@@ -2274,6 +2414,10 @@ function WasteProfiles({data}) {
       <label style={{ display: 'inline-block', background: '#059669', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
         {parsing ? 'Analyzing...' : 'Upload SDS (EWS)'}
         <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadEwsSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
+      </label>
+      <label style={{ display: 'inline-block', background: '#c2410c', color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+        {parsing ? 'Analyzing...' : 'Upload SDS (PRR)'}
+        <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadPrrSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
       </label>
     </div>}
     {viewMode === 'generator' && (function() {
@@ -2293,6 +2437,7 @@ function WasteProfiles({data}) {
           var gProfiles = genMap[gn];
           var useCount = gProfiles.filter(function(p) { return (p.profileType || 'use') === 'use'; }).length;
           var ewsCount = gProfiles.filter(function(p) { return p.profileType === 'ews'; }).length;
+          var prrCount = gProfiles.filter(function(p) { return p.profileType === 'prr'; }).length;
           var isOpen = expandedGens[gn];
           return React.createElement('div', { key: gn, style: { marginBottom: 10, background: 'var(--bg-white)', borderRadius: 10, boxShadow: 'var(--shadow)', overflow: 'hidden' } },
             React.createElement('div', {
@@ -2306,25 +2451,28 @@ function WasteProfiles({data}) {
                   React.createElement('div', { style: { fontSize: 12, color: 'var(--text-muted)', marginTop: 2 } },
                     gProfiles.length + ' profile' + (gProfiles.length !== 1 ? 's' : '') +
                     (useCount ? ' · ' + useCount + ' USE' : '') +
-                    (ewsCount ? ' · ' + ewsCount + ' EWS' : '')
+                    (ewsCount ? ' · ' + ewsCount + ' EWS' : '') +
+                    (prrCount ? ' · ' + prrCount + ' PRR' : '')
                   )
                 )
               ),
               React.createElement('div', { style: { display: 'flex', gap: 6 } },
                 useCount > 0 && React.createElement('span', { style: { background: '#f3e8ff', color: '#7c3aed', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 } }, 'USE: ' + useCount),
-                ewsCount > 0 && React.createElement('span', { style: { background: '#dcfce7', color: '#059669', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 } }, 'EWS: ' + ewsCount)
+                ewsCount > 0 && React.createElement('span', { style: { background: '#dcfce7', color: '#059669', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 } }, 'EWS: ' + ewsCount),
+                prrCount > 0 && React.createElement('span', { style: { background: '#fed7aa', color: '#c2410c', padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 } }, 'PRR: ' + prrCount)
               )
             ),
             isOpen && React.createElement('div', { style: { padding: '12px 16px' } },
               gProfiles.map(function(p) {
                 var isUse = (p.profileType || 'use') === 'use';
-                var color = isUse ? '#7c3aed' : '#059669';
+                var isPrr = p.profileType === 'prr';
+                var color = isPrr ? '#c2410c' : (isUse ? '#7c3aed' : '#059669');
                 return React.createElement('div', { key: p.id, style: { padding: '10px 12px', marginBottom: 8, borderRadius: 8, border: '1px solid var(--border)', borderLeft: '4px solid ' + color, background: expandedId === p.id ? '#fafbff' : '#fff' } },
                   React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
                     React.createElement('div', { style: { cursor: 'pointer', flex: 1 }, onClick: function() { setExpandedId(expandedId === p.id ? null : p.id); } },
                       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
                         React.createElement('span', { style: { fontWeight: 700, fontSize: 14, color: color } }, p.name || 'Unnamed Profile'),
-                        React.createElement('span', { style: { background: isUse ? '#f3e8ff' : '#dcfce7', color: color, padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 } }, isUse ? 'USE' : 'EWS')
+                        React.createElement('span', { style: { background: isPrr ? '#fed7aa' : (isUse ? '#f3e8ff' : '#dcfce7'), color: color, padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 } }, isPrr ? 'PRR' : (isUse ? 'USE' : 'EWS'))
                       ),
                       React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4, fontSize: 12 } },
                         p.commonName && React.createElement('span', { style: { color: '#555' } }, p.commonName),
@@ -2332,11 +2480,13 @@ function WasteProfiles({data}) {
                         p.unNumber && React.createElement('span', { style: { background: '#fef3c7', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#92400e', fontSize: 11 } }, p.unNumber),
                         p.hazardClass && React.createElement('span', { style: { background: '#fee2e2', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#b91c1c', fontSize: 11 } }, 'Class ' + p.hazardClass),
                         p.physicalState && React.createElement('span', { style: { background: '#e0e7ff', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#3730a3', fontSize: 11 } }, p.physicalState),
-                        !isUse && React.createElement('span', { style: { background: '#dcfce7', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#166534', fontSize: 11 } }, 'NON-RCRA')
+                        !isUse && !isPrr && React.createElement('span', { style: { background: '#dcfce7', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#166534', fontSize: 11 } }, 'NON-RCRA'),
+                        isPrr && React.createElement('span', { style: { background: '#fed7aa', padding: '1px 6px', borderRadius: 4, fontWeight: 600, color: '#c2410c', fontSize: 11 } }, 'PRR')
                       )
                     ),
                     React.createElement('div', { style: { display: 'flex', gap: 6 } },
-                      !isUse && React.createElement('button', { className: 'bp', style: { fontSize: 11, padding: '4px 10px', background: '#2563eb' }, onClick: function() { window.open('/api/profiles/' + p.id + '/ews-pdf', '_blank'); } }, 'PDF'),
+                      !isUse && !isPrr && React.createElement('button', { className: 'bp', style: { fontSize: 11, padding: '4px 10px', background: '#2563eb' }, onClick: function() { window.open('/api/profiles/' + p.id + '/ews-pdf', '_blank'); } }, 'PDF'),
+                      isPrr && React.createElement('button', { className: 'bp', style: { fontSize: 11, padding: '4px 10px', background: '#2563eb' }, onClick: function() { window.open('/api/profiles/' + p.id + '/prr-pdf', '_blank'); } }, 'PDF'),
                       React.createElement('button', { className: 'bp', style: { fontSize: 11, padding: '4px 10px', background: color }, onClick: function() { openEdit(p); } }, 'Edit'),
                       React.createElement('button', { style: { background: '#fee2e2', color: 'var(--danger)', fontSize: 11, padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer' }, onClick: function() { del(p.id); } }, 'Delete')
                     )
@@ -2377,12 +2527,15 @@ function WasteProfiles({data}) {
           React.createElement('div', { style: { fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 } }, 'These profiles have no generator assigned. Use the dropdown to assign them.'),
           unassigned.map(function(p) {
             var isUse = (p.profileType || 'use') === 'use';
-            var color = isUse ? '#7c3aed' : '#059669';
+            var isPrr = p.profileType === 'prr';
+            var color = isPrr ? '#c2410c' : (isUse ? '#7c3aed' : '#059669');
+            var typeBg = isPrr ? '#fed7aa' : (isUse ? '#f3e8ff' : '#dcfce7');
+            var typeLabel = isPrr ? 'PRR' : (isUse ? 'USE' : 'EWS');
             return React.createElement('div', { key: p.id, style: { padding: '10px 12px', marginBottom: 8, borderRadius: 8, border: '1px dashed #d1d5db', borderLeft: '4px solid ' + color, background: '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 } },
               React.createElement('div', { style: { flex: 1, minWidth: 200 } },
                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
                   React.createElement('span', { style: { fontWeight: 700, fontSize: 14, color: color } }, p.name || 'Unnamed Profile'),
-                  React.createElement('span', { style: { background: isUse ? '#f3e8ff' : '#dcfce7', color: color, padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 } }, isUse ? 'USE' : 'EWS')
+                  React.createElement('span', { style: { background: typeBg, color: color, padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 } }, typeLabel)
                 ),
                 React.createElement('div', { style: { fontSize: 12, color: '#888', marginTop: 2 } },
                   [p.commonName, p.properShippingName, p.unNumber].filter(Boolean).join(' · ') || 'No details'
@@ -2779,10 +2932,125 @@ function WasteProfiles({data}) {
         ))}
       </div>
     </div>
+
+    {/* =============== PRR SECTION =============== */}
+    <div style={{ marginTop: 32, paddingTop: 24, borderTop: '3px solid #e5e7eb' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 17, color: '#c2410c' }}>Pacific Resource Recovery (PRR) Profiles</h3>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Waste profiles for Pacific Resource Recovery facility.</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="bp" onClick={openNewPrr} style={{ padding: '8px 16px', background: '#c2410c' }}>+ New PRR Profile</button>
+        </div>
+      </div>
+
+      {/* PRR SDS Upload Area */}
+      <div style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)', border: '2px dashed #c2410c', textAlign: 'center' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#c2410c', marginBottom: 8 }}>Upload SDS (Safety Data Sheets) - PRR</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Upload one or more SDS PDFs to extract chemicals and generate a suggested PRR waste profile.</div>
+        <label style={{ display: 'inline-block', background: '#c2410c', color: '#fff', padding: '10px 24px', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
+          {parsing ? 'Analyzing SDS...' : 'Choose SDS PDF(s)'}
+          <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadPrrSDS(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={parsing} />
+        </label>
+        {parsing && <div style={{ marginTop: 8, color: '#c2410c', fontSize: 13 }}>Extracting chemical data from SDS...</div>}
+      </div>
+
+      {/* PRR Profiles List */}
+      {prrProfiles.length === 0 && !showForm && (
+        <div style={{ textAlign: 'center', padding: 40, color: '#999', fontSize: 14 }}>
+          {search ? 'No PRR profiles match your search.' : !showAssigned && allPrr.length > 0 ? 'All PRR profiles are assigned to generators. Click "Show All Profiles" to see them.' : 'No PRR profiles yet. Upload an SDS or click "+ New PRR Profile" to get started.'}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {prrProfiles.map(p => (
+          <div key={p.id} style={{ background: 'var(--bg-white)', borderRadius: 10, padding: 16, boxShadow: 'var(--shadow)', borderLeft: '4px solid #c2410c' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#c2410c' }}>{p.name || 'Unnamed Profile'}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6, fontSize: 13 }}>
+                  {p.customer && <span style={{ color: 'var(--text-muted)' }}>Generator: <strong>{p.customer}</strong></span>}
+                  {p.profileDescription && <span style={{ color: '#555' }}>{p.profileDescription}</span>}
+                  {p.usdotShippingName && <span style={{ color: '#555' }}>{p.usdotShippingName}</span>}
+                  <span style={{ background: '#fed7aa', padding: '1px 8px', borderRadius: 4, fontWeight: 600, color: '#c2410c', fontSize: 12 }}>PRR</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="bp" style={{ fontSize: 11, padding: '4px 10px', background: '#c2410c' }} onClick={() => openEdit(p)}>Edit</button>
+                <button className="bp" style={{ fontSize: 11, padding: '4px 10px', background: '#2563eb' }} onClick={() => window.open('/api/profiles/' + p.id + '/prr-pdf', '_blank')}>PDF</button>
+                <button style={{ background: '#fee2e2', color: 'var(--danger)', fontSize: 11, padding: '4px 10px' }} onClick={() => del(p.id)}>Delete</button>
+              </div>
+            </div>
+
+            {/* PRR Expanded view */}
+            {expandedId === p.id && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                {/* Generator Info */}
+                {(p.epaId || p.siteAddress || p.customer) && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: '#374151', marginBottom: 4 }}>Generator Information</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '4px 16px', fontSize: 13 }}>
+                      {p.customer && <div><strong>Generator:</strong> {p.customer}</div>}
+                      {p.siteAddress && <div><strong>Site Address:</strong> {p.siteAddress}{p.siteCity ? ', ' + p.siteCity : ''}{p.siteState ? ', ' + p.siteState : ''} {p.siteZip || ''}</div>}
+                      {p.epaId && <div><strong>EPA ID:</strong> {p.epaId}</div>}
+                      {p.stateId && <div><strong>State ID:</strong> {p.stateId}</div>}
+                      {p.emergencyPhone && <div><strong>Emergency Phone:</strong> {p.emergencyPhone}</div>}
+                    </div>
+                  </div>
+                )}
+                {/* Waste Properties */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px 16px', fontSize: 13, marginBottom: 12 }}>
+                  {p.profileDescription && <div><strong>Description:</strong> {p.profileDescription}</div>}
+                  {p.processGeneratingWaste && <div><strong>Process:</strong> {p.processGeneratingWaste}</div>}
+                  {p.color && <div><strong>Color:</strong> {p.color}</div>}
+                  {p.odor && <div><strong>Odor:</strong> {p.odor}</div>}
+                  {p.pH && <div><strong>pH:</strong> {p.pH}</div>}
+                  {p.flashPoint && <div><strong>Flash Point:</strong> {p.flashPoint}</div>}
+                  {p.specificGravity && <div><strong>Specific Gravity:</strong> {p.specificGravity}</div>}
+                  {p.viscosity && <div><strong>Viscosity:</strong> {p.viscosity}</div>}
+                  {p.btuValue && <div><strong>BTU Value:</strong> {p.btuValue}</div>}
+                  {p.usdotShippingName && <div><strong>DOT Shipping Name:</strong> {p.usdotShippingName}</div>}
+                  {p.frequency && <div><strong>Frequency:</strong> {p.frequency}</div>}
+                  {p.volumeToShip && <div><strong>Volume:</strong> {p.volumeToShip} {p.volumeUnit || ''}</div>}
+                </div>
+                {/* Composition */}
+                {p.chemicals && p.chemicals.length > 0 && (
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: '#c2410c' }}>Composition</div>
+                    <div className="rtable">
+                      <table>
+                        <thead><tr><th>Constituent</th><th>CAS #</th><th>Typical</th><th>Min</th><th>Max</th></tr></thead>
+                        <tbody>
+                          {p.chemicals.map((c, i) => (
+                            <tr key={i}>
+                              <td style={{ fontWeight: 600 }}>{c.name}</td>
+                              <td>{c.cas || '—'}</td>
+                              <td>{c.typical || '—'}</td>
+                              <td>{c.min || '—'}</td>
+                              <td>{c.max || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                {p.profileNotes && <div style={{ marginTop: 8, padding: '8px 12px', background: '#fffbeb', borderRadius: 6, fontSize: 13, whiteSpace: 'pre-wrap' }}><strong>Notes:</strong> {p.profileNotes}</div>}
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                  Created: {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
+                  {p.updatedAt && p.updatedAt !== p.createdAt && <span> | Updated: {new Date(p.updatedAt).toLocaleDateString()}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
     </>}
 
     {/* =============== USE Form Modal =============== */}
-    {showForm && form.profileType !== 'ews' && (
+    {showForm && form.profileType !== 'ews' && form.profileType !== 'prr' && (
       <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
         <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 750, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
           <h2>{editId ? 'Edit USE Profile' : 'New USE Waste Profile'}</h2>
@@ -3625,6 +3893,515 @@ function WasteProfiles({data}) {
             <div style={{ display: 'flex', gap: 8 }}>
               {editId && <button className="bp" style={{ background: '#2563eb' }} onClick={() => { window.open('/api/profiles/' + editId + '/ews-pdf', '_blank'); }}>Download PDF</button>}
               <button className="bp" style={{ background: '#059669' }} onClick={save}>{editId ? 'Update EWS Profile' : 'Save EWS Profile'}</button>
+            </div>
+          </div>
+
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* =============== PRR Form Modal =============== */}
+    {showForm && form.profileType === 'prr' && (
+      <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 800, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', padding: 0 }}>
+
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '2px solid #c2410c' }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: '#c2410c', letterSpacing: 1 }}>PACIFIC RESOURCE RECOVERY</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#c2410c' }}>WASTE PROFILE FORM</div>
+          </div>
+
+          <div style={{ padding: '12px 16px' }}>
+
+          {/* ===== SECTION 1: GENERATOR INFORMATION ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>1. Generator Information</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}>Generator:</strong>
+              <input list="prr-cust-list" value={form.customer} onChange={e => onPrrGeneratorChange(e.target.value)} placeholder="Select or type generator name" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+              <datalist id="prr-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}>Site Address:</strong>
+              <input value={form.siteAddress} onChange={e => setForm({ ...form, siteAddress: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>City:</strong>
+                <input value={form.siteCity} onChange={e => setForm({ ...form, siteCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State:</strong>
+                <select value={form.siteState} onChange={e => setForm({ ...form, siteState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option>
+                  {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Zip:</strong>
+                <input value={form.siteZip} onChange={e => setForm({ ...form, siteZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}>Mailing Address:</strong>
+              <input value={form.mailingAddress} onChange={e => setForm({ ...form, mailingAddress: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>City:</strong>
+                <input value={form.mailingCity} onChange={e => setForm({ ...form, mailingCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State:</strong>
+                <select value={form.mailingState} onChange={e => setForm({ ...form, mailingState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option>
+                  {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Zip:</strong>
+                <input value={form.mailingZip} onChange={e => setForm({ ...form, mailingZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>EPA ID #:</strong>
+                <input value={form.epaId} onChange={e => setForm({ ...form, epaId: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State ID #:</strong>
+                <input value={form.stateId} onChange={e => setForm({ ...form, stateId: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Emergency Phone:</strong>
+                <input value={form.emergencyPhone} onChange={e => setForm({ ...form, emergencyPhone: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+          </div>
+
+          {/* ===== SECTION 2: CUSTOMER BILLTO ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>2. Customer BillTo</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}>Customer Bill To:</strong>
+              <input value={form.billToName} onChange={e => setForm({ ...form, billToName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}>Billing Address:</strong>
+              <input value={form.billingAddress} onChange={e => setForm({ ...form, billingAddress: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>
+            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>City:</strong>
+                <input value={form.billingCity} onChange={e => setForm({ ...form, billingCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State:</strong>
+                <select value={form.billingState} onChange={e => setForm({ ...form, billingState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option>
+                  {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Zip:</strong>
+                <input value={form.billingZip} onChange={e => setForm({ ...form, billingZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+          </div>
+
+          {/* ===== SECTION 3: PROFILE INFORMATION ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>3. Profile Information</div>
+          <div className="mrow" style={{ marginBottom: 12 }}><label style={{ fontSize: 13, fontWeight: 700, color: '#c2410c' }}>Profile Name *</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Waste Coolant, Contaminated Soil (internal name)" style={{ fontSize: 12 }} autoFocus /></div>
+
+          {/* ===== SECTION 5: GENERATING PROCESS & MATERIAL COMPOSITION ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>5. Generating Process &amp; Material Composition</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
+              <strong>Profile Description:</strong>
+              <textarea value={form.profileDescription} onChange={e => setForm({ ...form, profileDescription: e.target.value })} rows={2} style={{ width: '100%', fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 4, padding: '4px 6px', marginTop: 4 }} placeholder="Describe the waste profile" />
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
+              <strong>Process Generating Waste:</strong>
+              <textarea value={form.processGeneratingWaste} onChange={e => setForm({ ...form, processGeneratingWaste: e.target.value })} rows={2} style={{ width: '100%', fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 4, padding: '4px 6px', marginTop: 4 }} placeholder="Describe the process" />
+            </div>
+            <div style={{ padding: '5px 10px' }}>
+              <strong>Chemical/Physical/Elemental Constituents:</strong>
+              <div style={{ marginTop: 6 }}>
+                {form.chemicals.length > 0 ? (
+                  <div className="rtable">
+                    <table>
+                      <thead><tr>
+                        <th style={{ fontSize: 11, width: 30 }}>TRI</th>
+                        <th style={{ fontSize: 11 }}>Chemical/Physical Composition</th>
+                        <th style={{ fontSize: 11, width: 90 }}>CAS#</th>
+                        <th style={{ fontSize: 11, width: 60 }}>Typical</th>
+                        <th style={{ fontSize: 11, width: 50 }}>Min</th>
+                        <th style={{ fontSize: 11, width: 50 }}>Max</th>
+                        <th style={{ fontSize: 11, width: 70 }}>Unit Type</th>
+                        <th style={{ width: 24 }}></th>
+                      </tr></thead>
+                      <tbody>
+                        {form.chemicals.map((c, i) => (
+                          <tr key={i}>
+                            <td><input type="checkbox" checked={c.tri || false} onChange={e => updateChemical(i, 'tri', e.target.checked)} /></td>
+                            <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><input value={c.typical} onChange={e => updateChemical(i, 'typical', e.target.value)} style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><input value={c.min} onChange={e => updateChemical(i, 'min', e.target.value)} style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><input value={c.max} onChange={e => updateChemical(i, 'max', e.target.value)} style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
+                            <td><select value={c.unitType || 'Wt %'} onChange={e => updateChemical(i, 'unitType', e.target.value)} style={{ fontSize: 11, padding: '2px', border: '1px solid #e5e7eb', borderRadius: 4 }}>
+                              <option>Vol %</option><option>Wt %</option><option>PPM</option>
+                            </select></td>
+                            <td><button onClick={() => removeChemical(i)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11, padding: '2px 6px' }}>&times;</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <div style={{ fontSize: 12, color: '#9ca3af', padding: '8px 0' }}>No constituents added yet.</div>}
+                <button onClick={addPrrChemical} style={{ fontSize: 11, padding: '4px 12px', background: '#c2410c', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 6 }}>+ Add Row</button>
+              </div>
+            </div>
+          </div>
+
+          {/* ===== SECTION 6: PHYSICAL & CHEMICAL PROPERTIES ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>6. Physical &amp; Chemical Properties</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Color:</strong>
+                <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Odor:</strong>
+                <select value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>None</option><option>Mild</option><option>Strong</option><option>Other</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Odor:</strong>
+                <select value={form.odorSelection} onChange={e => setForm({ ...form, odorSelection: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option>
+                  <option>(Acrid/Penetrating)</option><option>(Mercaptan)</option><option>(Offensive)</option>
+                  <option>(Pungent)</option><option>(Rotten Egg/Sulfide)</option><option>(Septic/Rancid)</option><option>(Other)</option>
+                </select></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>pH:</strong>
+                <select value={form.pH} onChange={e => setForm({ ...form, pH: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option>
+                  <option>{'≤ 2'}</option><option>{'> 2 to ≤ 5'}</option><option>{'> 5 to ≤ 10'}</option>
+                  <option>{'> 10 to ≤ 12.5'}</option><option>{'>12.5'}</option><option>N/A</option><option>Custom</option>
+                </select>
+                {form.pH === 'Custom' && <input value={form.pHCustom} onChange={e => setForm({ ...form, pHCustom: e.target.value })} placeholder="Enter pH" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>TOC:</strong>
+                <select value={form.toc} onChange={e => setForm({ ...form, toc: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>{'<1%'}</option><option>1-9%</option><option>{'>10%'}</option><option>N/A</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Flash Point:</strong>
+                <select value={form.flashPoint} onChange={e => setForm({ ...form, flashPoint: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option>
+                  <option>{'< 73°F'}</option><option>{'≥ 73°F to < 100°F'}</option>
+                  <option>{'≥ 100°F to < 140°F'}</option><option>{'≥ 140°F to < 150°F'}</option>
+                  <option>{'≥ 150°F to < 200°F'}</option><option>{'≥ 200°F'}</option><option>N/A</option><option>Actual</option>
+                </select>
+                {form.flashPoint === 'Actual' && <input value={form.flashPointOther} onChange={e => setForm({ ...form, flashPointOther: e.target.value })} placeholder="Actual value" style={{ fontSize: 12, width: 70, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+              </div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>FP Method:</strong>
+                <select value={form.flashPointMethod} onChange={e => setForm({ ...form, flashPointMethod: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Closed Cup</option><option>Open Cup</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Viscosity:</strong>
+                <select value={form.viscosity} onChange={e => setForm({ ...form, viscosity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>1 - 100</option><option>101 - 500</option><option>501 - 10000</option><option>{'>10000'}</option><option>Other</option>
+                </select>
+                {form.viscosity === 'Other' && <input value={form.viscosityOther} onChange={e => setForm({ ...form, viscosityOther: e.target.value })} placeholder="Value" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Boiling Pt:</strong>
+                <select value={form.boilingPoint} onChange={e => setForm({ ...form, boilingPoint: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>{'≤95F'}</option><option>{'>95F'}</option><option>N/A</option>
+                </select></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>BTU Value:</strong>
+                <select value={form.btuValue} onChange={e => setForm({ ...form, btuValue: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>0 - 2499</option><option>2500 - 4999</option><option>5000 - 10000</option><option>{'> 10000'}</option><option>Other</option>
+                </select>
+                {form.btuValue === 'Other' && <input value={form.btuValueOther} onChange={e => setForm({ ...form, btuValueOther: e.target.value })} placeholder="Value" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Specific Gravity:</strong>
+                <input value={form.specificGravity} onChange={e => setForm({ ...form, specificGravity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Phases/Layers:</strong>
+                <select value={form.phasesLayers} onChange={e => setForm({ ...form, phasesLayers: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>1</option><option>2</option><option>3</option>
+                </select></div>
+            </div>
+            {/* Physical State */}
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
+              <strong>Physical State (enter %):</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginTop: 4 }}>
+                {[['Solid', 'physSolid'], ['Liquid', 'physLiquid'], ['Sludge', 'physSludge'], ['Gas', 'physGas'], ['Ash', 'physAsh'], ['Powder', 'physPowder']].map(([label, key]) => (
+                  <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
+                    <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} placeholder="%" style={{ width: '100%', fontSize: 11, textAlign: 'center', border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Other Properties */}
+            <div style={{ padding: '5px 10px' }}>
+              <strong>Other Properties:</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginTop: 4 }}>
+                {[
+                  ['Explosive', 'propExplosive'], ['Radioactive', 'propRadioactive'], ['Thermally Unstable', 'propThermallyUnstable'],
+                  ['Shock Sensitive', 'propShockSensitive'], ['Pyrophoric', 'propPyrophoric'], ['Oxidizer', 'propOxidizer'],
+                  ['Water Reactive', 'propWaterReactive'], ['Air Reactive', 'propAirReactive'], ['Polymerizable', 'propPolymerizable'],
+                  ['Polymerizable (Inhibited)', 'propPolymerizableInhibited'], ['Asbestos (Friable)', 'propAsbestosFriable'], ['Asbestos (Non-Friable)', 'propAsbestosNonFriable'],
+                  ['Metal Fines', 'propMetalFines'], ['Organic Peroxides', 'propOrganicPeroxides'], ['Dioxins', 'propDioxins'],
+                  ['Furans', 'propFurans'], ['NORM', 'propNORM'], ['Biohazard', 'propBiohazard'],
+                  ['Pesticides', 'propPesticides'], ['None', 'propNone'], ['Reactive Cyanides', 'propReactiveCyanides'],
+                  ['Reactive Sulfides', 'propReactiveSulfides']
+                ].map(([label, key]) => (
+                  <label key={key} style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form[key] || false} onChange={e => setForm({ ...form, [key]: e.target.checked })} style={{ width: 13, height: 13 }} />{label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ===== SECTION 7: METALS ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>7. Metals</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <strong>Report as:</strong>
+              {['total', 'tclp'].map(t => (
+                <label key={t} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                  <input type="radio" name="metalsTotalOrTCLP" value={t} checked={form.metalsTotalOrTCLP === t} onChange={e => setForm({ ...form, metalsTotalOrTCLP: e.target.value })} />{t === 'total' ? 'Total PPM' : 'TCLP'}
+                </label>
+              ))}
+            </div>
+            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              {[['Arsenic', 'arsenic'], ['Barium', 'barium'], ['Cadmium', 'cadmium'], ['Chromium', 'chromium'],
+                ['Chromium Hex', 'chromiumHex'], ['Mercury', 'mercury'], ['Lead', 'lead'], ['Selenium', 'selenium'],
+                ['Silver', 'silver'], ['Copper', 'copper'], ['Nickel', 'nickel'], ['Zinc', 'zinc'],
+                ['Thallium', 'thallium'], ['Other', 'metalOther']
+              ].map(([label, key]) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, minWidth: 70 }}>{label}:</span>
+                  <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ===== SECTION 8: OTHER COMPONENTS ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>8. Other Components</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+              {[['Cyanides', 'cyanides'], ['Sulfides', 'sulfides'], ['Amines', 'amines'], ['PCBs', 'pcbs'], ['Phenolics', 'phenolics']].map(([label, key]) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>{label}:</span>
+                  <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '5px 10px', borderTop: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>BTU/LB:</strong>
+                <select value={form.btuLb} onChange={e => setForm({ ...form, btuLb: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>{'<2500'}</option><option>{'≥2500'}</option><option>Other</option>
+                </select>
+                {form.btuLb === 'Other' && <input value={form.btuLbOther} onChange={e => setForm({ ...form, btuLbOther: e.target.value })} placeholder="Value" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+              </div>
+            </div>
+          </div>
+
+          {/* ===== SECTION 9: REGULATORY INFORMATION ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>9. Regulatory Information</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Restricted Under LDR:</span>
+                <select value={form.restrictedUnderLDR} onChange={e => setForm({ ...form, restrictedUnderLDR: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>{'<500 ppm VOC:'}</span>
+                <select value={form.lessThan500VOC} onChange={e => setForm({ ...form, lessThan500VOC: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>LDR Subcategory:</span>
+                <select value={form.ldrSubcategory} onChange={e => setForm({ ...form, ldrSubcategory: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Wastewater</option><option>Non Wastewater</option><option>N/A</option>
+                </select></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>UHCs:</span>
+                <input value={form.uhcs} onChange={e => setForm({ ...form, uhcs: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>US EPA Haz Waste:</span>
+                <select value={form.usepaHazWaste} onChange={e => setForm({ ...form, usepaHazWaste: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>State Haz Waste:</span>
+                <select value={form.stateHazWaste} onChange={e => setForm({ ...form, stateHazWaste: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Alt Standards/Soil:</span>
+                <select value={form.altStandardsSoil} onChange={e => setForm({ ...form, altStandardsSoil: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>State Code Required:</span>
+                <select value={form.stateCodeRequired} onChange={e => setForm({ ...form, stateCodeRequired: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>RCRA Exempt:</span>
+                <select value={form.rcraExempt} onChange={e => setForm({ ...form, rcraExempt: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+            </div>
+            {form.rcraExempt === 'Yes' && <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600 }}>Exempt Reason:</span>
+              <input value={form.exemptReason} onChange={e => setForm({ ...form, exemptReason: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
+            </div>}
+
+            {/* Waste Codes */}
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
+              <strong style={{ fontSize: 12 }}>Waste Codes:</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
+                {[['F-Listed', 'fListed', 'fListedCodes'], ['K-Listed', 'kListed', 'kListedCodes'],
+                  ['P-Listed', 'pListed', 'pListedCodes'], ['U-Listed', 'uListed', 'uListedCodes']].map(([label, yesNoKey, codesKey]) => (
+                  <div key={yesNoKey} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, minWidth: 60 }}>{label}:</span>
+                    <select value={form[yesNoKey]} onChange={e => setForm({ ...form, [yesNoKey]: e.target.value })} style={{ fontSize: 11, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
+                      <option value="">Select</option><option>Yes</option><option>No</option>
+                    </select>
+                    {form[yesNoKey] === 'Yes' && <input value={form[codesKey]} onChange={e => setForm({ ...form, [codesKey]: e.target.value })} placeholder="Codes" style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D001 Ignitable:</span>
+                <select value={form.ignitableD001} onChange={e => setForm({ ...form, ignitableD001: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
+                  <option value="">-</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D002 Corrosive:</span>
+                <select value={form.corrosiveD002} onChange={e => setForm({ ...form, corrosiveD002: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
+                  <option value="">-</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D003 Reactive:</span>
+                <select value={form.reactiveD003} onChange={e => setForm({ ...form, reactiveD003: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
+                  <option value="">-</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D004-D043 Toxic:</span>
+                <select value={form.toxicD004D043} onChange={e => setForm({ ...form, toxicD004D043: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
+                  <option value="">-</option><option>Yes</option><option>No</option>
+                </select></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {[['Federal Universal Waste', 'federalUniversalWaste'], ['State Universal Waste', 'stateUniversalWaste'], ['Used Oil', 'usedOil'],
+                ['Halogen Content', 'halogenContent'], ['Recycle/Reuse', 'recycleReuse'], ['Product/Co-Product', 'productCoProduct'],
+                ['CERCLA Regulated', 'cerclaRegulated'], ['Benzene NESHAP', 'benzeneNESHAP'], ['TSCA PCB', 'tscaPCB'],
+                ['Halo Org Compound', 'haloOrgCompound'], ['Medical Waste', 'medicalWaste']
+              ].map(([label, key]) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>{label}:</span>
+                  <select value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>EPA Source Code:</span>
+                <input value={form.epaSourceCode} onChange={e => setForm({ ...form, epaSourceCode: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>EPA Form Code:</span>
+                <input value={form.epaFormCode} onChange={e => setForm({ ...form, epaFormCode: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Origin Code:</span>
+                <input value={form.originCode} onChange={e => setForm({ ...form, originCode: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+            {/* Sample Information */}
+            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
+              <strong style={{ fontSize: 12 }}>Sample Information:</strong>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Determination:</span>
+                  <select value={form.determination} onChange={e => setForm({ ...form, determination: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
+                    <option value="">Select</option><option>Generator Knowledge</option><option>SDS</option><option>Waste Analysis</option>
+                  </select></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Analysis Date:</span>
+                  <input type="date" value={form.analysisDate} onChange={e => setForm({ ...form, analysisDate: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sample Type:</span>
+                  <select value={form.sampleType} onChange={e => setForm({ ...form, sampleType: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
+                    <option value="">Select</option><option>Composite Sample</option><option>Grab Sample</option>
+                  </select></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sample Date:</span>
+                  <input type="date" value={form.sampleDate} onChange={e => setForm({ ...form, sampleDate: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sample IDs:</span>
+                  <input value={form.sampleIds} onChange={e => setForm({ ...form, sampleIds: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sampler Name:</span>
+                  <input value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
+              </div>
+            </div>
+          </div>
+
+          {/* ===== SECTION 10: SHIPPING ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>10. Shipping</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Volume to Ship:</strong>
+                <input value={form.volumeToShip} onChange={e => setForm({ ...form, volumeToShip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Unit:</strong>
+                <select value={form.volumeUnit} onChange={e => setForm({ ...form, volumeUnit: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Tons</option><option>Lbs</option><option>Yds</option><option>Gals</option><option>Kgs</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Frequency:</strong>
+                <select value={form.frequency} onChange={e => setForm({ ...form, frequency: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>One Time</option><option>Monthly</option><option>Quarterly</option><option>Annually</option><option>Other</option>
+                </select></div>
+            </div>
+            <div style={{ padding: '5px 10px', borderTop: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Combination Package:</strong>
+                <input value={form.combinationPackage} onChange={e => setForm({ ...form, combinationPackage: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Transportation:</strong>
+                <select value={form.transportation} onChange={e => setForm({ ...form, transportation: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Containerized</option><option>Bulk Liquid</option><option>Bulk Solid</option>
+                </select></div>
+            </div>
+          </div>
+
+          {/* ===== SECTION 11: DOT INFORMATION ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>11. DOT Information</div>
+          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
+            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>USDOT Hazardous Material:</strong>
+                <select value={form.usdotHazMaterial} onChange={e => setForm({ ...form, usdotHazMaterial: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
+                  <option value="">Select</option><option>Yes</option><option>No</option>
+                </select></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Proper Shipping Name:</strong>
+                <input value={form.usdotShippingName} onChange={e => setForm({ ...form, usdotShippingName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
+            </div>
+          </div>
+
+          {/* ===== PROFILE NOTES ===== */}
+          <div className="mrow"><label>Profile Notes</label>
+            <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={2} placeholder="Additional notes" /></div>
+
+          {/* ===== CERTIFICATION / SIGNATURE ===== */}
+          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, marginTop: 12, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>Certification / Signature</div>
+          <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: '15px', fontStyle: 'italic' }}>
+            I hereby certify that all information submitted in this and all attached documents contain true and accurate descriptions of the waste.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
+            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Signer Name</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input list="prr-signer-list" value={form.signatureName || ''} onChange={e => setForm({ ...form, signatureName: e.target.value })} placeholder="Type or select a name" style={{ fontSize: 12, flex: 1 }} />
+                <datalist id="prr-signer-list">{signers.map((s, i) => <option key={i} value={s} />)}</datalist>
+              </div></div>
+            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Date</label>
+              <input type="date" value={form.signatureDate || ''} onChange={e => setForm({ ...form, signatureDate: e.target.value })} style={{ fontSize: 12 }} /></div>
+            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Title</label>
+              <input value={form.signatureTitle || ''} onChange={e => setForm({ ...form, signatureTitle: e.target.value })} placeholder="Title" style={{ fontSize: 12 }} /></div>
+          </div>
+          {form.signatureName && <div style={{ background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 16px', marginBottom: 8, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>Signature Preview</div>
+            <div style={{ fontFamily: "'Dancing Script', cursive, serif", fontSize: 24, color: '#c2410c' }}>{form.signatureName}</div>
+          </div>}
+          {signers.length > 0 && <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Saved signers:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {signers.map((s, i) => (
+                <span key={i} style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 4, padding: '2px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                  onClick={() => setForm({ ...form, signatureName: s })}>
+                  {s}
+                  <span onClick={e => { e.stopPropagation(); if (confirm('Remove "' + s + '" from saved signers?')) deleteSigner(s); }} style={{ color: '#b91c1c', fontWeight: 700, cursor: 'pointer' }}>&times;</span>
+                </span>
+              ))}
+            </div>
+          </div>}
+
+          <div className="mactions" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+            <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {editId && <button className="bp" style={{ background: '#2563eb' }} onClick={() => { window.open('/api/profiles/' + editId + '/prr-pdf', '_blank'); }}>Download PDF</button>}
+              <button className="bp" style={{ background: '#c2410c' }} onClick={save}>{editId ? 'Update PRR Profile' : 'Save PRR Profile'}</button>
             </div>
           </div>
 
