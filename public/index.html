@@ -3904,508 +3904,587 @@ function WasteProfiles({data}) {
     {/* =============== PRR Form Modal =============== */}
     {showForm && form.profileType === 'prr' && (
       <div className="overlay" onClick={() => { setShowForm(false); setEditId(null); }}>
-        <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 800, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', padding: 0 }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: 850, maxWidth: '96vw', maxHeight: '94vh', overflowY: 'auto', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.3)', fontFamily: "'Arial', 'Helvetica', sans-serif", fontSize: 12, color: '#222', position: 'relative' }}>
 
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '2px solid #c2410c' }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: '#c2410c', letterSpacing: 1 }}>PACIFIC RESOURCE RECOVERY</div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#c2410c' }}>WASTE PROFILE FORM</div>
-          </div>
+          {/* ========== PAGE 1 ========== */}
+          <div style={{ padding: '0 0 8px 0' }}>
 
-          <div style={{ padding: '12px 16px' }}>
-
-          {/* ===== SECTION 1: GENERATOR INFORMATION ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>1. Generator Information</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ whiteSpace: 'nowrap' }}>Generator:</strong>
-              <input list="prr-cust-list" value={form.customer} onChange={e => onPrrGeneratorChange(e.target.value)} placeholder="Select or type generator name" style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
-              <datalist id="prr-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ whiteSpace: 'nowrap' }}>Site Address:</strong>
-              <input value={form.siteAddress} onChange={e => setForm({ ...form, siteAddress: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>City:</strong>
-                <input value={form.siteCity} onChange={e => setForm({ ...form, siteCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State:</strong>
-                <select value={form.siteState} onChange={e => setForm({ ...form, siteState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option>
-                  {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Zip:</strong>
-                <input value={form.siteZip} onChange={e => setForm({ ...form, siteZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ whiteSpace: 'nowrap' }}>Mailing Address:</strong>
-              <input value={form.mailingAddress} onChange={e => setForm({ ...form, mailingAddress: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>City:</strong>
-                <input value={form.mailingCity} onChange={e => setForm({ ...form, mailingCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State:</strong>
-                <select value={form.mailingState} onChange={e => setForm({ ...form, mailingState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option>
-                  {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Zip:</strong>
-                <input value={form.mailingZip} onChange={e => setForm({ ...form, mailingZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>EPA ID #:</strong>
-                <input value={form.epaId} onChange={e => setForm({ ...form, epaId: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State ID #:</strong>
-                <input value={form.stateId} onChange={e => setForm({ ...form, stateId: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Emergency Phone:</strong>
-                <input value={form.emergencyPhone} onChange={e => setForm({ ...form, emergencyPhone: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-            </div>
-          </div>
-
-          {/* ===== SECTION 2: CUSTOMER BILLTO ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>2. Customer BillTo</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ whiteSpace: 'nowrap' }}>Customer Bill To:</strong>
-              <input value={form.billToName} onChange={e => setForm({ ...form, billToName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ whiteSpace: 'nowrap' }}>Billing Address:</strong>
-              <input value={form.billingAddress} onChange={e => setForm({ ...form, billingAddress: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
-            </div>
-            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>City:</strong>
-                <input value={form.billingCity} onChange={e => setForm({ ...form, billingCity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>State:</strong>
-                <select value={form.billingState} onChange={e => setForm({ ...form, billingState: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option>
-                  {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Zip:</strong>
-                <input value={form.billingZip} onChange={e => setForm({ ...form, billingZip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-            </div>
-          </div>
-
-          {/* ===== SECTION 3: PROFILE INFORMATION ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>3. Profile Information</div>
-          <div className="mrow" style={{ marginBottom: 12 }}><label style={{ fontSize: 13, fontWeight: 700, color: '#c2410c' }}>Profile Name *</label>
-            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Waste Coolant, Contaminated Soil (internal name)" style={{ fontSize: 12 }} autoFocus /></div>
-
-          {/* ===== SECTION 5: GENERATING PROCESS & MATERIAL COMPOSITION ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>5. Generating Process &amp; Material Composition</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
-              <strong>Profile Description:</strong>
-              <textarea value={form.profileDescription} onChange={e => setForm({ ...form, profileDescription: e.target.value })} rows={2} style={{ width: '100%', fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 4, padding: '4px 6px', marginTop: 4 }} placeholder="Describe the waste profile" />
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
-              <strong>Process Generating Waste:</strong>
-              <textarea value={form.processGeneratingWaste} onChange={e => setForm({ ...form, processGeneratingWaste: e.target.value })} rows={2} style={{ width: '100%', fontSize: 12, border: '1px solid #e5e7eb', borderRadius: 4, padding: '4px 6px', marginTop: 4 }} placeholder="Describe the process" />
-            </div>
-            <div style={{ padding: '5px 10px' }}>
-              <strong>Chemical/Physical/Elemental Constituents:</strong>
-              <div style={{ marginTop: 6 }}>
-                {form.chemicals.length > 0 ? (
-                  <div className="rtable">
-                    <table>
-                      <thead><tr>
-                        <th style={{ fontSize: 11, width: 30 }}>TRI</th>
-                        <th style={{ fontSize: 11 }}>Chemical/Physical Composition</th>
-                        <th style={{ fontSize: 11, width: 90 }}>CAS#</th>
-                        <th style={{ fontSize: 11, width: 60 }}>Typical</th>
-                        <th style={{ fontSize: 11, width: 50 }}>Min</th>
-                        <th style={{ fontSize: 11, width: 50 }}>Max</th>
-                        <th style={{ fontSize: 11, width: 70 }}>Unit Type</th>
-                        <th style={{ width: 24 }}></th>
-                      </tr></thead>
-                      <tbody>
-                        {form.chemicals.map((c, i) => (
-                          <tr key={i}>
-                            <td><input type="checkbox" checked={c.tri || false} onChange={e => updateChemical(i, 'tri', e.target.checked)} /></td>
-                            <td><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} placeholder="Name" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                            <td><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                            <td><input value={c.typical} onChange={e => updateChemical(i, 'typical', e.target.value)} style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                            <td><input value={c.min} onChange={e => updateChemical(i, 'min', e.target.value)} style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                            <td><input value={c.max} onChange={e => updateChemical(i, 'max', e.target.value)} style={{ border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px', fontSize: 11, width: '100%' }} /></td>
-                            <td><select value={c.unitType || 'Wt %'} onChange={e => updateChemical(i, 'unitType', e.target.value)} style={{ fontSize: 11, padding: '2px', border: '1px solid #e5e7eb', borderRadius: 4 }}>
-                              <option>Vol %</option><option>Wt %</option><option>PPM</option>
-                            </select></td>
-                            <td><button onClick={() => removeChemical(i)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11, padding: '2px 6px' }}>&times;</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : <div style={{ fontSize: 12, color: '#9ca3af', padding: '8px 0' }}>No constituents added yet.</div>}
-                <button onClick={addPrrChemical} style={{ fontSize: 11, padding: '4px 12px', background: '#c2410c', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', marginTop: 6 }}>+ Add Row</button>
+            {/* Page 1 Header: Logo + Title */}
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #222', padding: '10px 14px 8px 14px' }}>
+              <img src="data:image/jpeg;base64,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" alt="PRR Logo" style={{ height: 60, marginRight: 14, flexShrink: 0 }} />
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: 1, textTransform: 'uppercase' }}>WASTE MATERIAL PROFILE SHEET</div>
               </div>
             </div>
-          </div>
 
-          {/* ===== SECTION 6: PHYSICAL & CHEMICAL PROPERTIES ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>6. Physical &amp; Chemical Properties</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Color:</strong>
-                <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Odor:</strong>
-                <select value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>None</option><option>Mild</option><option>Strong</option><option>Other</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Odor:</strong>
-                <select value={form.odorSelection} onChange={e => setForm({ ...form, odorSelection: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option>
-                  <option>(Acrid/Penetrating)</option><option>(Mercaptan)</option><option>(Offensive)</option>
-                  <option>(Pungent)</option><option>(Rotten Egg/Sulfide)</option><option>(Septic/Rancid)</option><option>(Other)</option>
-                </select></div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>pH:</strong>
-                <select value={form.pH} onChange={e => setForm({ ...form, pH: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option>
-                  <option>{'≤ 2'}</option><option>{'> 2 to ≤ 5'}</option><option>{'> 5 to ≤ 10'}</option>
-                  <option>{'> 10 to ≤ 12.5'}</option><option>{'>12.5'}</option><option>N/A</option><option>Custom</option>
-                </select>
-                {form.pH === 'Custom' && <input value={form.pHCustom} onChange={e => setForm({ ...form, pHCustom: e.target.value })} placeholder="Enter pH" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+            {/* Sections 1 & 2 side by side */}
+            <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #999' }}>
+
+              {/* Section 1: Generator Information (~55%) */}
+              <div style={{ flex: '0 0 55%', borderRight: '1px solid #999' }}>
+                <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>1. Generator Information</div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>Generator:</span>
+                  <input list="prr-cust-list" value={form.customer} onChange={e => onPrrGeneratorChange(e.target.value)} placeholder="Select or type generator name" style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                  <datalist id="prr-cust-list">{custNames.map((c, i) => <option key={i} value={c} />)}</datalist>
+                </div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>Site Address:</span>
+                  <input value={form.siteAddress} onChange={e => setForm({ ...form, siteAddress: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                </div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'grid', gridTemplateColumns: '1fr 80px 70px', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>City:</span>
+                    <input value={form.siteCity} onChange={e => setForm({ ...form, siteCity: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>St:</span>
+                    <select value={form.siteState} onChange={e => setForm({ ...form, siteState: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                      <option value=""></option>
+                      {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
+                    </select></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Zip:</span>
+                    <input value={form.siteZip} onChange={e => setForm({ ...form, siteZip: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent', width: 40 }} /></div>
+                </div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>Mailing Address:</span>
+                  <input value={form.mailingAddress} onChange={e => setForm({ ...form, mailingAddress: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                </div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'grid', gridTemplateColumns: '1fr 80px 70px', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>City:</span>
+                    <input value={form.mailingCity} onChange={e => setForm({ ...form, mailingCity: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>St:</span>
+                    <select value={form.mailingState} onChange={e => setForm({ ...form, mailingState: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                      <option value=""></option>
+                      {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
+                    </select></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Zip:</span>
+                    <input value={form.mailingZip} onChange={e => setForm({ ...form, mailingZip: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent', width: 40 }} /></div>
+                </div>
+                <div style={{ padding: '3px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>EPA ID #:</span>
+                    <input value={form.epaId} onChange={e => setForm({ ...form, epaId: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>State ID #:</span>
+                    <input value={form.stateId} onChange={e => setForm({ ...form, stateId: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap' }}>Emergency Ph:</span>
+                    <input value={form.emergencyPhone} onChange={e => setForm({ ...form, emergencyPhone: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>TOC:</strong>
-                <select value={form.toc} onChange={e => setForm({ ...form, toc: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>{'<1%'}</option><option>1-9%</option><option>{'>10%'}</option><option>N/A</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Flash Point:</strong>
-                <select value={form.flashPoint} onChange={e => setForm({ ...form, flashPoint: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option>
-                  <option>{'< 73°F'}</option><option>{'≥ 73°F to < 100°F'}</option>
-                  <option>{'≥ 100°F to < 140°F'}</option><option>{'≥ 140°F to < 150°F'}</option>
-                  <option>{'≥ 150°F to < 200°F'}</option><option>{'≥ 200°F'}</option><option>N/A</option><option>Actual</option>
-                </select>
-                {form.flashPoint === 'Actual' && <input value={form.flashPointOther} onChange={e => setForm({ ...form, flashPointOther: e.target.value })} placeholder="Actual value" style={{ fontSize: 12, width: 70, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+
+              {/* Section 2: Customer BillTo (~45%) + Section 3 below it */}
+              <div style={{ flex: '0 0 45%' }}>
+                <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>2. Customer BillTo</div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>Customer Bill To:</span>
+                  <input value={form.billToName} onChange={e => setForm({ ...form, billToName: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                </div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>Billing Address:</span>
+                  <input value={form.billingAddress} onChange={e => setForm({ ...form, billingAddress: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                </div>
+                <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'grid', gridTemplateColumns: '1fr 60px 60px', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>City:</span>
+                    <input value={form.billingCity} onChange={e => setForm({ ...form, billingCity: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>St:</span>
+                    <select value={form.billingState} onChange={e => setForm({ ...form, billingState: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                      <option value=""></option>
+                      {'AK,AL,AR,AZ,CA,CO,CT,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,MA,MD,ME,MI,MN,MO,MS,MT,NC,ND,NE,NH,NJ,NM,NV,NY,OH,OK,OR,PA,RI,SC,SD,TN,TX,VA,VT,WA,WI,WV,WY'.split(',').map(s => <option key={s} value={s}>{s}</option>)}
+                    </select></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Zip:</span>
+                    <input value={form.billingZip} onChange={e => setForm({ ...form, billingZip: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent', width: 36 }} /></div>
+                </div>
+
+                {/* Section 3: Profile Information (sits below section 2) */}
+                <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>3. Profile Information</div>
+                <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>Profile Name:</span>
+                  <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Waste Coolant, Contaminated Soil" style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} autoFocus />
+                </div>
               </div>
             </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>FP Method:</strong>
-                <select value={form.flashPointMethod} onChange={e => setForm({ ...form, flashPointMethod: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Closed Cup</option><option>Open Cup</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Viscosity:</strong>
-                <select value={form.viscosity} onChange={e => setForm({ ...form, viscosity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>1 - 100</option><option>101 - 500</option><option>501 - 10000</option><option>{'>10000'}</option><option>Other</option>
-                </select>
-                {form.viscosity === 'Other' && <input value={form.viscosityOther} onChange={e => setForm({ ...form, viscosityOther: e.target.value })} placeholder="Value" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+
+            {/* Section 4: Disposal Facility (For Office Use Only) */}
+            <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>4. Disposal Facility (For Office Use Only)</div>
+            <div style={{ border: '1px solid #999', borderTop: 'none', display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: 11 }}>
+              <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Disposal Facility:</span>
+                <input value={form.disposalFacility || ''} onChange={e => setForm({ ...form, disposalFacility: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Boiling Pt:</strong>
-                <select value={form.boilingPoint} onChange={e => setForm({ ...form, boilingPoint: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>{'≤95F'}</option><option>{'>95F'}</option><option>N/A</option>
-                </select></div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>BTU Value:</strong>
-                <select value={form.btuValue} onChange={e => setForm({ ...form, btuValue: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>0 - 2499</option><option>2500 - 4999</option><option>5000 - 10000</option><option>{'> 10000'}</option><option>Other</option>
-                </select>
-                {form.btuValue === 'Other' && <input value={form.btuValueOther} onChange={e => setForm({ ...form, btuValueOther: e.target.value })} placeholder="Value" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+              <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700 }}>Approval #:</span>
+                  <input value={form.approvalExpiration || ''} onChange={e => setForm({ ...form, approvalExpiration: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700 }}>Date:</span>
+                  <input value={form.approvalDate || ''} onChange={e => setForm({ ...form, approvalDate: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Specific Gravity:</strong>
-                <input value={form.specificGravity} onChange={e => setForm({ ...form, specificGravity: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Phases/Layers:</strong>
-                <select value={form.phasesLayers} onChange={e => setForm({ ...form, phasesLayers: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>1</option><option>2</option><option>3</option>
-                </select></div>
-            </div>
-            {/* Physical State */}
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
-              <strong>Physical State (enter %):</strong>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginTop: 4 }}>
-                {[['Solid', 'physSolid'], ['Liquid', 'physLiquid'], ['Sludge', 'physSludge'], ['Gas', 'physGas'], ['Ash', 'physAsh'], ['Powder', 'physPowder']].map(([label, key]) => (
-                  <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
-                    <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} placeholder="%" style={{ width: '100%', fontSize: 11, textAlign: 'center', border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />
-                  </div>
-                ))}
+              <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700 }}>Common Name:</span>
+                  <input value={form.commonName || ''} onChange={e => setForm({ ...form, commonName: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700 }}>Active:</span>
+                  <select value={form.facilityActive || ''} onChange={e => setForm({ ...form, facilityActive: e.target.value })} style={{ fontSize: 10, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value=""></option><option>Yes</option><option>No</option>
+                  </select></div>
+              </div>
+              <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Re-cert/Change Status:</span>
+                <input value={form.recertChangeStatus || ''} onChange={e => setForm({ ...form, recertChangeStatus: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
               </div>
             </div>
-            {/* Other Properties */}
-            <div style={{ padding: '5px 10px' }}>
-              <strong>Other Properties:</strong>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginTop: 4 }}>
+
+            {/* Section 5: Generating Process & Material Composition */}
+            <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px', marginTop: 0 }}>5. Generating Process &amp; Material Composition</div>
+            <div style={{ border: '1px solid #999', borderTop: 'none' }}>
+              <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #999' }}>
+                <div style={{ flex: 1, padding: '3px 8px', borderRight: '1px solid #999' }}>
+                  <span style={{ fontWeight: 700, fontSize: 11 }}>Profile Description:</span>
+                  <textarea value={form.profileDescription} onChange={e => setForm({ ...form, profileDescription: e.target.value })} rows={3} style={{ width: '100%', fontSize: 11, border: '1px solid #ccc', padding: '2px 4px', marginTop: 2, resize: 'vertical', fontFamily: 'Arial, sans-serif' }} placeholder="Describe the waste profile" />
+                </div>
+                <div style={{ flex: 1, padding: '3px 8px' }}>
+                  <span style={{ fontWeight: 700, fontSize: 11 }}>Process generating the waste:</span>
+                  <textarea value={form.processGeneratingWaste} onChange={e => setForm({ ...form, processGeneratingWaste: e.target.value })} rows={3} style={{ width: '100%', fontSize: 11, border: '1px solid #ccc', padding: '2px 4px', marginTop: 2, resize: 'vertical', fontFamily: 'Arial, sans-serif' }} placeholder="Describe the process" />
+                </div>
+              </div>
+
+              {/* Constituents sub-header */}
+              <div style={{ background: '#8B4513', color: '#fff', fontWeight: 700, fontSize: 11, padding: '3px 8px' }}>Chemical/Physical/Elemental Constituents</div>
+              <div style={{ padding: '0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                  <thead>
+                    <tr style={{ background: '#f5f5f5' }}>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', width: 30, fontWeight: 700 }}>TRI</th>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', fontWeight: 700 }}>Chemical/Physical Composition</th>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', width: 80, fontWeight: 700 }}>CAS#</th>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', width: 55, fontWeight: 700 }}>Typical</th>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', width: 45, fontWeight: 700 }}>Min</th>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', width: 45, fontWeight: 700 }}>Max</th>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', width: 65, fontWeight: 700 }}>Unit Type</th>
+                      <th style={{ border: '1px solid #999', padding: '2px 4px', width: 24 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.chemicals.map((c, i) => (
+                      <tr key={i}>
+                        <td style={{ border: '1px solid #ccc', padding: '1px', textAlign: 'center' }}><input type="checkbox" checked={c.tri || false} onChange={e => updateChemical(i, 'tri', e.target.checked)} style={{ width: 13, height: 13 }} /></td>
+                        <td style={{ border: '1px solid #ccc', padding: '1px' }}><input value={c.name} onChange={e => updateChemical(i, 'name', e.target.value)} style={{ width: '100%', border: 'none', fontSize: 11, padding: '1px 3px', outline: 'none' }} /></td>
+                        <td style={{ border: '1px solid #ccc', padding: '1px' }}><input value={c.cas} onChange={e => updateChemical(i, 'cas', e.target.value)} placeholder="XXXX-XX-X" style={{ width: '100%', border: 'none', fontSize: 11, padding: '1px 3px', outline: 'none' }} /></td>
+                        <td style={{ border: '1px solid #ccc', padding: '1px' }}><input value={c.typical} onChange={e => updateChemical(i, 'typical', e.target.value)} style={{ width: '100%', border: 'none', fontSize: 11, padding: '1px 3px', outline: 'none' }} /></td>
+                        <td style={{ border: '1px solid #ccc', padding: '1px' }}><input value={c.min} onChange={e => updateChemical(i, 'min', e.target.value)} style={{ width: '100%', border: 'none', fontSize: 11, padding: '1px 3px', outline: 'none' }} /></td>
+                        <td style={{ border: '1px solid #ccc', padding: '1px' }}><input value={c.max} onChange={e => updateChemical(i, 'max', e.target.value)} style={{ width: '100%', border: 'none', fontSize: 11, padding: '1px 3px', outline: 'none' }} /></td>
+                        <td style={{ border: '1px solid #ccc', padding: '1px' }}><select value={c.unitType || 'Wt %'} onChange={e => updateChemical(i, 'unitType', e.target.value)} style={{ fontSize: 10, width: '100%', border: 'none', outline: 'none', padding: '1px' }}>
+                          <option>Vol %</option><option>Wt %</option><option>PPM</option>
+                        </select></td>
+                        <td style={{ border: '1px solid #ccc', padding: '1px', textAlign: 'center' }}><button onClick={() => removeChemical(i)} style={{ background: 'none', color: '#c00', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0, lineHeight: 1 }}>&times;</button></td>
+                      </tr>
+                    ))}
+                    {form.chemicals.length === 0 && (
+                      <tr><td colSpan={8} style={{ border: '1px solid #ccc', padding: '6px 8px', color: '#999', fontSize: 11, textAlign: 'center' }}>No constituents added yet.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+                <div style={{ padding: '4px 8px' }}>
+                  <button onClick={addPrrChemical} style={{ fontSize: 10, padding: '2px 10px', background: '#1a1a1a', color: '#fff', border: 'none', cursor: 'pointer' }}>+ Add Row</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 6: Physical & Chemical Properties */}
+            <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>6. Physical &amp; Chemical Properties</div>
+            <div style={{ border: '1px solid #999', borderTop: 'none' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Color:</span>
+                  <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Flash Point:</span>
+                  <select value={form.flashPoint} onChange={e => setForm({ ...form, flashPoint: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option>
+                    <option>{'< 73°F'}</option><option>{'≥ 73°F to < 100°F'}</option>
+                    <option>{'≥ 100°F to < 140°F'}</option><option>{'≥ 140°F to < 150°F'}</option>
+                    <option>{'≥ 150°F to < 200°F'}</option><option>{'≥ 200°F'}</option><option>N/A</option><option>Actual</option>
+                  </select>
+                  {form.flashPoint === 'Actual' && <input value={form.flashPointOther} onChange={e => setForm({ ...form, flashPointOther: e.target.value })} placeholder="Value" style={{ fontSize: 11, width: 50, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />}
+                </div>
+                <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>BTU Value:</span>
+                  <select value={form.btuValue} onChange={e => setForm({ ...form, btuValue: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>0 - 2499</option><option>2500 - 4999</option><option>5000 - 10000</option><option>{'> 10000'}</option><option>Other</option>
+                  </select>
+                  {form.btuValue === 'Other' && <input value={form.btuValueOther} onChange={e => setForm({ ...form, btuValueOther: e.target.value })} placeholder="Value" style={{ fontSize: 11, width: 50, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Odor:</span>
+                  <select value={form.odor} onChange={e => setForm({ ...form, odor: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>None</option><option>Mild</option><option>Strong</option><option>Other</option>
+                  </select></div>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>FP Method:</span>
+                  <select value={form.flashPointMethod} onChange={e => setForm({ ...form, flashPointMethod: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Closed Cup</option><option>Open Cup</option>
+                  </select></div>
+                <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Sp. Gravity:</span>
+                  <input value={form.specificGravity} onChange={e => setForm({ ...form, specificGravity: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>pH:</span>
+                  <select value={form.pH} onChange={e => setForm({ ...form, pH: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option>
+                    <option>{'≤ 2'}</option><option>{'> 2 to ≤ 5'}</option><option>{'> 5 to ≤ 10'}</option>
+                    <option>{'> 10 to ≤ 12.5'}</option><option>{'>12.5'}</option><option>N/A</option><option>Custom</option>
+                  </select>
+                  {form.pH === 'Custom' && <input value={form.pHCustom} onChange={e => setForm({ ...form, pHCustom: e.target.value })} placeholder="pH" style={{ fontSize: 11, width: 40, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />}
+                </div>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Viscosity:</span>
+                  <select value={form.viscosity} onChange={e => setForm({ ...form, viscosity: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>1 - 100</option><option>101 - 500</option><option>501 - 10000</option><option>{'>10000'}</option><option>Other</option>
+                  </select>
+                  {form.viscosity === 'Other' && <input value={form.viscosityOther} onChange={e => setForm({ ...form, viscosityOther: e.target.value })} placeholder="Val" style={{ fontSize: 11, width: 40, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />}
+                </div>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Phases:</span>
+                  <select value={form.phasesLayers} onChange={e => setForm({ ...form, phasesLayers: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>1</option><option>2</option><option>3</option>
+                  </select></div>
+                <div style={{ padding: '3px 8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Odor Type:</span>
+                    <select value={form.odorSelection} onChange={e => setForm({ ...form, odorSelection: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                      <option value="">Select</option>
+                      <option>(Acrid/Penetrating)</option><option>(Mercaptan)</option><option>(Offensive)</option>
+                      <option>(Pungent)</option><option>(Rotten Egg/Sulfide)</option><option>(Septic/Rancid)</option><option>(Other)</option>
+                    </select></div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>TOC:</span>
+                  <select value={form.toc} onChange={e => setForm({ ...form, toc: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>{'<1%'}</option><option>1-9%</option><option>{'>10%'}</option><option>N/A</option>
+                  </select></div>
+                <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Boiling Pt:</span>
+                  <select value={form.boilingPoint} onChange={e => setForm({ ...form, boilingPoint: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>{'≤95F'}</option><option>{'>95F'}</option><option>N/A</option>
+                  </select></div>
+              </div>
+
+              {/* Physical State row */}
+              <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc' }}>
+                <span style={{ fontWeight: 700, fontSize: 11 }}>Physical State (enter %):</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, marginTop: 2 }}>
+                  {[['Solid', 'physSolid'], ['Liquid', 'physLiquid'], ['Sludge', 'physSludge'], ['Gas', 'physGas'], ['Ash', 'physAsh'], ['Powder', 'physPowder']].map(([label, key]) => (
+                    <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>
+                      <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} placeholder="%" style={{ width: '100%', fontSize: 10, textAlign: 'center', border: '1px solid #999', padding: '1px 2px' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Other Properties sub-header */}
+              <div style={{ background: '#8B4513', color: '#fff', fontWeight: 700, fontSize: 11, padding: '3px 8px' }}>Other Properties</div>
+              <div style={{ padding: '4px 8px', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 2 }}>
                 {[
                   ['Explosive', 'propExplosive'], ['Radioactive', 'propRadioactive'], ['Thermally Unstable', 'propThermallyUnstable'],
                   ['Shock Sensitive', 'propShockSensitive'], ['Pyrophoric', 'propPyrophoric'], ['Oxidizer', 'propOxidizer'],
                   ['Water Reactive', 'propWaterReactive'], ['Air Reactive', 'propAirReactive'], ['Polymerizable', 'propPolymerizable'],
-                  ['Polymerizable (Inhibited)', 'propPolymerizableInhibited'], ['Asbestos (Friable)', 'propAsbestosFriable'], ['Asbestos (Non-Friable)', 'propAsbestosNonFriable'],
+                  ['Polymerizable (Inhibited)', 'propPolymerizableInhibited'], ['Asbestos Friable', 'propAsbestosFriable'], ['Asbestos Non-Friable', 'propAsbestosNonFriable'],
                   ['Metal Fines', 'propMetalFines'], ['Organic Peroxides', 'propOrganicPeroxides'], ['Dioxins', 'propDioxins'],
-                  ['Furans', 'propFurans'], ['NORM', 'propNORM'], ['Biohazard', 'propBiohazard'],
-                  ['Pesticides', 'propPesticides'], ['None', 'propNone'], ['Reactive Cyanides', 'propReactiveCyanides'],
+                  ['Furans', 'propFurans'], ['NORM', 'propNORM'], ['Biohazard/Infectious Waste', 'propBiohazard'],
+                  ['Pesticides/Herbicides', 'propPesticides'], ['NONE', 'propNone'], ['Reactive Cyanides', 'propReactiveCyanides'],
                   ['Reactive Sulfides', 'propReactiveSulfides']
                 ].map(([label, key]) => (
-                  <label key={key} style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={form[key] || false} onChange={e => setForm({ ...form, [key]: e.target.checked })} style={{ width: 13, height: 13 }} />{label}
+                  <label key={key} style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    <input type="checkbox" checked={form[key] || false} onChange={e => setForm({ ...form, [key]: e.target.checked })} style={{ width: 12, height: 12 }} />{label}
                   </label>
                 ))}
               </div>
             </div>
+
           </div>
 
-          {/* ===== SECTION 7: METALS ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>7. Metals</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <strong>Report as:</strong>
-              {['total', 'tclp'].map(t => (
-                <label key={t} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
-                  <input type="radio" name="metalsTotalOrTCLP" value={t} checked={form.metalsTotalOrTCLP === t} onChange={e => setForm({ ...form, metalsTotalOrTCLP: e.target.value })} />{t === 'total' ? 'Total PPM' : 'TCLP'}
-                </label>
-              ))}
-            </div>
-            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-              {[['Arsenic', 'arsenic'], ['Barium', 'barium'], ['Cadmium', 'cadmium'], ['Chromium', 'chromium'],
-                ['Chromium Hex', 'chromiumHex'], ['Mercury', 'mercury'], ['Lead', 'lead'], ['Selenium', 'selenium'],
-                ['Silver', 'silver'], ['Copper', 'copper'], ['Nickel', 'nickel'], ['Zinc', 'zinc'],
-                ['Thallium', 'thallium'], ['Other', 'metalOther']
-              ].map(([label, key]) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, minWidth: 70 }}>{label}:</span>
-                  <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* ========== PAGE 2 ========== */}
+          <div style={{ padding: '0 0 8px 0' }}>
 
-          {/* ===== SECTION 8: OTHER COMPONENTS ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>8. Other Components</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
-              {[['Cyanides', 'cyanides'], ['Sulfides', 'sulfides'], ['Amines', 'amines'], ['PCBs', 'pcbs'], ['Phenolics', 'phenolics']].map(([label, key]) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600 }}>{label}:</span>
-                  <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ padding: '5px 10px', borderTop: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>BTU/LB:</strong>
-                <select value={form.btuLb} onChange={e => setForm({ ...form, btuLb: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>{'<2500'}</option><option>{'≥2500'}</option><option>Other</option>
-                </select>
-                {form.btuLb === 'Other' && <input value={form.btuLbOther} onChange={e => setForm({ ...form, btuLbOther: e.target.value })} placeholder="Value" style={{ fontSize: 12, width: 60, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />}
+            {/* Page 2 Header */}
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #222', padding: '8px 14px 6px 14px', borderTop: '3px solid #1a1a1a' }}>
+              <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wgARCACcANwDAREAAhEBAxEB/8QAHQABAAEEAwEAAAAAAAAAAAAAAAYHCAQFAQMCCf/EABsBAQACAwEBAAAAAAAAAAAAAAABBgUDBwQC/9oADAMBAAIQAxAAAAG/4ENNmazFeGhFOr0e8PmA8/XzO897q/W6zUr21iy2OR+ECSshdnPTqnzbIyTsAAAA1RpDFw+PtzotY6/mAPM/OPu1Y2/RushtuyuV7tn+ud22Ofgek3gz1Wq03TkkQAAAKeE41fFqPN6frtGoDiYx9urG36MTf58Xfoqvms5cPn7h85vngmvaOIDNnb9DZ7tH599QwAAAQQ1lfxNA6XXQOCX5j1z7O5C3qvVGvFms1SMnmLT8Lzy7/PdIs8nlOtaLyZ6tbXHP7d1Euino9YJ6HOTkAAHBAIQanV6l1dxAEwy3suQvVpytn3SLEV+2jC0e5WxXSo3szWNGuD/eGqZNht1+aHa3HN0qwrXd19df7DegAA4Kewg1MrlMa/ihMcr7rj73Z9R5dOy9Wzw+aWeLAWt47nt0eZv9ZvTaRbPHPbW45uBVxaLw/rsXQSQAAAgJpK1hqHVDATHKe64++WeltdxEEw+PuRvtotErnOrrbDf6Seet2naOZ3Ze/pMW+sZa1HNwBcnPQa3T0mcHsAAAp2S/zabUeb0/3M931Ov06+77+rtel3K3DGUejGmqdfq0xv04zE9Hn6/r5AHtP0DnuOBOYqKAAACLnshtbw9DKfXwBV2z5qqtqytkGJ5JEN+IwPX5OjbrAAuZdDuK+uj6UmYAAABTYnRTmuYeidSwONr+R7mbjr3Z9nlVnvn5bS/dWev7+QMpsucnotxs9ApumqIAAAABTUkJuNGqA4XHR7xebv8Av6mmV900y3v8IpvFfpkruseeXMpV9avE+2IlTzkAAAAAEaIyZRycQ4lhnoyTkHJjG/JWAAAAAAAAcHIAAAAAAAAABimUY5rjag4O0AAGMZIAAAAAALOk1AN4iPJ26JQUjTKzdIxDJMI3JSxM0NmjDNWkTJEwJEAAAUwKIpqcjMToypaKNJ3ZgmtJwjRmwTs0U+TMTSmMYBMUTomwAAAAAAAAAAAAOs6DLAAAIwx3RHz4fOyejDauDrfOVOzCjTynmXuJ6Xzsno6Z+MWNeXOzvbMGNPuZ3b17BvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/2Q==" alt="PRR Logo" style={{ height: 40, marginRight: 14, flexShrink: 0 }} />
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontWeight: 800, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' }}>WASTE MATERIAL PROFILE SHEET (continued)</div>
               </div>
             </div>
-          </div>
 
-          {/* ===== SECTION 9: REGULATORY INFORMATION ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>9. Regulatory Information</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Restricted Under LDR:</span>
-                <select value={form.restrictedUnderLDR} onChange={e => setForm({ ...form, restrictedUnderLDR: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>{'<500 ppm VOC:'}</span>
-                <select value={form.lessThan500VOC} onChange={e => setForm({ ...form, lessThan500VOC: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>LDR Subcategory:</span>
-                <select value={form.ldrSubcategory} onChange={e => setForm({ ...form, ldrSubcategory: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Wastewater</option><option>Non Wastewater</option><option>N/A</option>
-                </select></div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>UHCs:</span>
-                <input value={form.uhcs} onChange={e => setForm({ ...form, uhcs: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>US EPA Haz Waste:</span>
-                <select value={form.usepaHazWaste} onChange={e => setForm({ ...form, usepaHazWaste: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>State Haz Waste:</span>
-                <select value={form.stateHazWaste} onChange={e => setForm({ ...form, stateHazWaste: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Alt Standards/Soil:</span>
-                <select value={form.altStandardsSoil} onChange={e => setForm({ ...form, altStandardsSoil: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>State Code Required:</span>
-                <select value={form.stateCodeRequired} onChange={e => setForm({ ...form, stateCodeRequired: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>RCRA Exempt:</span>
-                <select value={form.rcraExempt} onChange={e => setForm({ ...form, rcraExempt: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-            </div>
-            {form.rcraExempt === 'Yes' && <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 600 }}>Exempt Reason:</span>
-              <input value={form.exemptReason} onChange={e => setForm({ ...form, exemptReason: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} />
-            </div>}
+            {/* Sections 7 & 8 side by side */}
+            <div style={{ display: 'flex', gap: 0 }}>
+              {/* Section 7: Metals (~50%) */}
+              <div style={{ flex: '0 0 50%', borderRight: '1px solid #999' }}>
+                <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>7. Metals</div>
+                <div style={{ border: '1px solid #999', borderTop: 'none' }}>
+                  <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {['total', 'tclp'].map(t => (
+                      <label key={t} style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
+                        <input type="radio" name="metalsTotalOrTCLP" value={t} checked={form.metalsTotalOrTCLP === t} onChange={e => setForm({ ...form, metalsTotalOrTCLP: e.target.value })} style={{ width: 12, height: 12 }} />
+                        {t === 'total' ? 'Total (PPM)' : 'TCLP (mg/L)'}
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: 11 }}>
+                    {[['ARSENIC (As)', 'arsenic'], ['SELENIUM (Se)', 'selenium'],
+                      ['BARIUM (Ba)', 'barium'], ['SILVER (Ag)', 'silver'],
+                      ['CADMIUM (Cd)', 'cadmium'], ['COPPER (Cu)', 'copper'],
+                      ['CHROMIUM (Cr)', 'chromium'], ['NICKEL (Ni)', 'nickel'],
+                      ['CHROMIUM HEX (Cr+6)', 'chromiumHex'], ['ZINC (Zn)', 'zinc'],
+                      ['MERCURY (Hg)', 'mercury'], ['THALLIUM (Ti)', 'thallium'],
+                      ['LEAD (Pb)', 'lead'], ['OTHER:', 'metalOther']
+                    ].map(([label, key], idx) => (
+                      <div key={key} style={{ padding: '2px 8px', borderBottom: '1px solid #ccc', borderRight: idx % 2 === 0 ? '1px solid #ccc' : 'none', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <span style={{ fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap', minWidth: 95 }}>{label}</span>
+                        <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-            {/* Waste Codes */}
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
-              <strong style={{ fontSize: 12 }}>Waste Codes:</strong>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
-                {[['F-Listed', 'fListed', 'fListedCodes'], ['K-Listed', 'kListed', 'kListedCodes'],
-                  ['P-Listed', 'pListed', 'pListedCodes'], ['U-Listed', 'uListed', 'uListedCodes']].map(([label, yesNoKey, codesKey]) => (
-                  <div key={yesNoKey} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, minWidth: 60 }}>{label}:</span>
-                    <select value={form[yesNoKey]} onChange={e => setForm({ ...form, [yesNoKey]: e.target.value })} style={{ fontSize: 11, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
-                      <option value="">Select</option><option>Yes</option><option>No</option>
+              {/* Section 8: Other Components (~50%) */}
+              <div style={{ flex: '0 0 50%' }}>
+                <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>8. Other Components</div>
+                <div style={{ border: '1px solid #999', borderTop: 'none', borderLeft: 'none' }}>
+                  <div style={{ padding: '2px 8px', borderBottom: '1px solid #ccc', fontSize: 10, fontWeight: 700 }}>Total (PPM)</div>
+                  {[['CYANIDES', 'cyanides'], ['PCBs', 'pcbs'], ['SULFIDES', 'sulfides'], ['PHENOLICS', 'phenolics'], ['AMINES', 'amines']].map(([label, key]) => (
+                    <div key={key} style={{ padding: '2px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11 }}>
+                      <span style={{ fontWeight: 700, fontSize: 10, minWidth: 70 }}>{label}:</span>
+                      <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+                    </div>
+                  ))}
+                  {/* BTU/lb sub-section */}
+                  <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 11 }}>BTU/lb:</span>
+                    <select value={form.btuLb} onChange={e => setForm({ ...form, btuLb: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                      <option value="">Select</option><option>{'<2500'}</option><option>{'≥2500'}</option><option>Other</option>
                     </select>
-                    {form[yesNoKey] === 'Yes' && <input value={form[codesKey]} onChange={e => setForm({ ...form, [codesKey]: e.target.value })} placeholder="Codes" style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} />}
+                    {form.btuLb === 'Other' && <input value={form.btuLbOther} onChange={e => setForm({ ...form, btuLbOther: e.target.value })} placeholder="Value" style={{ fontSize: 11, width: 60, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 9: Regulatory Information */}
+            <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>9. Regulatory Information</div>
+            <div style={{ border: '1px solid #999', borderTop: 'none', fontSize: 11 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Restricted Under LDR:</span>
+                  <select value={form.restrictedUnderLDR} onChange={e => setForm({ ...form, restrictedUnderLDR: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>{'<500 ppm VOC:'}</span>
+                  <select value={form.lessThan500VOC} onChange={e => setForm({ ...form, lessThan500VOC: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>LDR Subcategory:</span>
+                  <select value={form.ldrSubcategory} onChange={e => setForm({ ...form, ldrSubcategory: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Wastewater</option><option>Non Wastewater</option><option>N/A</option>
+                  </select></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>UHCs:</span>
+                  <input value={form.uhcs} onChange={e => setForm({ ...form, uhcs: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>US EPA Haz Waste:</span>
+                  <select value={form.usepaHazWaste} onChange={e => setForm({ ...form, usepaHazWaste: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>State Haz Waste:</span>
+                  <select value={form.stateHazWaste} onChange={e => setForm({ ...form, stateHazWaste: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Alt Standards/Soil:</span>
+                  <select value={form.altStandardsSoil} onChange={e => setForm({ ...form, altStandardsSoil: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>State Code Req:</span>
+                  <select value={form.stateCodeRequired} onChange={e => setForm({ ...form, stateCodeRequired: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>RCRA Exempt:</span>
+                  <select value={form.rcraExempt} onChange={e => setForm({ ...form, rcraExempt: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+              </div>
+              {form.rcraExempt === 'Yes' && <div style={{ padding: '2px 8px', borderBottom: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontWeight: 700, fontSize: 10 }}>Exempt Reason:</span>
+                <input value={form.exemptReason} onChange={e => setForm({ ...form, exemptReason: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} />
+              </div>}
+
+              {/* Waste Codes */}
+              <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc' }}>
+                <span style={{ fontWeight: 700, fontSize: 11 }}>Waste Codes:</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 2 }}>
+                  {[['F-Listed', 'fListed', 'fListedCodes'], ['K-Listed', 'kListed', 'kListedCodes'],
+                    ['P-Listed', 'pListed', 'pListedCodes'], ['U-Listed', 'uListed', 'uListedCodes']].map(([label, yesNoKey, codesKey]) => (
+                    <div key={yesNoKey} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <span style={{ fontWeight: 700, fontSize: 10, minWidth: 50 }}>{label}:</span>
+                      <select value={form[yesNoKey]} onChange={e => setForm({ ...form, [yesNoKey]: e.target.value })} style={{ fontSize: 10, border: '1px solid #ccc', padding: '1px 2px' }}>
+                        <option value="">-</option><option>Yes</option><option>No</option>
+                      </select>
+                      {form[yesNoKey] === 'Yes' && <input value={form[codesKey]} onChange={e => setForm({ ...form, [codesKey]: e.target.value })} placeholder="Codes" style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px 2px' }} />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '2px 6px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontSize: 9, fontWeight: 700 }}>D001 Ignitable:</span>
+                  <select value={form.ignitableD001} onChange={e => setForm({ ...form, ignitableD001: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px' }}>
+                    <option value="">-</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 6px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontSize: 9, fontWeight: 700 }}>D002 Corrosive:</span>
+                  <select value={form.corrosiveD002} onChange={e => setForm({ ...form, corrosiveD002: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px' }}>
+                    <option value="">-</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 6px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontSize: 9, fontWeight: 700 }}>D003 Reactive:</span>
+                  <select value={form.reactiveD003} onChange={e => setForm({ ...form, reactiveD003: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px' }}>
+                    <option value="">-</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontSize: 9, fontWeight: 700 }}>D004-D043:</span>
+                  <select value={form.toxicD004D043} onChange={e => setForm({ ...form, toxicD004D043: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px' }}>
+                    <option value="">-</option><option>Yes</option><option>No</option>
+                  </select></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                {[['Federal Universal Waste', 'federalUniversalWaste'], ['State Universal Waste', 'stateUniversalWaste'], ['Used Oil', 'usedOil'],
+                  ['Halogen Content', 'halogenContent'], ['Recycle/Reuse', 'recycleReuse'], ['Product/Co-Product', 'productCoProduct'],
+                  ['CERCLA Regulated', 'cerclaRegulated'], ['Benzene NESHAP', 'benzeneNESHAP'], ['TSCA PCB', 'tscaPCB'],
+                  ['Halo Org Compound', 'haloOrgCompound'], ['Medical Waste', 'medicalWaste']
+                ].map(([label, key], idx) => (
+                  <div key={key} style={{ padding: '2px 6px', borderRight: idx % 3 !== 2 ? '1px solid #ccc' : 'none', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700 }}>{label}:</span>
+                    <select value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                      <option value="">-</option><option>Yes</option><option>No</option>
+                    </select>
                   </div>
                 ))}
               </div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D001 Ignitable:</span>
-                <select value={form.ignitableD001} onChange={e => setForm({ ...form, ignitableD001: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
-                  <option value="">-</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D002 Corrosive:</span>
-                <select value={form.corrosiveD002} onChange={e => setForm({ ...form, corrosiveD002: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
-                  <option value="">-</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D003 Reactive:</span>
-                <select value={form.reactiveD003} onChange={e => setForm({ ...form, reactiveD003: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
-                  <option value="">-</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 10, fontWeight: 600 }}>D004-D043 Toxic:</span>
-                <select value={form.toxicD004D043} onChange={e => setForm({ ...form, toxicD004D043: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '1px 2px' }}>
-                  <option value="">-</option><option>Yes</option><option>No</option>
-                </select></div>
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[['Federal Universal Waste', 'federalUniversalWaste'], ['State Universal Waste', 'stateUniversalWaste'], ['Used Oil', 'usedOil'],
-                ['Halogen Content', 'halogenContent'], ['Recycle/Reuse', 'recycleReuse'], ['Product/Co-Product', 'productCoProduct'],
-                ['CERCLA Regulated', 'cerclaRegulated'], ['Benzene NESHAP', 'benzeneNESHAP'], ['TSCA PCB', 'tscaPCB'],
-                ['Halo Org Compound', 'haloOrgCompound'], ['Medical Waste', 'medicalWaste']
-              ].map(([label, key]) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600 }}>{label}:</span>
-                  <select value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
-                    <option value="">Select</option><option>Yes</option><option>No</option>
-                  </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>EPA Source Code:</span>
+                  <input value={form.epaSourceCode} onChange={e => setForm({ ...form, epaSourceCode: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ padding: '2px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>EPA Form Code:</span>
+                  <input value={form.epaFormCode} onChange={e => setForm({ ...form, epaFormCode: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Origin Code:</span>
+                  <input value={form.originCode} onChange={e => setForm({ ...form, originCode: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+              </div>
+              {/* Sample Information */}
+              <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc' }}>
+                <span style={{ fontWeight: 700, fontSize: 11 }}>Sample Information:</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Determination:</span>
+                    <select value={form.determination} onChange={e => setForm({ ...form, determination: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px 2px' }}>
+                      <option value="">Select</option><option>Generator Knowledge</option><option>SDS</option><option>Waste Analysis</option>
+                    </select></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Analysis Date:</span>
+                    <input type="date" value={form.analysisDate} onChange={e => setForm({ ...form, analysisDate: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px 2px' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Sample Type:</span>
+                    <select value={form.sampleType} onChange={e => setForm({ ...form, sampleType: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px 2px' }}>
+                      <option value="">Select</option><option>Composite Sample</option><option>Grab Sample</option>
+                    </select></div>
                 </div>
-              ))}
-            </div>
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>EPA Source Code:</span>
-                <input value={form.epaSourceCode} onChange={e => setForm({ ...form, epaSourceCode: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>EPA Form Code:</span>
-                <input value={form.epaFormCode} onChange={e => setForm({ ...form, epaFormCode: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Origin Code:</span>
-                <input value={form.originCode} onChange={e => setForm({ ...form, originCode: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-            </div>
-            {/* Sample Information */}
-            <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb' }}>
-              <strong style={{ fontSize: 12 }}>Sample Information:</strong>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Determination:</span>
-                  <select value={form.determination} onChange={e => setForm({ ...form, determination: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
-                    <option value="">Select</option><option>Generator Knowledge</option><option>SDS</option><option>Waste Analysis</option>
-                  </select></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Analysis Date:</span>
-                  <input type="date" value={form.analysisDate} onChange={e => setForm({ ...form, analysisDate: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sample Type:</span>
-                  <select value={form.sampleType} onChange={e => setForm({ ...form, sampleType: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }}>
-                    <option value="">Select</option><option>Composite Sample</option><option>Grab Sample</option>
-                  </select></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sample Date:</span>
-                  <input type="date" value={form.sampleDate} onChange={e => setForm({ ...form, sampleDate: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sample IDs:</span>
-                  <input value={form.sampleIds} onChange={e => setForm({ ...form, sampleIds: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 11, fontWeight: 600 }}>Sampler Name:</span>
-                  <input value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} style={{ fontSize: 11, flex: 1, border: '1px solid #e5e7eb', borderRadius: 4, padding: '2px 4px' }} /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Sample Date:</span>
+                    <input type="date" value={form.sampleDate} onChange={e => setForm({ ...form, sampleDate: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px 2px' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Sample IDs:</span>
+                    <input value={form.sampleIds} onChange={e => setForm({ ...form, sampleIds: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px 2px' }} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ fontWeight: 700, fontSize: 10 }}>Sampler Name:</span>
+                    <input value={form.samplerName} onChange={e => setForm({ ...form, samplerName: e.target.value })} style={{ fontSize: 10, flex: 1, border: '1px solid #ccc', padding: '1px 2px' }} /></div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* ===== SECTION 10: SHIPPING ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>10. Shipping</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Volume to Ship:</strong>
-                <input value={form.volumeToShip} onChange={e => setForm({ ...form, volumeToShip: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Unit:</strong>
-                <select value={form.volumeUnit} onChange={e => setForm({ ...form, volumeUnit: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Tons</option><option>Lbs</option><option>Yds</option><option>Gals</option><option>Kgs</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Frequency:</strong>
-                <select value={form.frequency} onChange={e => setForm({ ...form, frequency: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>One Time</option><option>Monthly</option><option>Quarterly</option><option>Annually</option><option>Other</option>
-                </select></div>
+            {/* Section 10: Shipping */}
+            <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>10. Shipping</div>
+            <div style={{ border: '1px solid #999', borderTop: 'none', fontSize: 11 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid #ccc' }}>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Volume:</span>
+                  <input value={form.volumeToShip} onChange={e => setForm({ ...form, volumeToShip: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Unit:</span>
+                  <select value={form.volumeUnit} onChange={e => setForm({ ...form, volumeUnit: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Tons</option><option>Lbs</option><option>Yds</option><option>Gals</option><option>Kgs</option>
+                  </select></div>
+                <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Frequency:</span>
+                  <select value={form.frequency} onChange={e => setForm({ ...form, frequency: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>One Time</option><option>Monthly</option><option>Quarterly</option><option>Annually</option><option>Other</option>
+                  </select></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Combination Package:</span>
+                  <input value={form.combinationPackage} onChange={e => setForm({ ...form, combinationPackage: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+                <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Transportation:</span>
+                  <select value={form.transportation} onChange={e => setForm({ ...form, transportation: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Containerized</option><option>Bulk Liquid</option><option>Bulk Solid</option>
+                  </select></div>
+              </div>
             </div>
-            <div style={{ padding: '5px 10px', borderTop: '1px solid #e5e7eb', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Combination Package:</strong>
-                <input value={form.combinationPackage} onChange={e => setForm({ ...form, combinationPackage: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Transportation:</strong>
-                <select value={form.transportation} onChange={e => setForm({ ...form, transportation: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Containerized</option><option>Bulk Liquid</option><option>Bulk Solid</option>
-                </select></div>
+
+            {/* Section 11: DOT Information */}
+            <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>11. DOT Information</div>
+            <div style={{ border: '1px solid #999', borderTop: 'none', fontSize: 11 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                <div style={{ padding: '3px 8px', borderRight: '1px solid #ccc', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>USDOT Haz Material:</span>
+                  <select value={form.usdotHazMaterial} onChange={e => setForm({ ...form, usdotHazMaterial: e.target.value })} style={{ fontSize: 10, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px', background: 'transparent' }}>
+                    <option value="">Select</option><option>Yes</option><option>No</option>
+                  </select></div>
+                <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ fontWeight: 700, fontSize: 11 }}>Proper Shipping Name:</span>
+                  <input value={form.usdotShippingName} onChange={e => setForm({ ...form, usdotShippingName: e.target.value })} style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #999', outline: 'none', padding: '1px 2px', background: 'transparent' }} /></div>
+              </div>
+            </div>
+
+            {/* Profile Notes */}
+            <div style={{ padding: '3px 8px', borderBottom: '1px solid #ccc', border: '1px solid #999', borderTop: 'none' }}>
+              <span style={{ fontWeight: 700, fontSize: 11 }}>Profile Notes:</span>
+              <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={2} style={{ width: '100%', fontSize: 11, border: '1px solid #ccc', padding: '2px 4px', marginTop: 2, resize: 'vertical', fontFamily: 'Arial, sans-serif' }} placeholder="Additional notes" />
+            </div>
+
+          </div>
+
+          {/* ========== CERTIFICATION (Page 4) ========== */}
+          <div style={{ padding: '0 0 8px 0' }}>
+            <div style={{ background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12, padding: '4px 8px' }}>Certification</div>
+            <div style={{ border: '1px solid #999', borderTop: 'none', padding: '8px 14px' }}>
+              <div style={{ fontSize: 10, color: '#333', lineHeight: '14px', marginBottom: 8, fontStyle: 'italic' }}>
+                I hereby certify that all information submitted in this and all attached documents contain true and accurate descriptions of the waste. I further certify that the waste has been properly characterized, classified, described, labeled, marked and placarded in accordance with USDOT, USEPA, and state regulatory agency requirements, and is in proper condition for transportation according to applicable national and international governmental regulations. I certify under penalty of law that I have personally examined and am familiar with the information submitted in this and all attached documents, and that based on my inquiry of those individuals immediately responsible for obtaining the information, I believe that the submitted information is true, accurate and complete. I am aware that there are significant penalties for submitting false information, including the possibility of fine and imprisonment.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 2 }}>Generator Representative Name:</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input list="prr-signer-list" value={form.signatureName || ''} onChange={e => setForm({ ...form, signatureName: e.target.value })} placeholder="Type or select a name" style={{ fontSize: 11, flex: 1, border: 'none', borderBottom: '1px solid #222', outline: 'none', padding: '2px 0', background: 'transparent' }} />
+                    <datalist id="prr-signer-list">{signers.map((s, i) => <option key={i} value={s} />)}</datalist>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 2 }}>Date:</div>
+                  <input type="date" value={form.signatureDate || ''} onChange={e => setForm({ ...form, signatureDate: e.target.value })} style={{ fontSize: 11, width: '100%', border: 'none', borderBottom: '1px solid #222', outline: 'none', padding: '2px 0', background: 'transparent' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 2 }}>Title:</div>
+                  <input value={form.signatureTitle || ''} onChange={e => setForm({ ...form, signatureTitle: e.target.value })} placeholder="Title" style={{ fontSize: 11, width: '100%', border: 'none', borderBottom: '1px solid #222', outline: 'none', padding: '2px 0', background: 'transparent' }} />
+                </div>
+              </div>
+              {form.signatureName && <div style={{ borderTop: '1px solid #ccc', paddingTop: 6, marginTop: 4, textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: '#999', marginBottom: 2 }}>Generator Signature</div>
+                <div style={{ fontFamily: "'Dancing Script', cursive, serif", fontSize: 22, color: '#222' }}>{form.signatureName}</div>
+              </div>}
+              {signers.length > 0 && <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 10, color: '#777', marginBottom: 3 }}>Saved signers:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {signers.map((s, i) => (
+                    <span key={i} style={{ background: '#f5f5f5', border: '1px solid #ccc', padding: '1px 6px', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}
+                      onClick={() => setForm({ ...form, signatureName: s })}>
+                      {s}
+                      <span onClick={e => { e.stopPropagation(); if (confirm('Remove "' + s + '" from saved signers?')) deleteSigner(s); }} style={{ color: '#c00', fontWeight: 700, cursor: 'pointer' }}>&times;</span>
+                    </span>
+                  ))}
+                </div>
+              </div>}
             </div>
           </div>
 
-          {/* ===== SECTION 11: DOT INFORMATION ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>11. DOT Information</div>
-          <div style={{ border: '1px solid #d1d5db', marginBottom: 12, fontSize: 13 }}>
-            <div style={{ padding: '5px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>USDOT Hazardous Material:</strong>
-                <select value={form.usdotHazMaterial} onChange={e => setForm({ ...form, usdotHazMaterial: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }}>
-                  <option value="">Select</option><option>Yes</option><option>No</option>
-                </select></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><strong>Proper Shipping Name:</strong>
-                <input value={form.usdotShippingName} onChange={e => setForm({ ...form, usdotShippingName: e.target.value })} style={{ fontSize: 12, flex: 1, border: 'none', borderBottom: '1px solid #9ca3af', outline: 'none', padding: '2px 4px', background: 'transparent' }} /></div>
-            </div>
-          </div>
-
-          {/* ===== PROFILE NOTES ===== */}
-          <div className="mrow"><label>Profile Notes</label>
-            <textarea value={form.profileNotes || ''} onChange={e => setForm({ ...form, profileNotes: e.target.value })} rows={2} placeholder="Additional notes" /></div>
-
-          {/* ===== CERTIFICATION / SIGNATURE ===== */}
-          <div style={{ background: '#fed7aa', padding: '6px 10px', fontWeight: 700, fontSize: 14, marginBottom: 6, marginTop: 12, borderBottom: '2px solid #c2410c', color: '#c2410c' }}>Certification / Signature</div>
-          <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: '15px', fontStyle: 'italic' }}>
-            I hereby certify that all information submitted in this and all attached documents contain true and accurate descriptions of the waste.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Signer Name</label>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <input list="prr-signer-list" value={form.signatureName || ''} onChange={e => setForm({ ...form, signatureName: e.target.value })} placeholder="Type or select a name" style={{ fontSize: 12, flex: 1 }} />
-                <datalist id="prr-signer-list">{signers.map((s, i) => <option key={i} value={s} />)}</datalist>
-              </div></div>
-            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Date</label>
-              <input type="date" value={form.signatureDate || ''} onChange={e => setForm({ ...form, signatureDate: e.target.value })} style={{ fontSize: 12 }} /></div>
-            <div className="mrow" style={{ marginBottom: 0 }}><label style={{ fontSize: 13 }}>Title</label>
-              <input value={form.signatureTitle || ''} onChange={e => setForm({ ...form, signatureTitle: e.target.value })} placeholder="Title" style={{ fontSize: 12 }} /></div>
-          </div>
-          {form.signatureName && <div style={{ background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 8, padding: '8px 16px', marginBottom: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>Signature Preview</div>
-            <div style={{ fontFamily: "'Dancing Script', cursive, serif", fontSize: 24, color: '#c2410c' }}>{form.signatureName}</div>
-          </div>}
-          {signers.length > 0 && <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Saved signers:</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {signers.map((s, i) => (
-                <span key={i} style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 4, padding: '2px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                  onClick={() => setForm({ ...form, signatureName: s })}>
-                  {s}
-                  <span onClick={e => { e.stopPropagation(); if (confirm('Remove "' + s + '" from saved signers?')) deleteSigner(s); }} style={{ color: '#b91c1c', fontWeight: 700, cursor: 'pointer' }}>&times;</span>
-                </span>
-              ))}
-            </div>
-          </div>}
-
-          <div className="mactions" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
-            <button className="bc" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</button>
+          {/* Action buttons */}
+          <div style={{ padding: '8px 14px 12px 14px', display: 'flex', gap: 8, justifyContent: 'space-between', borderTop: '2px solid #1a1a1a', background: '#f9f9f9' }}>
+            <button onClick={() => { setShowForm(false); setEditId(null); }} style={{ padding: '6px 16px', fontSize: 12, background: '#fff', border: '1px solid #999', cursor: 'pointer' }}>Cancel</button>
             <div style={{ display: 'flex', gap: 8 }}>
-              {editId && <button className="bp" style={{ background: '#2563eb' }} onClick={() => { window.open('/api/profiles/' + editId + '/prr-pdf', '_blank'); }}>Download PDF</button>}
-              <button className="bp" style={{ background: '#c2410c' }} onClick={save}>{editId ? 'Update PRR Profile' : 'Save PRR Profile'}</button>
+              {editId && <button style={{ padding: '6px 16px', fontSize: 12, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer' }} onClick={() => { window.open('/api/profiles/' + editId + '/prr-pdf', '_blank'); }}>Download PDF</button>}
+              <button style={{ padding: '6px 16px', fontSize: 12, background: '#1a1a1a', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700 }} onClick={save}>{editId ? 'Update PRR Profile' : 'Save PRR Profile'}</button>
             </div>
           </div>
 
-          </div>
         </div>
       </div>
     )}
