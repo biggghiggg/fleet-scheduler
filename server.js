@@ -4,6 +4,8 @@ const path = require('path');
 const os = require('os');
 const multer = require('multer');
 var PDFDocument = require('pdfkit');
+var pdfLib = null;
+try { pdfLib = require('pdf-lib'); } catch(e) { console.log('pdf-lib not installed, PRR PDF generation disabled'); }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2193,6 +2195,182 @@ function estimateMixtureProps(result) {
     result.caWasteCodes.push('133');
   }
 }
+
+// ---- PRR PDF Generation (fills Blank-PRR-Profile Form template via pdf-lib) ----
+app.get('/api/profiles/:id/prr-pdf', function(req, res) {
+  if (!pdfLib) return res.status(500).json({ error: 'pdf-lib is not installed. Run: npm install pdf-lib' });
+
+  var profile = profiles.find(function(p) { return p.id === req.params.id; });
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+  var templatePath = path.join(__dirname, 'Blank-PRR-Profile Form 2026.pdf');
+  if (!fs.existsSync(templatePath)) return res.status(500).json({ error: 'PRR template PDF not found on server' });
+
+  var templateBytes = fs.readFileSync(templatePath);
+  var p = profile;
+
+  pdfLib.PDFDocument.load(templateBytes).then(function(pdfDoc) {
+    var form = pdfDoc.getForm();
+
+    // --- Helper functions ---
+    function safeSetText(fieldName, value) {
+      try {
+        if (value) form.getTextField(fieldName).setText(String(value));
+      } catch(e) { /* field not found, skip */ }
+    }
+
+    function safeSetDropdown(fieldName, value) {
+      try {
+        if (value && value !== 'Select' && value !== '') form.getDropdown(fieldName).select(value);
+      } catch(e) { /* field not found or invalid option, skip */ }
+    }
+
+    function safeSetCheckbox(fieldName, checked) {
+      try {
+        if (checked) { form.getCheckBox(fieldName).check(); }
+        else { form.getCheckBox(fieldName).uncheck(); }
+      } catch(e) { /* skip */ }
+    }
+
+    // --- Text Fields ---
+    safeSetText('Generator', p.customer || '');
+    safeSetText('Site Address', p.siteAddress || '');
+    safeSetText('Site City', p.siteCity || '');
+    safeSetText('Site Zip Code', p.siteZip || '');
+    safeSetText('EPA ID', p.epaId || '');
+    safeSetText('State ID', p.stateId || '');
+    safeSetText('Emergency Tel', p.emergencyPhone || '');
+    safeSetText('Mailing Address', p.mailingAddress || '');
+    safeSetText('Mailing City', p.mailingCity || '');
+    safeSetText('Mailing Zip Code', p.mailingZip || '');
+    safeSetText('Bill To Name', p.billToName || '');
+    safeSetText('Billing Address', p.billingAddress || '');
+    safeSetText('Billing City', p.billingCity || '');
+    safeSetText('Billing Zip Code', p.billingZip || '');
+    safeSetText('Profile Name', p.name || p.profileName || '');
+    safeSetText('Profile Description', p.profileDescription || '');
+    safeSetText('Process Generating Waste', p.processGeneratingWaste || '');
+    safeSetText('Color', p.color || '');
+    safeSetText('Specific Gravity (lbs/gal)', p.specificGravity || '');
+    safeSetText('Flash Point (Other)', p.flashPointOther || '');
+    safeSetText('Viscocity Other', p.viscosityOther || '');
+    safeSetText('BTU Value (Other)', p.btuValueOther || '');
+    safeSetText('BTU/LB (Other)', p.btuLbOther || '');
+    safeSetText('Arsenic', p.arsenic || '');
+    safeSetText('Barium', p.barium || '');
+    safeSetText('Cadium', p.cadmium || '');
+    safeSetText('Chromium', p.chromium || '');
+    safeSetText('Chromium Hex', p.chromiumHex || '');
+    safeSetText('Mercury', p.mercury || '');
+    safeSetText('Lead', p.lead || '');
+    safeSetText('SELENIUM', p.selenium || '');
+    safeSetText('Silver', p.silver || '');
+    safeSetText('Copper', p.copper || '');
+    safeSetText('Nickel', p.nickel || '');
+    safeSetText('Zinc', p.zinc || '');
+    safeSetText('Thallium', p.thallium || '');
+    safeSetText('Other', p.metalOther || '');
+    safeSetText('Cyanides', p.cyanides || '');
+    safeSetText('Sulfides', p.sulfides || '');
+    safeSetText('Amines', p.amines || '');
+    safeSetText('PCBs', p.pcbs || '');
+    safeSetText('Phenolics', p.phenolics || '');
+    safeSetText('USDOT Shipping Name', p.usdotShippingName || '');
+    safeSetText('Generator Representative Name', p.signatureName || '');
+    safeSetText('Title', p.signatureTitle || '');
+    safeSetText('Common Name', p.commonName || '');
+    safeSetText('State Waste Code', p.stateWasteCode || '');
+    safeSetText('Samplr Name', p.samplerName || '');
+    safeSetText('Samp IDs', p.sampleIds || '');
+    safeSetText('Text69', p.volumeToShip || '');
+    safeSetText('Date1_af_date', p.signatureDate || '');
+
+    // --- Dropdown Fields ---
+    safeSetDropdown('Site State', p.siteState);
+    safeSetDropdown('Mailing State', p.mailingState);
+    safeSetDropdown('Billing State', p.billingState);
+    safeSetDropdown('Odor', p.odor);
+    safeSetDropdown('Odor Selection', p.odorSelection);
+    safeSetDropdown('pH', p.pH);
+    safeSetDropdown('Flash Point', p.flashPoint);
+    safeSetDropdown('Flash Point Method', p.flashPointMethod);
+    safeSetDropdown('TOC', p.toc);
+    safeSetDropdown('Viscosity', p.viscosity);
+    safeSetDropdown('Boiling Point', p.boilingPoint);
+    safeSetDropdown('BTU Value', p.btuValue);
+    safeSetDropdown('BTU/LB', p.btuLb);
+    safeSetDropdown('Phases/Layers', p.phasesLayers);
+    safeSetDropdown('Restricted Under LDR', p.restrictedUnderLDR);
+    safeSetDropdown('<500 PPM VOC', p.lessThan500VOC);
+    safeSetDropdown('LDR Subcategory-Non Wastewater', p.ldrSubcategory);
+    safeSetDropdown("UHC's", p.uhcs);
+    safeSetDropdown('USEPA Hazardous Waste', p.usepaHazWaste);
+    safeSetDropdown('State Hazardous Waste', p.stateHazWaste);
+    safeSetDropdown('Alternative Standards of Soil', p.altStandardsSoil);
+    safeSetDropdown('State Code Required', p.stateCodeRequired);
+    safeSetDropdown('RCRA Exempt', p.rcraExempt);
+    safeSetDropdown('F Listed', p.fListed);
+    safeSetDropdown('USDOT Haz Material', p.usdotHazMaterial);
+    safeSetDropdown('Hallogen 1k ppm', p.halogenContent);
+    safeSetDropdown('Halo Org Comp', p.haloOrgCompound);
+    safeSetDropdown('Dropdown2', p.volumeUnit);
+    safeSetDropdown('Dropdown91', p.determination);
+    safeSetDropdown('Dropdown92', p.frequency);
+    safeSetDropdown('Dropdown94', p.transportation);
+    safeSetDropdown('Sample', p.sampleType);
+    safeSetDropdown('Approval Status', 'New');
+
+    // --- Checkbox Fields ---
+    safeSetCheckbox('Explosive', p.propExplosive);
+    safeSetCheckbox('Radioactive', p.propRadioactive);
+    safeSetCheckbox('Thermally Unstable', p.propThermallyUnstable);
+    safeSetCheckbox('Shock Sensitive', p.propShockSensitive);
+    safeSetCheckbox('Pyrophoric', p.propPyrophoric);
+    safeSetCheckbox('Oxidizer', p.propOxidizer);
+    safeSetCheckbox('Water Reactive', p.propWaterReactive);
+    safeSetCheckbox('Air Reactive', p.propAirReactive);
+    safeSetCheckbox('Asbestos Friable', p.propAsbestosFriable);
+    safeSetCheckbox('Asbestos Non-Friable', p.propAsbestosNonFriable);
+    safeSetCheckbox('Metal Fines', p.propMetalFines);
+    safeSetCheckbox('Organic Peroxides', p.propOrganicPeroxides);
+    safeSetCheckbox('Polymerizable', p.propPolymerizable);
+    safeSetCheckbox('Polymerizable (Inhibited)', p.propPolymerizableInhibited);
+    safeSetCheckbox('Dioxins', p.propDioxins);
+    safeSetCheckbox('Furans', p.propFurans);
+    safeSetCheckbox('NORM', p.propNORM);
+    safeSetCheckbox('Biohazard/Infectious Waste', p.propBiohazard);
+    safeSetCheckbox('Pesticides/Herbicides', p.propPesticides);
+    safeSetCheckbox('None CB', p.propNone);
+    safeSetCheckbox('Reactive Cyanides', p.propReactiveCyanides);
+    safeSetCheckbox('Reactive Sulfides', p.propReactiveSulfides);
+    safeSetCheckbox('Total PPM/TCLP', p.metalsTotalOrTCLP === 'tclp');
+
+    // --- Chemical Composition Rows (up to 18) ---
+    var chems = p.chemicals || [];
+    for (var i = 0; i < Math.min(chems.length, 18); i++) {
+      var idx = i + 1;
+      safeSetText('CPC' + idx, chems[i].name || '');
+      safeSetText('Cas' + idx, chems[i].cas || '');
+      safeSetText('Typical' + idx, chems[i].typical || '');
+      safeSetText('Min' + idx, chems[i].min || '');
+      safeSetText('Max' + idx, chems[i].max || '');
+      if (chems[i].unitType) safeSetDropdown('Unit Type' + idx, chems[i].unitType);
+      if (chems[i].tri) safeSetCheckbox('Check Box CPC' + idx, true);
+    }
+
+    // Do NOT flatten - keep form editable in Adobe Acrobat
+
+    return pdfDoc.save();
+  }).then(function(pdfBytes) {
+    var safeName = (p.name || p.profileName || 'PRR-Profile').replace(/[^a-zA-Z0-9_-]/g, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '-PRR.pdf"');
+    res.send(Buffer.from(pdfBytes));
+  }).catch(function(err) {
+    console.error('PRR PDF generation error:', err);
+    res.status(500).json({ error: 'Failed to generate PRR PDF: ' + err.message });
+  });
+});
 
 app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
   if (!pdfParse) return res.status(500).json({ error: 'pdf-parse not installed' });
