@@ -912,6 +912,7 @@ function Bins({data}){
   const bins=data.bins||[];
   const vendors=data.vendors||[];
   const unbilled=data.unbilled||[];
+  const binInvoices=data.binInvoices||{};
   const activeBins=bins.filter(b=>!b.archived);
   const archivedBins=bins.filter(b=>b.archived);
   const custNames=(data.customers||[]).map(c=>c.name).filter(Boolean).sort();
@@ -1037,6 +1038,7 @@ function Bins({data}){
   },[bins,reportMonth]);
 
   const money=(n)=>'$'+(Number(n)||0).toFixed(2);
+  const saveInvoiceNumber=async(customer,num)=>{var key=reportMonth+'|'+customer;await api('PUT','/bin-invoices',{key:key,invoiceNumber:num});};
   const visibleGroups=showMargin?report.groups:report.groups.filter(g=>!g.idle);
   const billableGroups=report.groups.filter(g=>!g.idle);
   const unbilledOpenTotal=unbilled.filter(u=>u.status!=='Resolved').reduce((s,u)=>s+(parseFloat(u.amount)||0),0);
@@ -1150,7 +1152,13 @@ function Bins({data}){
     ):(
       <div>
         {visibleGroups.map((g,gi)=>(<div key={gi} style={{marginBottom:18}}>
-          <div style={{fontWeight:800,fontSize:14,background:g.idle?'#eef2ff':'#eff6ff',borderLeft:'4px solid '+(g.idle?'#6366f1':'var(--primary)'),padding:'6px 10px',marginBottom:6,color:g.idle?'#3730a3':'inherit'}}>{g.customer}{g.idle?' — still on vendor rent, no customer billing':''}</div>
+          <div style={{fontWeight:800,fontSize:14,background:g.idle?'#eef2ff':'#eff6ff',borderLeft:'4px solid '+(g.idle?'#6366f1':'var(--primary)'),padding:'6px 10px',marginBottom:6,color:g.idle?'#3730a3':'inherit',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:6}}>
+            <span>{g.customer}{g.idle?' — still on vendor rent, no customer billing':''}</span>
+            {!g.idle&&<span style={{display:'flex',alignItems:'center',gap:4}}>
+              <label style={{fontSize:11,fontWeight:600,color:'var(--text-muted)'}}>Invoice #:</label>
+              <input value={binInvoices[reportMonth+'|'+g.customer]||''} onChange={e=>saveInvoiceNumber(g.customer,e.target.value)} placeholder="Enter invoice #" style={{fontSize:12,padding:'2px 6px',border:'1px solid #cbd5e1',borderRadius:4,width:130,fontWeight:600}} />
+            </span>}
+          </div>
           <div className="rtable">
             <table>
               <thead><tr><th>Bin #</th><th>Size</th><th>Vendor</th><th>Dropped</th><th>Picked Up</th><th style={{textAlign:'right'}}>{showMargin?'Cust Days':'Days'}</th><th style={{textAlign:'right'}}>Day Rate</th><th style={{textAlign:'right'}}>Haul Fee</th><th style={{textAlign:'right'}}>Line Total</th>{showMargin&&<th style={{textAlign:'right',color:'#b45309'}}>Vend Days</th>}{showMargin&&<th style={{textAlign:'right',color:'#b45309'}}>Vendor Cost</th>}{showMargin&&<th style={{textAlign:'right',color:'#166534'}}>Margin</th>}</tr></thead>
