@@ -930,7 +930,12 @@ function Bins({data}){
     if(!form.dateDropped){alert('Date dropped is required');return;}
     const payload={...form,binNumber:form.binNumber.trim(),vendor:form.vendor.trim(),customer:form.customer.trim(),driver:form.driver.trim(),dailyRate:parseFloat(form.dailyRate)||0,haulFee:parseFloat(form.haulFee)||0,vendorDayRate:parseFloat(form.vendorDayRate)||0,vendorHaulCost:parseFloat(form.vendorHaulCost)||0};
     if(form.vendor.trim()&&vendors.indexOf(form.vendor.trim())===-1){await api('POST','/vendors',{name:form.vendor.trim()});}
-    if(editId){await api('PUT','/bins/'+editId,payload);}else{await api('POST','/bins',payload);}
+    if(editId){await api('PUT','/bins/'+editId,payload);}else{
+      // Auto-archive any existing active entry for this bin number so there's only one active row per bin
+      var existing=activeBins.filter(function(b){return b.binNumber===payload.binNumber;});
+      for(var i=0;i<existing.length;i++){await api('PUT','/bins/'+existing[i].id,{archived:true});}
+      await api('POST','/bins',payload);
+    }
     setShowForm(false);setEditId(null);setForm(empty);
   };
   const archive=async(b)=>{if(!confirm('Archive bin '+b.binNumber+' / '+(b.customer||'no customer')+'?\n\nIt will be hidden from the active list and removed from billing, but kept in history. You can restore it anytime.'))return;await api('PUT','/bins/'+b.id,{archived:true});};
