@@ -636,6 +636,19 @@ app.delete('/api/bins/:id', function(req, res) {
   res.json({ok:true});
 });
 
+// BIN INVOICE NUMBERS - keyed by "YYYY-MM|customerName"
+app.get('/api/bin-invoices', function(req, res) { res.json(data.binInvoices || {}); });
+
+app.put('/api/bin-invoices', function(req, res) {
+  var key = req.body.key;
+  var invoiceNumber = req.body.invoiceNumber || '';
+  if (!key) return res.status(400).json({error: 'key required'});
+  if (!data.binInvoices) data.binInvoices = {};
+  data.binInvoices[key] = invoiceNumber;
+  saveData(data); broadcast({type:'full-sync',data:data});
+  res.json(data.binInvoices);
+});
+
 // UNACCOUNTED BINS - vendor-billed bins not in tracking (reconciliation watchlist)
 app.get('/api/unbilled', function(req, res) { res.json(data.unbilled || []); });
 
