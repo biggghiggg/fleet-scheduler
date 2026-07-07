@@ -4828,7 +4828,10 @@ function Pickups({data}) {
                     <button onClick={() => startAssign(pickup.id, pickup.date || pickup.requestedDate)} style={{ background: '#8b5cf6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Assign Driver</button>
                   )}
                   {viewMode === 'active' && pickup.status === 'assigned' && (
-                    <button onClick={() => doArchive(pickup.id)} style={{ background: '#6b7280', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Complete &amp; Archive</button>
+                    <React.Fragment>
+                      <button onClick={() => startAssign(pickup.id, pickup.date || pickup.requestedDate)} style={{ background: '#8b5cf6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Reassign</button>
+                      <button onClick={() => doArchive(pickup.id)} style={{ background: '#6b7280', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Complete &amp; Archive</button>
+                    </React.Fragment>
                   )}
                   {viewMode === 'archived' && (
                     <button onClick={() => doUnarchive(pickup.id)} style={{ background: '#3b82f6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Restore</button>
