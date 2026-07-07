@@ -420,10 +420,23 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mrow"><label>Date</label>
           <input type="date" value={modal.date||''} onChange={e=>setModal({...modal,date:e.target.value})}/>
         </div>
-        <div className="mrow"><label>Person</label>
-          <select value={modal.driverId} onChange={e=>setModal({...modal,driverId:e.target.value})}>
-            {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
-          </select></div>
+        {eid ? (
+          <div style={{background:'#f5f3ff',border:'2px solid #8b5cf6',borderRadius:8,padding:12,marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
+              <span style={{fontSize:18}}>&#8644;</span>
+              <label style={{fontSize:14,fontWeight:700,color:'#6d28d9',margin:0}}>Reassign Driver</label>
+            </div>
+            <div style={{fontSize:12,color:'#6b7280',marginBottom:6}}>Currently: <strong style={{color:'#1f2937'}}>{(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'unknown'}</strong></div>
+            <select value={modal.driverId} onChange={e=>setModal({...modal,driverId:e.target.value})} style={{width:'100%',padding:'8px 10px',fontSize:14,fontWeight:600,border:'2px solid #8b5cf6',borderRadius:6,background:'#fff'}}>
+              {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
+            </select>
+          </div>
+        ) : (
+          <div className="mrow"><label>Person</label>
+            <select value={modal.driverId} onChange={e=>setModal({...modal,driverId:e.target.value})}>
+              {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
+            </select></div>
+        )}
         <div className="mrow"><label>Location / Job</label>
           <select value={(data.locations||[]).includes(modal.location)?modal.location:'__custom'} onChange={e=>{
             if(e.target.value==='__custom') setModal({...modal,location:''});
