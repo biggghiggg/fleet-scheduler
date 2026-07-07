@@ -285,6 +285,11 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
   const [pinPrompt,setPinPrompt]=useState(null); /* null or {action: function, pin: ''} */
   const [pinError,setPinError]=useState('');
 
+  const [reassignJob,setReassignJob]=useState(null);
+  const [reassignTo,setReassignTo]=useState('');
+  const startReassign=(job,e)=>{e.stopPropagation();requirePin(()=>{setReassignJob(job);setReassignTo('');});};
+  const doReassign=async()=>{if(!reassignJob||!reassignTo)return;await api('PUT','/jobs/'+reassignJob.id,{driverId:reassignTo});setReassignJob(null);setReassignTo('');};
+
   const checkPin=(pin)=>{return data.drivers.some(d=>d.pin&&d.pin===pin);};
 
   const requirePin=(actionFn)=>{setPinPrompt({action:actionFn,pin:''});setPinError('');};
@@ -355,7 +360,10 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
                 {job.timeWindow&&<div className="tm">{job.timeWindow}</div>}
                 {job.equipment&&job.equipment.length>0&&<div style={{fontSize:9,color:'#888'}}>{job.equipment.join(', ')}</div>}
                 {job.notes&&<div style={{fontSize:10,color:'#666',marginTop:1}}>{job.notes.length>50?job.notes.slice(0,50)+'...':job.notes}</div>}
-                <span className="x" onClick={e=>{e.stopPropagation();del(job.id);}}>&#10005;</span>
+                <div style={{display:'flex',gap:2,position:'absolute',top:2,right:2}}>
+                  <span style={{cursor:'pointer',fontSize:9,background:'#8b5cf6',color:'#fff',borderRadius:3,padding:'1px 4px',fontWeight:700}} onClick={e=>startReassign(job,e)} title="Reassign to another driver">&#8644;</span>
+                  <span className="x" onClick={e=>{e.stopPropagation();del(job.id);}}>&#10005;</span>
+                </div>
               </div>);
             })}
             {jobs.length>0&&<div style={{color:'var(--primary)',fontSize:10,textAlign:'center',marginTop:4,cursor:'pointer',fontWeight:600}} onClick={e=>{e.stopPropagation();openAdd(driver.id,date);}}>+</div>}
@@ -384,6 +392,25 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div style={{marginTop:16,display:'flex',gap:8,justifyContent:'center'}}>
           <button className="bc" onClick={()=>{setPinPrompt(null);setPinError('');}}>Cancel</button>
           <button className="bp" onClick={submitPin}>Submit</button>
+        </div>
+      </div>
+    </div>)}
+    {reassignJob&&(<div className="overlay" onClick={()=>setReassignJob(null)}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:400}}>
+        <h2>Reassign Job</h2>
+        <div style={{fontSize:13,color:'var(--text-muted)',marginBottom:12}}>
+          <strong>{reassignJob.location||'(no location)'}</strong> on {reassignJob.date}
+          <br/>Currently assigned to: <strong>{(data.drivers.find(d=>d.id===reassignJob.driverId)||{}).name||'unknown'}</strong>
+        </div>
+        <div className="mrow"><label>Move to:</label>
+          <select value={reassignTo} onChange={e=>setReassignTo(e.target.value)} autoFocus>
+            <option value="">-- Select Driver --</option>
+            {data.drivers.filter(d=>d.id!==reassignJob.driverId).map(d=><option key={d.id} value={d.id}>{d.name}{d.role?' ('+d.role+')':''}</option>)}
+          </select>
+        </div>
+        <div className="mactions">
+          <button className="bc" onClick={()=>setReassignJob(null)}>Cancel</button>
+          <button className="bp" onClick={doReassign} disabled={!reassignTo}>Reassign</button>
         </div>
       </div>
     </div>)}
