@@ -2194,10 +2194,21 @@ function WasteProfiles({data}) {
   const save = async () => {
     if (!form.name.trim()) { alert('Please enter a profile name'); return; }
     const payload = { ...form };
+    // Strip out pending SDS entries from the payload (they'll be uploaded separately)
+    if (payload.sdsAttachments) {
+      payload.sdsAttachments = payload.sdsAttachments.filter(s => !s.id.startsWith('_pending'));
+    }
+    var savedProfileId = editId;
     if (editId) {
       await fetch('/api/profiles/' + editId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     } else {
-      await fetch('/api/profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const resp = await fetch('/api/profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const created = await resp.json();
+      savedProfileId = created.id;
+    }
+    // Upload any pending SDS files that were staged before save
+    if (pendingSdsFiles.length > 0 && savedProfileId) {
+      await flushPendingSds(savedProfileId);
     }
 
     // Auto-create customer if generator name doesn't exist in customers list
@@ -2241,11 +2252,12 @@ function WasteProfiles({data}) {
       addSigner(form.signatureName.trim());
     }
 
-    setShowForm(false); setEditId(null); setForm(emptyForm);
+    setShowForm(false); setEditId(null); setForm(emptyForm); setPendingSdsFiles([]);
     loadProfiles();
   };
 
   const openEdit = (p) => {
+    setPendingSdsFiles([]);
     if (p.profileType === 'prr') {
       setEditId(p.id);
       const base = {};
@@ -2351,15 +2363,15 @@ function WasteProfiles({data}) {
   };
 
   const openNew = () => {
-    setEditId(null); setForm(emptyForm); setShowForm(true);
+    setEditId(null); setForm(emptyForm); setPendingSdsFiles([]); setShowForm(true);
   };
 
   const openNewEws = () => {
-    setEditId(null); setForm(emptyEwsForm); setShowForm(true);
+    setEditId(null); setForm(emptyEwsForm); setPendingSdsFiles([]); setShowForm(true);
   };
 
   const openNewPrr = () => {
-    setForm({...emptyPrrForm});
+    setForm({...emptyPrrForm}); setPendingSdsFiles([]);
     setEditId(null);
     setShowForm(true);
   };
@@ -2410,8 +2422,15 @@ function WasteProfiles({data}) {
 
   // SDS Attachment upload / remove
   const [sdsUploading, setSdsUploading] = useState(false);
+  const [pendingSdsFiles, setPendingSdsFiles] = useState([]); // File objects staged before profile is saved
   const uploadSdsAttachment = async (files) => {
-    if (!editId) { alert('Please save the profile first before attaching SDS files.'); return; }
+    if (!editId) {
+      // Profile not saved yet — stage files locally so they upload on save
+      const staged = Array.from(files).map((f, i) => ({ id: '_pending' + Date.now() + i, name: f.name, size: f.size, _file: f }));
+      setPendingSdsFiles(prev => [...prev, ...staged]);
+      setForm(prev => ({ ...prev, sdsAttachments: [...(prev.sdsAttachments || []), ...staged.map(s => ({ id: s.id, name: s.name, size: s.size }))] }));
+      return;
+    }
     setSdsUploading(true);
     try {
       const fd = new FormData();
@@ -2420,13 +2439,18 @@ function WasteProfiles({data}) {
       const result = await r.json();
       if (result.sdsAttachments) {
         setForm(prev => ({ ...prev, sdsAttachments: result.sdsAttachments }));
-        // Also refresh profiles list
         loadProfiles();
       }
     } catch(e) { console.error('SDS upload error:', e); alert('Failed to upload SDS file(s)'); }
     setSdsUploading(false);
   };
   const removeSdsAttachment = async (sdsId) => {
+    // Check if it's a pending (unsaved) file
+    if (sdsId.startsWith('_pending')) {
+      setPendingSdsFiles(prev => prev.filter(f => f.id !== sdsId));
+      setForm(prev => ({ ...prev, sdsAttachments: (prev.sdsAttachments || []).filter(s => s.id !== sdsId) }));
+      return;
+    }
     if (!editId) return;
     if (!confirm('Remove this SDS attachment?')) return;
     try {
@@ -2437,6 +2461,16 @@ function WasteProfiles({data}) {
         loadProfiles();
       }
     } catch(e) { console.error('SDS remove error:', e); }
+  };
+  // Upload any pending SDS files to a profile after it's created
+  const flushPendingSds = async (profileId) => {
+    if (pendingSdsFiles.length === 0) return;
+    const fd = new FormData();
+    pendingSdsFiles.forEach(s => fd.append('sdsFiles', s._file));
+    try {
+      await fetch('/api/profiles/' + profileId + '/sds-upload', { method: 'POST', body: fd });
+    } catch(e) { console.error('Flush pending SDS error:', e); }
+    setPendingSdsFiles([]);
   };
 
   // Filter profiles
@@ -3679,25 +3713,22 @@ function WasteProfiles({data}) {
           <div style={{ background: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 8, padding: 12, marginTop: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#1d4ed8' }}>Attached SDS Documents</div>
-              {editId ? (
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2563eb', color: '#fff', padding: '5px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-                  {sdsUploading ? 'Uploading...' : '+ Attach SDS PDF'}
-                  <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSdsAttachment(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={sdsUploading} />
-                </label>
-              ) : (
-                <span style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>Save profile first to attach SDS files</span>
-              )}
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2563eb', color: '#fff', padding: '5px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                {sdsUploading ? 'Uploading...' : '+ Attach SDS PDF'}
+                <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSdsAttachment(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={sdsUploading} />
+              </label>
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>SDS files attached here will be appended to the profile PDF when you download it.</div>
             {(form.sdsAttachments || []).length === 0 ? (
               <div style={{ textAlign: 'center', padding: 12, color: '#9ca3af', fontSize: 12 }}>No SDS files attached yet.</div>
             ) : (
               (form.sdsAttachments || []).map(sds => (
-                <div key={sds.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#fff', border: '1px solid #bfdbfe', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
+                <div key={sds.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: sds.id.startsWith('_pending') ? '#fefce8' : '#fff', border: '1px solid ' + (sds.id.startsWith('_pending') ? '#fde68a' : '#bfdbfe'), borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 14 }}>PDF</span>
                     <span style={{ fontWeight: 600 }}>{sds.name}</span>
                     {sds.size && <span style={{ color: '#9ca3af', fontSize: 10 }}>({(sds.size / 1024).toFixed(0)} KB)</span>}
+                    {sds.id.startsWith('_pending') && <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 3 }}>will upload on save</span>}
                   </div>
                   <button onClick={() => removeSdsAttachment(sds.id)} style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600, padding: '3px 8px' }}>Remove</button>
                 </div>
@@ -4099,25 +4130,22 @@ function WasteProfiles({data}) {
           <div style={{ background: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 8, padding: 12, marginTop: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#1d4ed8' }}>Attached SDS Documents</div>
-              {editId ? (
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2563eb', color: '#fff', padding: '5px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-                  {sdsUploading ? 'Uploading...' : '+ Attach SDS PDF'}
-                  <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSdsAttachment(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={sdsUploading} />
-                </label>
-              ) : (
-                <span style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>Save profile first to attach SDS files</span>
-              )}
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2563eb', color: '#fff', padding: '5px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                {sdsUploading ? 'Uploading...' : '+ Attach SDS PDF'}
+                <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSdsAttachment(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={sdsUploading} />
+              </label>
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>SDS files attached here will be appended to the profile PDF when you download it.</div>
             {(form.sdsAttachments || []).length === 0 ? (
               <div style={{ textAlign: 'center', padding: 12, color: '#9ca3af', fontSize: 12 }}>No SDS files attached yet.</div>
             ) : (
               (form.sdsAttachments || []).map(sds => (
-                <div key={sds.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: '#fff', border: '1px solid #bfdbfe', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
+                <div key={sds.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: sds.id.startsWith('_pending') ? '#fefce8' : '#fff', border: '1px solid ' + (sds.id.startsWith('_pending') ? '#fde68a' : '#bfdbfe'), borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 14 }}>PDF</span>
                     <span style={{ fontWeight: 600 }}>{sds.name}</span>
                     {sds.size && <span style={{ color: '#9ca3af', fontSize: 10 }}>({(sds.size / 1024).toFixed(0)} KB)</span>}
+                    {sds.id.startsWith('_pending') && <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 3 }}>will upload on save</span>}
                   </div>
                   <button onClick={() => removeSdsAttachment(sds.id)} style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600, padding: '3px 8px' }}>Remove</button>
                 </div>
@@ -4730,25 +4758,22 @@ function WasteProfiles({data}) {
           <div style={{ margin: '0 14px 8px 14px', background: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 8, padding: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1d4ed8' }}>Attached SDS Documents</div>
-              {editId ? (
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2563eb', color: '#fff', padding: '5px 14px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
-                  {sdsUploading ? 'Uploading...' : '+ Attach SDS PDF'}
-                  <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSdsAttachment(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={sdsUploading} />
-                </label>
-              ) : (
-                <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>Save profile first to attach SDS files</span>
-              )}
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#2563eb', color: '#fff', padding: '5px 14px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
+                {sdsUploading ? 'Uploading...' : '+ Attach SDS PDF'}
+                <input type="file" multiple accept=".pdf" onChange={e => { if (e.target.files.length > 0) { uploadSdsAttachment(e.target.files); e.target.value = ''; } }} style={{ display: 'none' }} disabled={sdsUploading} />
+              </label>
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 6 }}>SDS files will be appended to the profile PDF when downloaded.</div>
             {(form.sdsAttachments || []).length === 0 ? (
               <div style={{ textAlign: 'center', padding: 8, color: '#9ca3af', fontSize: 11 }}>No SDS files attached yet.</div>
             ) : (
               (form.sdsAttachments || []).map(sds => (
-                <div key={sds.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', background: '#fff', border: '1px solid #bfdbfe', borderRadius: 5, marginBottom: 3, fontSize: 11 }}>
+                <div key={sds.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 8px', background: sds.id.startsWith('_pending') ? '#fefce8' : '#fff', border: '1px solid ' + (sds.id.startsWith('_pending') ? '#fde68a' : '#bfdbfe'), borderRadius: 5, marginBottom: 3, fontSize: 11 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 12 }}>PDF</span>
                     <span style={{ fontWeight: 600 }}>{sds.name}</span>
                     {sds.size && <span style={{ color: '#9ca3af', fontSize: 9 }}>({(sds.size / 1024).toFixed(0)} KB)</span>}
+                    {sds.id.startsWith('_pending') && <span style={{ background: '#fef3c7', color: '#92400e', fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>will upload on save</span>}
                   </div>
                   <button onClick={() => removeSdsAttachment(sds.id)} style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer', fontSize: 9, fontWeight: 600, padding: '2px 6px' }}>Remove</button>
                 </div>
