@@ -890,6 +890,70 @@ app.delete('/api/profiles/:id', function(req, res) {
   res.json({ok:true});
 });
 
+// ======== SDS ATTACHMENT UPLOAD / DELETE ========
+app.post('/api/profiles/:id/sds-upload', upload.array('sdsFiles', 10), function(req, res) {
+  var profile = profiles.find(function(p) { return p.id === req.params.id; });
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+  if (!profile.sdsAttachments) profile.sdsAttachments = [];
+  var added = [];
+  for (var i = 0; i < req.files.length; i++) {
+    var f = req.files[i];
+    var entry = { id: 'sds' + Date.now() + i, name: f.originalname, filename: f.filename, size: f.size, uploadedAt: new Date().toISOString() };
+    profile.sdsAttachments.push(entry);
+    added.push(entry);
+  }
+  saveProfiles(profiles);
+  res.json({ sdsAttachments: profile.sdsAttachments, added: added });
+});
+
+app.delete('/api/profiles/:id/sds/:sdsId', function(req, res) {
+  var profile = profiles.find(function(p) { return p.id === req.params.id; });
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+  if (!profile.sdsAttachments) profile.sdsAttachments = [];
+  var sdsIdx = profile.sdsAttachments.findIndex(function(s) { return s.id === req.params.sdsId; });
+  if (sdsIdx === -1) return res.status(404).json({ error: 'SDS attachment not found' });
+  // Optionally delete the file from disk
+  var sdsEntry = profile.sdsAttachments[sdsIdx];
+  var filePath = path.join(UPLOADS_DIR, sdsEntry.filename);
+  if (fs.existsSync(filePath)) { try { fs.unlinkSync(filePath); } catch(e) { /* ignore */ } }
+  profile.sdsAttachments.splice(sdsIdx, 1);
+  saveProfiles(profiles);
+  res.json({ sdsAttachments: profile.sdsAttachments });
+});
+
+// Helper: merge SDS PDF attachments into a generated profile PDF buffer
+function mergeSdsIntoPdf(profilePdfBuffer, sdsAttachments) {
+  if (!pdfLib) return Promise.resolve(profilePdfBuffer);
+  if (!sdsAttachments || sdsAttachments.length === 0) return Promise.resolve(profilePdfBuffer);
+
+  return pdfLib.PDFDocument.load(profilePdfBuffer).then(function(mergedDoc) {
+    var chain = Promise.resolve();
+    sdsAttachments.forEach(function(sds) {
+      chain = chain.then(function() {
+        var sdsPath = path.join(UPLOADS_DIR, sds.filename);
+        if (!fs.existsSync(sdsPath)) return;
+        var sdsBytes = fs.readFileSync(sdsPath);
+        return pdfLib.PDFDocument.load(sdsBytes, { ignoreEncryption: true }).then(function(sdsDoc) {
+          var pageCount = sdsDoc.getPageCount();
+          var indices = [];
+          for (var i = 0; i < pageCount; i++) { indices.push(i); }
+          return mergedDoc.copyPages(sdsDoc, indices);
+        }).then(function(copiedPages) {
+          if (copiedPages) {
+            copiedPages.forEach(function(page) { mergedDoc.addPage(page); });
+          }
+        }).catch(function(err) {
+          console.error('Error merging SDS ' + sds.name + ':', err.message);
+        });
+      });
+    });
+    return chain.then(function() {
+      return mergedDoc.save();
+    });
+  });
+}
+
 // ======== EWS PDF GENERATION ========
 app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   var profile = profiles.find(function(p) { return p.id === req.params.id; });
@@ -905,9 +969,21 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   doc.on('end', function() {
     var pdfData = Buffer.concat(buffers);
     var safeName = (profile.name || 'EWS-Profile').replace(/[^a-zA-Z0-9_-]/g, '_');
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '.pdf"');
-    res.send(pdfData);
+    // Merge SDS attachments if any
+    var sdsAttachments = (profile.sdsAttachments || []).filter(function(s) {
+      return (s.filename && s.filename.toLowerCase().endsWith('.pdf')) || (s.name && s.name.toLowerCase().endsWith('.pdf'));
+    });
+    mergeSdsIntoPdf(pdfData, sdsAttachments).then(function(finalPdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '.pdf"');
+      res.send(Buffer.from(finalPdf));
+    }).catch(function(err) {
+      console.error('EWS PDF merge error:', err.message);
+      // Fall back to sending the profile PDF without SDS
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '.pdf"');
+      res.send(pdfData);
+    });
   });
 
   var LM = 50;           // left margin
@@ -2376,9 +2452,15 @@ app.get('/api/profiles/:id/prr-pdf', function(req, res) {
     return pdfDoc.save();
   }).then(function(pdfBytes) {
     var safeName = (p.name || p.profileName || 'PRR-Profile').replace(/[^a-zA-Z0-9_-]/g, '_');
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '-PRR.pdf"');
-    res.send(Buffer.from(pdfBytes));
+    // Merge SDS attachments if any
+    var sdsAttachments = (p.sdsAttachments || []).filter(function(s) {
+      return (s.filename && s.filename.toLowerCase().endsWith('.pdf')) || (s.name && s.name.toLowerCase().endsWith('.pdf'));
+    });
+    return mergeSdsIntoPdf(Buffer.from(pdfBytes), sdsAttachments).then(function(finalPdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '-PRR.pdf"');
+      res.send(Buffer.from(finalPdf));
+    });
   }).catch(function(err) {
     console.error('PRR PDF generation error:', err);
     res.status(500).json({ error: 'Failed to generate PRR PDF: ' + err.message });
