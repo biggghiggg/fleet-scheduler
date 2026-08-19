@@ -2550,8 +2550,8 @@
               React.createElement('label', { style: { fontWeight: 'bold', fontSize: 13, display: 'block', marginBottom: 4 } }, 'Salesperson'),
               React.createElement('select', { value: form.salesPerson || '', onChange: function(e) { setForm(function(p) { return Object.assign({}, p, { salesPerson: e.target.value }); }); }, style: { width: '100%', padding: '8px 10px', borderRadius: 4, border: '1px solid #d1d5db', fontSize: 14 } },
                 React.createElement('option', { value: '' }, '-- Select Salesperson --'),
-                rbDrivers.slice().sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); }).map(function(d) {
-                  return React.createElement('option', { key: d.id, value: d.name }, d.name + (d.role ? ' (' + d.role + ')' : ''));
+                rbDrivers.filter(function(d) { return (d.role || '').toLowerCase().indexOf('sales') !== -1; }).sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); }).map(function(d) {
+                  return React.createElement('option', { key: d.id, value: d.name }, d.name);
                 })
               )
             ),
