@@ -284,6 +284,8 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
   const [custDropOpen,setCustDropOpen]=useState(false);
   const [pinPrompt,setPinPrompt]=useState(null); /* null or {action: function, pin: ''} */
   const [pinError,setPinError]=useState('');
+  const [showRoutePlanner,setShowRoutePlanner]=useState(false);
+  const [rpDay,setRpDay]=useState(null); /* index into dates[], null = all week */
 
   const checkPin=(pin)=>{return data.drivers.some(d=>d.pin&&d.pin===pin);};
 
@@ -315,7 +317,180 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       <button onClick={now} style={{background:'#16a34a'}}>Today</button>
       <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
       <button onClick={next}>Next &#9654;</button>
+      <button onClick={()=>{setShowRoutePlanner(!showRoutePlanner);setRpDay(null);}} style={{background:showRoutePlanner?'#dc2626':'#7c3aed',color:'#fff',padding:'6px 16px',borderRadius:6,fontSize:13,fontWeight:700,border:'none',cursor:'pointer',marginLeft:12}}>{showRoutePlanner?'← Back to Schedule':'Route Planner'}</button>
     </div>
+    {showRoutePlanner ? (()=>{
+      /* ── Route Planner View ── */
+      const DAYS_SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      const rpDates = rpDay !== null ? [dates[rpDay]] : dates;
+      const rpDateKeys = rpDates.map(d=>dk(d));
+
+      /* Collect all jobs for selected date(s) */
+      const rpJobs = data.jobs.filter(j=>rpDateKeys.indexOf(j.date)!==-1);
+
+      /* Build flat list of stops: one entry per customer per job */
+      const stops = [];
+      rpJobs.forEach(j=>{
+        const driver = data.drivers.find(d=>d.id===j.driverId);
+        const truck = data.trucks.find(t=>t.id===j.truckId);
+        const trailer = data.trailers.find(t=>t.id===j.trailerId);
+        const entries = (j.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
+        if(entries.length===0){
+          stops.push({job:j,driver,truck,trailer,customer:null,entry:null,city:'No Customer Assigned',address:'',custName:'(Empty slot)'});
+        } else {
+          entries.forEach(entry=>{
+            const c=(data.customers||[]).find(x=>x.id===entry.id);
+            if(c){
+              const city=(c.city||'').trim()||'No City';
+              stops.push({job:j,driver,truck,trailer,customer:c,entry,city:city,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),custName:c.name});
+            }
+          });
+        }
+      });
+
+      /* Group by city */
+      const cityMap={};
+      stops.forEach(s=>{
+        const key=s.city.toLowerCase();
+        if(!cityMap[key]) cityMap[key]={city:s.city,stops:[]};
+        cityMap[key].stops.push(s);
+      });
+      const cityGroups = Object.values(cityMap).sort((a,b)=>a.city.localeCompare(b.city));
+
+      /* Print handler - client-side */
+      const printRoutePlan=()=>{
+        const dateLabel = rpDay!==null ? (rpDates[0].getMonth()+1)+'/'+rpDates[0].getDate()+'/'+rpDates[0].getFullYear() : fmt(ws)+' - '+fmt(end);
+        var html='<!DOCTYPE html><html><head><title>Route Plan - '+dateLabel+'</title><style>';
+        html+='*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;padding:20px;color:#111}';
+        html+='h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;background:#1e293b;color:#fff;padding:8px 14px;margin:0}';
+        html+='.sub{font-size:13px;color:#666;margin-bottom:16px}.summary{display:flex;gap:20px;margin-bottom:16px;font-size:13px;padding:8px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:6px}';
+        html+='.area{border:1px solid #ccc;border-radius:8px;margin-bottom:14px;overflow:hidden;page-break-inside:avoid}';
+        html+='table{width:100%;border-collapse:collapse;font-size:12px}th{background:#f8fafc;padding:6px 10px;text-align:left;font-weight:700;border-bottom:1px solid #ddd}';
+        html+='td{padding:5px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}.driver{color:#7c3aed;font-weight:700}';
+        html+='.badge{display:inline-block;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px}';
+        html+='@media print{body{padding:10px}h1{font-size:18px}.area{page-break-inside:avoid}}';
+        html+='</style></head><body>';
+        html+='<h1>Route Plan</h1><div class="sub">'+dateLabel+' &bull; Independence Environmental Services</div>';
+        html+='<div class="summary"><span><strong>'+rpJobs.length+'</strong> jobs</span><span><strong>'+cityGroups.length+'</strong> areas</span><span><strong>'+[...new Set(rpJobs.map(function(j){return j.driverId}))].length+'</strong> drivers</span><span><strong>'+stops.filter(function(s){return s.customer}).length+'</strong> stops</span></div>';
+        cityGroups.forEach(function(group){
+          var drvSet={};group.stops.forEach(function(s){if(s.driver)drvSet[s.driver.name]=1;});
+          html+='<div class="area"><h2>'+group.city+' ('+group.stops.length+' stop'+(group.stops.length!==1?'s':'')+')';
+          Object.keys(drvSet).forEach(function(dn){html+='<span class="badge">'+dn+'</span>';});
+          html+='</h2><table><tr>';
+          if(rpDay===null) html+='<th>Day</th>';
+          html+='<th>Customer</th><th>Address</th><th>Driver</th><th>Truck / Trailer</th><th>Dest.</th><th>Time</th><th>Equipment</th><th>Notes</th></tr>';
+          group.stops.forEach(function(s,si){
+            var tw=(s.entry&&s.entry.timeWindow)||s.job.timeWindow||'';
+            var eq=(s.entry&&s.entry.equipment)?s.entry.equipment.join(', '):(s.job.equipment||[]).join(', ');
+            var notes=[(s.entry&&s.entry.jobNotes)||'',s.job.notes||''].filter(Boolean).join(' | ');
+            var dateObj=new Date(s.job.date+'T00:00:00');
+            var dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+            var dayIdx=dates.findIndex(function(d){return dk(d)===s.job.date;});
+            html+='<tr style="background:'+(si%2===0?'#fff':'#f9fafb')+'">';
+            if(rpDay===null) html+='<td style="font-weight:600">'+(dayNames[dayIdx]||'')+' '+(dateObj.getMonth()+1)+'/'+dateObj.getDate()+'</td>';
+            html+='<td style="font-weight:600">'+s.custName+'</td>';
+            html+='<td style="color:#666">'+(s.address||'-')+'</td>';
+            html+='<td class="driver">'+(s.driver?s.driver.name:'-')+'</td>';
+            html+='<td>'+[s.truck?s.truck.name:'',s.trailer?s.trailer.name:''].filter(Boolean).join(' + ')+'</td>';
+            html+='<td style="font-weight:600">'+(s.job.location||'-')+'</td>';
+            html+='<td>'+(tw||'-')+'</td>';
+            html+='<td>'+(eq||'-')+'</td>';
+            html+='<td style="color:#666;max-width:180px">'+(notes||'-')+'</td></tr>';
+          });
+          html+='</table></div>';
+        });
+        html+='</body></html>';
+        var win=window.open('','_blank');win.document.write(html);win.document.close();
+        setTimeout(function(){win.print();},500);
+      };
+
+      return <div>
+        {/* Day picker */}
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+          <span style={{fontWeight:700,fontSize:13,color:'#374151',marginRight:4}}>View:</span>
+          <button onClick={()=>setRpDay(null)} style={{padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:rpDay===null?700:400,background:rpDay===null?'#7c3aed':'#f3f4f6',color:rpDay===null?'#fff':'#374151',border:'1px solid '+(rpDay===null?'#7c3aed':'#d1d5db'),cursor:'pointer'}}>Full Week</button>
+          {dates.map((d,i)=><button key={i} onClick={()=>setRpDay(i)} style={{padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:rpDay===i?700:400,background:rpDay===i?'#7c3aed':(dk(d)===today?'#fef9c3':'#f3f4f6'),color:rpDay===i?'#fff':'#374151',border:'1px solid '+(rpDay===i?'#7c3aed':dk(d)===today?'#fbbf24':'#d1d5db'),cursor:'pointer'}}>{DAYS_SHORT[i]} {d.getMonth()+1}/{d.getDate()}</button>)}
+          <button onClick={printRoutePlan} style={{marginLeft:'auto',background:'#475569',color:'#fff',padding:'6px 16px',borderRadius:6,fontSize:13,fontWeight:600,border:'none',cursor:'pointer'}}>🖨 Print Route Plan</button>
+        </div>
+
+        {/* Summary bar */}
+        <div style={{display:'flex',gap:16,marginBottom:16,padding:'10px 16px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:8,fontSize:13,flexWrap:'wrap'}}>
+          <span><strong>{rpJobs.length}</strong> jobs</span>
+          <span><strong>{cityGroups.length}</strong> areas</span>
+          <span><strong>{[...new Set(rpJobs.map(j=>j.driverId))].length}</strong> drivers</span>
+          <span><strong>{stops.filter(s=>s.customer).length}</strong> stops</span>
+        </div>
+
+        {/* Area cards */}
+        {cityGroups.length===0 ? <div style={{textAlign:'center',padding:40,color:'#9ca3af'}}>No jobs scheduled for {rpDay!==null?DAYS_SHORT[rpDay]:'this week'}.</div> :
+          cityGroups.map(group=>{
+            /* Deduplicate drivers in this area */
+            const areaDrivers={};
+            group.stops.forEach(s=>{
+              if(!s.driver) return;
+              const key=s.driver.id+'_'+s.job.date;
+              if(!areaDrivers[key]) areaDrivers[key]={driver:s.driver,truck:s.truck,trailer:s.trailer,date:s.job.date,location:s.job.location,jobId:s.job.id};
+            });
+            const driverList=Object.values(areaDrivers);
+
+            return <div key={group.city} style={{marginBottom:16,border:'1px solid #e5e7eb',borderRadius:10,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+              {/* Area header */}
+              <div style={{background:'#1e293b',color:'#fff',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontSize:18}}>📍</span>
+                  <span style={{fontSize:16,fontWeight:700}}>{group.city}</span>
+                  <span style={{background:'rgba(255,255,255,0.2)',padding:'2px 10px',borderRadius:12,fontSize:12}}>{group.stops.length} stop{group.stops.length!==1?'s':''}</span>
+                </div>
+                <div style={{display:'flex',gap:6}}>
+                  {driverList.map(d=><span key={d.driver.id+'_'+d.date} style={{background:'#7c3aed',padding:'3px 10px',borderRadius:12,fontSize:11,fontWeight:600}}>{d.driver.name}</span>)}
+                </div>
+              </div>
+
+              {/* Stops table */}
+              <div style={{padding:0}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                  <thead>
+                    <tr style={{background:'#f8fafc'}}>
+                      {rpDay===null&&<th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb',width:80}}>Day</th>}
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb'}}>Customer</th>
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb'}}>Address</th>
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb',width:100}}>Driver</th>
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb',width:120}}>Truck / Trailer</th>
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb',width:90}}>Destination</th>
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb',width:90}}>Time</th>
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb'}}>Equipment</th>
+                      <th style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'1px solid #e5e7eb'}}>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.stops.map((s,si)=>{
+                      const tw=(s.entry&&s.entry.timeWindow)||s.job.timeWindow||'';
+                      const eq=(s.entry&&s.entry.equipment)?s.entry.equipment.join(', '):(s.job.equipment||[]).join(', ');
+                      const notes=[(s.entry&&s.entry.jobNotes)||'',s.job.notes||''].filter(Boolean).join(' | ');
+                      const sc=s.job.status?(s.job.status.toLowerCase().replace(/\s/g,'')):'';
+                      const statusColors={complete:'#dcfce7',cancelled:'#fee2e2',enroute:'#dbeafe',loading:'#fef9c3'};
+                      const rowBg=statusColors[sc]||((si%2===0)?'#fff':'#f9fafb');
+                      const dateObj=new Date(s.job.date+'T00:00:00');
+                      return <tr key={s.job.id+'_'+(s.customer?s.customer.id:si)} style={{background:rowBg}}>
+                        {rpDay===null&&<td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontSize:12,fontWeight:600}}>{DAYS_SHORT[dates.findIndex(d=>dk(d)===s.job.date)]||''} {dateObj.getMonth()+1}/{dateObj.getDate()}</td>}
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontWeight:600}}>{s.custName}</td>
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontSize:12,color:'#6b7280'}}>{s.address||'-'}</td>
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontWeight:600,color:'#7c3aed'}}>{s.driver?s.driver.name:'-'}</td>
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontSize:12}}>{[s.truck?s.truck.name:'',s.trailer?s.trailer.name:''].filter(Boolean).join(' + ')||'-'}</td>
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontSize:12,fontWeight:600}}>{s.job.location||'-'}</td>
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontSize:12}}>{tw||'-'}</td>
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontSize:11}}>{eq||'-'}</td>
+                        <td style={{padding:'6px 12px',borderBottom:'1px solid #f3f4f6',fontSize:11,color:'#6b7280',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{notes||'-'}</td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>;
+          })
+        }
+      </div>;
+    })() :
     <div style={{display:'flex',gap:10,marginBottom:8,flexWrap:'wrap',alignItems:'center',fontSize:11}}>
       <span style={{fontWeight:700,color:'#666'}}>Legend:</span>
       <span style={{background:'#fca5a5',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Coast</span>
@@ -323,12 +498,12 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       <span style={{background:'#e9d5ff',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Roll Off</span>
       <span style={{background:'#fce7f3',padding:'2px 8px',borderRadius:4,fontWeight:600}}>EWS / LA TSDF / PRR / USE</span>
       <span style={{background:'#dcfce7',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Custom</span>
-    </div>
-    {clip&&<div style={{background:'#7c3aed',color:'#fff',padding:'8px 16px',borderRadius:8,marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13}}>
+    </div>}
+    {!showRoutePlanner&&clip&&<div style={{background:'#7c3aed',color:'#fff',padding:'8px 16px',borderRadius:8,marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13}}>
       <span><strong>Job copied:</strong> {clip.location||'(no location)'} &mdash; Click any cell to paste</span>
       <button onClick={clearClip} style={{background:'#fff',color:'#7c3aed',fontSize:12,padding:'4px 12px'}}>Clear</button>
     </div>}
-    <div className="grid"><table><thead><tr><th>Person</th>
+    {!showRoutePlanner&&<div className="grid"><table><thead><tr><th>Person</th>
       {dates.map((d,i)=>(<th key={i} style={dk(d)===today?{background:'#fffbeb'}:{}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{d.getMonth()+1}/{d.getDate()}</span></th>))}
     </tr></thead><tbody>
       {data.drivers.map((driver,dIdx)=>(<tr key={driver.id}><td><div style={{display:'flex',alignItems:'center',gap:4}}>
@@ -362,9 +537,9 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
           </div></td>);
         })}
       </tr>))}
-    </tbody></table></div>
+    </tbody></table></div>}
 
-    {dates.map((date,i)=>{const c=dayConflicts(date);if(!c.length)return null;
+    {!showRoutePlanner&&dates.map((date,i)=>{const c=dayConflicts(date);if(!c.length)return null;
       return(<div key={i} style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:10,margin:'8px 0',fontSize:12}}>
         <strong style={{color:'var(--danger)'}}>Conflicts on {DAYS[i]} {date.getMonth()+1}/{date.getDate()}:</strong>
         {c.map((x,j)=>(<div key={j} style={{marginTop:4}}>{x.tn} assigned to: {x.jobs.map(j2=>data.drivers.find(d=>d.id===j2.driverId)?.name).join(', ')}</div>))}
