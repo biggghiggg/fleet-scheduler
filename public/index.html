@@ -4991,6 +4991,25 @@ function Pickups({data}) {
                   {viewMode === 'archived' && (
                     <button onClick={() => doUnarchive(pickup.id)} style={{ background: '#3b82f6', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Restore</button>
                   )}
+                  <button onClick={() => {
+                    const ids = pickup.customerIds || [];
+                    const custs = ids.map(entry => { const cid = typeof entry === 'string' ? entry : entry.id; const c = (data.customers || []).find(cx => cx.id === cid); return c ? { name: c.name, address: [c.address, c.city, c.state, c.zip].filter(Boolean).join(', '), phone: c.phone || '', contact: c.contact || '', pricing: c.pricing || c.notes || '', jobNotes: entry.jobNotes || '', timeWindow: entry.timeWindow || '', equipment: (entry.equipment || []).join(', ') || 'None', placards: (entry.placards || []).join(', ') || 'None' } : null; }).filter(Boolean);
+                    const dt = pickup.date || pickup.requestedDate || '';
+                    const jobData = {
+                      date: dt ? (dt.split('-')[1] + '/' + dt.split('-')[2] + '/' + dt.split('-')[0]) : '',
+                      driver: pickup.assignedDriverName || '',
+                      location: pickup.customerName || pickup.location || '',
+                      truck: pickup.truckTrailerType || 'N/A',
+                      trailer: 'N/A',
+                      status: pickup.status === 'new' ? 'New Request' : pickup.status === 'assigned' ? 'Assigned' : (pickup.status || 'Scheduled'),
+                      notes: pickup.notes || '',
+                      salesPerson: pickup.salesPerson || '',
+                      customers: custs
+                    };
+                    const f = document.createElement('form'); f.method = 'POST'; f.action = '/print-job'; f.target = '_blank';
+                    const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = 'jobData'; inp.value = JSON.stringify(jobData);
+                    f.appendChild(inp); document.body.appendChild(f); f.submit(); document.body.removeChild(f);
+                  }} style={{ background: '#475569', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Print</button>
                   <button onClick={() => openEdit(pickup)} style={{ background: '#f59e0b', color: '#fff', fontSize: 11, padding: '5px 12px' }}>Edit</button>
                   <button onClick={() => doDelete(pickup.id)} style={{ background: '#ef4444', color: '#fff', fontSize: 11, padding: '5px 8px' }}>X</button>
                 </div>
