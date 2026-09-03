@@ -6,10 +6,8 @@ const multer = require('multer');
 var PDFDocument = require('pdfkit');
 var pdfLib = null;
 try { pdfLib = require('pdf-lib'); } catch(e) { console.log('pdf-lib not installed, PRR PDF generation disabled'); }
-
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 // Use persistent volume on Railway, local directory otherwise
 var DATA_DIR = __dirname;
 if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
@@ -20,10 +18,8 @@ if (process.env.RAILWAY_VOLUME_MOUNT_PATH) {
   console.log('Using Railway data dir: ' + DATA_DIR);
 }
 if (!fs.existsSync(DATA_DIR)) { fs.mkdirSync(DATA_DIR, { recursive: true }); }
-
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
-
 const defaultData = {
   drivers: [
     {id:'d1',name:'Brian',role:'Driver',skills:[]},
@@ -63,7 +59,6 @@ const defaultData = {
   equipment: ['Liftgate','Drum Dolly','Placards','PPE','Bins','Totes'],
   locations: ['EWS','Brenntag Fresno','Brenntag Richmond','Coast','GQ','Avenal','Lost Hills','Madera','Thatcher','Bolthouse','Leprinos','Eagle Quick Lube','Faraday','PAC','PRR','Local Route','Parc/Atlas/High Bar','F&T Farms']
 };
-
 function loadData() {
   try {
     if (fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
@@ -71,9 +66,7 @@ function loadData() {
   saveData(defaultData);
   return defaultData;
 }
-
 function saveData(d) { fs.writeFileSync(DATA_FILE, JSON.stringify(d, null, 2)); }
-
 function createBackup() {
   try {
     if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
@@ -87,7 +80,6 @@ function createBackup() {
     }
   } catch(e) { console.error('Backup error:', e.message); }
 }
-
 var data = loadData();
 if (!data.locations) { data.locations = defaultData.locations; saveData(data); }
 if (!data.customers) { data.customers = []; saveData(data); }
@@ -103,21 +95,17 @@ console.log('Drivers count: ' + data.drivers.length);
 console.log('Jobs count: ' + data.jobs.length);
 createBackup();
 setInterval(createBackup, 3600000);
-
 var clients = [];
 function broadcast(msg) {
   var payload = 'data: ' + JSON.stringify(msg) + '\n\n';
   clients.forEach(function(res) { res.write(payload); });
 }
-
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-
 // DOCUMENTS / FILE UPLOADS
 var UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); }
 var DOCS_FILE = path.join(DATA_DIR, 'documents.json');
-
 function loadDocs() {
   try {
     if (fs.existsSync(DOCS_FILE)) return JSON.parse(fs.readFileSync(DOCS_FILE, 'utf8'));
@@ -126,7 +114,6 @@ function loadDocs() {
 }
 function saveDocs(docs) { fs.writeFileSync(DOCS_FILE, JSON.stringify(docs, null, 2)); }
 var documents = loadDocs();
-
 var upload = multer({
   storage: multer.diskStorage({
     destination: function(req, file, cb) { cb(null, UPLOADS_DIR); },
@@ -134,9 +121,7 @@ var upload = multer({
   }),
   limits: { fileSize: 50 * 1024 * 1024 }
 });
-
 app.get('/api/documents', function(req, res) { res.json(documents); });
-
 app.post('/api/documents', upload.single('file'), function(req, res) {
   if (!req.file) return res.status(400).json({error:'No file uploaded'});
   var doc = {
@@ -152,7 +137,6 @@ app.post('/api/documents', upload.single('file'), function(req, res) {
   saveDocs(documents);
   res.json(doc);
 });
-
 app.get('/api/documents/:id/download', function(req, res) {
   var doc = documents.find(function(d) { return d.id === req.params.id; });
   if (!doc) return res.status(404).json({error:'Not found'});
@@ -160,7 +144,6 @@ app.get('/api/documents/:id/download', function(req, res) {
   if (!fs.existsSync(filePath)) return res.status(404).json({error:'File not found'});
   res.download(filePath, doc.name);
 });
-
 app.get('/api/documents/:id/view', function(req, res) {
   var doc = documents.find(function(d) { return d.id === req.params.id; });
   if (!doc) return res.status(404).json({error:'Not found'});
@@ -178,7 +161,6 @@ app.get('/api/documents/:id/view', function(req, res) {
   res.setHeader('Content-Disposition', 'inline; filename="' + doc.name + '"');
   fs.createReadStream(filePath).pipe(res);
 });
-
 app.delete('/api/documents/:id', function(req, res) {
   var doc = documents.find(function(d) { return d.id === req.params.id; });
   if (!doc) return res.status(404).json({error:'Not found'});
@@ -188,7 +170,6 @@ app.delete('/api/documents/:id', function(req, res) {
   saveDocs(documents);
   res.json({ok:true});
 });
-
 app.get('/api/events', function(req, res) {
   res.writeHead(200, { 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'Connection':'keep-alive' });
   res.write('data: ' + JSON.stringify({ type:'connected', data: data }) + '\n\n');
@@ -199,9 +180,7 @@ app.get('/api/events', function(req, res) {
     console.log('Client disconnected (' + clients.length + ' total)');
   });
 });
-
 app.get('/api/data', function(req, res) { res.json(data); });
-
 // PRINT JOB PAGE - serves a clean printable page via POST with multiple customers
 app.use(express.urlencoded({extended:true}));
 app.post('/print-job', function(req, res) {
@@ -210,7 +189,6 @@ app.post('/print-job', function(req, res) {
   var q = jobData;
   var customers = q.customers || [];
   if(customers.length === 0) customers = [null]; // at least one page even with no customer
-
   var html = '<!DOCTYPE html><html><head><title>Job - ' + (q.driver||'') + ' - ' + (q.date||'') + '</title>';
   html += '<style>';
   html += '*{margin:0;padding:0;box-sizing:border-box}';
@@ -237,8 +215,7 @@ app.post('/print-job', function(req, res) {
   html += '.back-link{display:inline-block;margin-bottom:10px;color:#2563eb;text-decoration:none;font-size:13px}';
   html += '@media print{.back-link{display:none}body{padding:15px 20px}.cust-box{background:#eff6ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section{background:#fffbeb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.placards-section .placard-tag{background:#fef3c7 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}div[style*="background:#f5f3ff"]{background:#f5f3ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   html += '</style></head><body>';
-  html += '<a href="javascript:history.back()" class="back-link">&larr; Back to RouteBoard</a>';
-
+  html += '<a href="javascript:window.close()" class="back-link" style="cursor:pointer">&larr; Back to RouteBoard</a>';
   customers.forEach(function(cust, idx) {
     html += '<div class="page">';
     html += '<div class="header"><h1>Job Assignment</h1><div class="company">Independence Environmental Services</div></div>';
@@ -281,11 +258,9 @@ app.post('/print-job', function(req, res) {
     html += '<div class="footer"><span>Independence Environmental Services</span><span>Printed: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
     html += '</div>';
   });
-
   html += '</body></html>';
   res.send(html);
 });
-
 // PRINT CUSTOMER PAGE
 app.get('/print-customer', function(req, res) {
   var q = req.query;
@@ -327,7 +302,6 @@ app.get('/print-customer', function(req, res) {
   html += '</body></html>';
   res.send(html);
 });
-
 // JOBS
 app.post('/api/jobs', function(req, res) {
   var job = Object.assign({}, req.body, { id: 'j' + Date.now() + Math.random().toString(36).slice(2) });
@@ -343,7 +317,6 @@ app.delete('/api/jobs/:id', function(req, res) {
   data.jobs = data.jobs.filter(function(j) { return j.id !== req.params.id; });
   saveData(data); broadcast({type:'job-deleted',jobId:req.params.id}); res.json({ok:true});
 });
-
 // DRIVERS
 app.post('/api/drivers', function(req, res) {
   var driver = Object.assign({}, req.body, { id: 'd' + Date.now() });
@@ -360,7 +333,6 @@ app.delete('/api/drivers/:id', function(req, res) {
   data.jobs = data.jobs.filter(function(j) { return j.driverId !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-
 // DRIVER REORDER
 app.put('/api/drivers-reorder', function(req, res) {
   var ids = req.body.order;
@@ -376,7 +348,6 @@ app.put('/api/drivers-reorder', function(req, res) {
   data.drivers = reordered;
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-
 // TRUCKS
 app.post('/api/trucks', function(req, res) {
   var truck = Object.assign({}, req.body, { id: 't' + Date.now() });
@@ -392,7 +363,6 @@ app.delete('/api/trucks/:id', function(req, res) {
   data.trucks = data.trucks.filter(function(t) { return t.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-
 // TRAILERS
 app.post('/api/trailers', function(req, res) {
   var trailer = Object.assign({}, req.body, { id: 'tr' + Date.now() });
@@ -408,7 +378,6 @@ app.delete('/api/trailers/:id', function(req, res) {
   data.trailers = data.trailers.filter(function(t) { return t.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-
 // EQUIPMENT
 app.post('/api/equipment', function(req, res) {
   if (req.body.name && data.equipment.indexOf(req.body.name) === -1) {
@@ -420,7 +389,6 @@ app.delete('/api/equipment/:name', function(req, res) {
   data.equipment = data.equipment.filter(function(e) { return e !== req.params.name; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-
 // LOCATIONS
 app.post('/api/locations', function(req, res) {
   if (req.body.name && data.locations.indexOf(req.body.name) === -1) {
@@ -440,7 +408,6 @@ app.delete('/api/locations/:name', function(req, res) {
   data.locations = data.locations.filter(function(l) { return l !== req.params.name; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-
 // CUSTOMERS
 app.get('/api/customers', function(req, res) { res.json(data.customers || []); });
 app.post('/api/customers', function(req, res) {
@@ -506,10 +473,8 @@ app.post('/api/customers/import', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true, imported:added, updated:updated});
 });
-
 // PICKUPS
 app.get('/api/pickups', function(req, res) { res.json(data.pickups || []); });
-
 app.post('/api/pickups', function(req, res) {
   var p = Object.assign({}, req.body, {
     id: 'pk' + Date.now() + Math.random().toString(36).slice(2),
@@ -525,7 +490,6 @@ app.post('/api/pickups', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json(p);
 });
-
 app.put('/api/pickups/:id', function(req, res) {
   var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
   if (idx === -1) return res.status(404).json({error:'Not found'});
@@ -533,7 +497,6 @@ app.put('/api/pickups/:id', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json(data.pickups[idx]);
 });
-
 // Assign driver + auto-create job on Weekly Schedule
 app.put('/api/pickups/:id/assign', function(req, res) {
   var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
@@ -545,7 +508,6 @@ app.put('/api/pickups/:id/assign', function(req, res) {
   pickup.assignedDate = b.date || pickup.requestedDate || '';
   pickup.status = 'assigned';
   pickup.updatedAt = new Date().toISOString();
-
   // Auto-create a job on the Weekly Schedule
   if (pickup.assignedDriverId && pickup.assignedDate) {
     // Use new-format fields if available, fall back to old format
@@ -575,11 +537,9 @@ app.put('/api/pickups/:id/assign', function(req, res) {
     data.jobs.push(job);
     pickup.routeBoardJobId = job.id;
   }
-
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ ok: true, pickup: pickup });
 });
-
 // Archive a pickup
 app.put('/api/pickups/:id/archive', function(req, res) {
   var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
@@ -590,7 +550,6 @@ app.put('/api/pickups/:id/archive', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true});
 });
-
 // Unarchive
 app.put('/api/pickups/:id/unarchive', function(req, res) {
   var idx = data.pickups.findIndex(function(p) { return p.id === req.params.id; });
@@ -601,16 +560,13 @@ app.put('/api/pickups/:id/unarchive', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true});
 });
-
 app.delete('/api/pickups/:id', function(req, res) {
   data.pickups = (data.pickups || []).filter(function(p) { return p.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true});
 });
-
 // ROLL-OFF BINS - movement / rental tracking
 app.get('/api/bins', function(req, res) { res.json(data.bins || []); });
-
 app.post('/api/bins', function(req, res) {
   var bin = Object.assign({}, req.body, {
     id: 'bin' + Date.now() + Math.random().toString(36).slice(2),
@@ -621,7 +577,6 @@ app.post('/api/bins', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json(bin);
 });
-
 app.put('/api/bins/:id', function(req, res) {
   var idx = data.bins.findIndex(function(b) { return b.id === req.params.id; });
   if (idx === -1) return res.status(404).json({error:'Not found'});
@@ -629,16 +584,13 @@ app.put('/api/bins/:id', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json(data.bins[idx]);
 });
-
 app.delete('/api/bins/:id', function(req, res) {
   data.bins = (data.bins || []).filter(function(b) { return b.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true});
 });
-
 // BIN INVOICE NUMBERS - keyed by "YYYY-MM|customerName"
 app.get('/api/bin-invoices', function(req, res) { res.json(data.binInvoices || {}); });
-
 app.put('/api/bin-invoices', function(req, res) {
   var key = req.body.key;
   var invoiceNumber = req.body.invoiceNumber || '';
@@ -648,10 +600,8 @@ app.put('/api/bin-invoices', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json(data.binInvoices);
 });
-
 // UNACCOUNTED BINS - vendor-billed bins not in tracking (reconciliation watchlist)
 app.get('/api/unbilled', function(req, res) { res.json(data.unbilled || []); });
-
 app.post('/api/unbilled', function(req, res) {
   var u = Object.assign({}, req.body, {
     id: 'ub' + Date.now() + Math.random().toString(36).slice(2),
@@ -662,7 +612,6 @@ app.post('/api/unbilled', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json(u);
 });
-
 app.put('/api/unbilled/:id', function(req, res) {
   var idx = data.unbilled.findIndex(function(u) { return u.id === req.params.id; });
   if (idx === -1) return res.status(404).json({error:'Not found'});
@@ -670,13 +619,11 @@ app.put('/api/unbilled/:id', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json(data.unbilled[idx]);
 });
-
 app.delete('/api/unbilled/:id', function(req, res) {
   data.unbilled = (data.unbilled || []).filter(function(u) { return u.id !== req.params.id; });
   saveData(data); broadcast({type:'full-sync',data:data});
   res.json({ok:true});
 });
-
 // VENDORS (bin suppliers) - managed list
 app.post('/api/vendors', function(req, res) {
   if (req.body.name && (data.vendors || []).indexOf(req.body.name) === -1) {
@@ -689,7 +636,6 @@ app.delete('/api/vendors/:name', function(req, res) {
   data.vendors = (data.vendors || []).filter(function(v) { return v !== req.params.name; });
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
-
 // PRINTABLE MONTHLY BIN BILLING REPORT (POST so it works in Safari)
 app.post('/print-bin-report', function(req, res) {
   var payload;
@@ -699,7 +645,6 @@ app.post('/print-bin-report', function(req, res) {
   var grandTotal = payload.grandTotal || 0;
   var fmtMoney = function(n) { return '$' + (Number(n)||0).toFixed(2); };
   var esc = function(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-
   var html = '<!DOCTYPE html><html><head><title>Bin Billing - ' + esc(monthLabel) + '</title>';
   html += '<style>';
   html += '*{margin:0;padding:0;box-sizing:border-box}';
@@ -721,9 +666,8 @@ app.post('/print-bin-report', function(req, res) {
   html += '.empty{padding:30px;text-align:center;color:#888;font-size:14px}';
   html += '@media print{.back-link{display:none}body{padding:14px 18px}.cust-name{background:#eff6ff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.grand{background:#f0fdf4 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}th{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   html += '</style></head><body>';
-  html += '<a href="javascript:history.back()" class="back-link">&larr; Back to RouteBoard</a>';
+  html += '<a href="javascript:window.close()" class="back-link" style="cursor:pointer">&larr; Back to RouteBoard</a>';
   html += '<div class="header"><h1>Roll-Off Bin Billing</h1><div class="company">Independence Environmental Services</div><div class="period">' + esc(monthLabel) + '</div></div>';
-
   if (groups.length === 0) {
     html += '<div class="empty">No billable bin activity for this period.</div>';
   } else {
@@ -752,15 +696,12 @@ app.post('/print-bin-report', function(req, res) {
     });
     html += '<div class="grand"><span>TOTAL DUE &mdash; ' + esc(monthLabel) + '</span><span>' + fmtMoney(grandTotal) + '</span></div>';
   }
-
   html += '<div class="footer"><span>Independence Environmental Services</span><span>Generated: ' + new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() + '</span></div>';
   html += '</body></html>';
   res.send(html);
 });
-
 // WASTE PROFILES
 var PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
-
 function loadProfiles() {
   try {
     if (fs.existsSync(PROFILES_FILE)) return JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8'));
@@ -769,7 +710,6 @@ function loadProfiles() {
 }
 function saveProfiles(p) { fs.writeFileSync(PROFILES_FILE, JSON.stringify(p, null, 2)); }
 var profiles = loadProfiles();
-
 // SAVED SIGNERS — dropdown for signature names
 var SIGNERS_FILE = path.join(DATA_DIR, 'signers.json');
 function loadSigners() {
@@ -780,7 +720,6 @@ function loadSigners() {
 }
 function saveSignersFile(s) { fs.writeFileSync(SIGNERS_FILE, JSON.stringify(s, null, 2)); }
 var signers = loadSigners();
-
 app.get('/api/signers', function(req, res) { res.json(signers); });
 app.post('/api/signers', function(req, res) {
   var name = (req.body.name || '').trim();
@@ -798,7 +737,6 @@ app.delete('/api/signers/:name', function(req, res) {
   saveSignersFile(signers);
   res.json(signers);
 });
-
 // WASTE STREAM PROFILES — reusable Section 3 templates
 var WASTE_STREAMS_FILE = path.join(DATA_DIR, 'wasteStreams.json');
 function loadWasteStreams() {
@@ -809,7 +747,6 @@ function loadWasteStreams() {
 }
 function saveWasteStreams(ws) { fs.writeFileSync(WASTE_STREAMS_FILE, JSON.stringify(ws, null, 2)); }
 var wasteStreams = loadWasteStreams();
-
 app.get('/api/waste-streams', function(req, res) { res.json(wasteStreams); });
 app.post('/api/waste-streams', function(req, res) {
   var ws = Object.assign({}, req.body, { id: 'ws' + Date.now(), createdAt: new Date().toISOString() });
@@ -829,9 +766,7 @@ app.delete('/api/waste-streams/:id', function(req, res) {
   saveWasteStreams(wasteStreams);
   res.json({ok:true});
 });
-
 app.get('/api/profiles', function(req, res) { res.json(profiles); });
-
 // Sync generator info from a profile back to the customer record
 function syncProfileToCustomer(profile) {
   var custName = (profile.customer || '').trim();
@@ -866,7 +801,6 @@ function syncProfileToCustomer(profile) {
     broadcast({type:'full-sync',data:data});
   }
 }
-
 app.post('/api/profiles', function(req, res) {
   var profile = Object.assign({}, req.body, { id: 'prof' + Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   profiles.push(profile);
@@ -874,7 +808,6 @@ app.post('/api/profiles', function(req, res) {
   syncProfileToCustomer(profile);
   res.json(profile);
 });
-
 app.put('/api/profiles/:id', function(req, res) {
   var idx = profiles.findIndex(function(p) { return p.id === req.params.id; });
   if (idx === -1) return res.status(404).json({error:'Not found'});
@@ -883,13 +816,11 @@ app.put('/api/profiles/:id', function(req, res) {
   syncProfileToCustomer(profiles[idx]);
   res.json(profiles[idx]);
 });
-
 app.delete('/api/profiles/:id', function(req, res) {
   profiles = profiles.filter(function(p) { return p.id !== req.params.id; });
   saveProfiles(profiles);
   res.json({ok:true});
 });
-
 // ======== SDS ATTACHMENT UPLOAD / DELETE ========
 app.post('/api/profiles/:id/sds-upload', upload.array('sdsFiles', 10), function(req, res) {
   var profile = profiles.find(function(p) { return p.id === req.params.id; });
@@ -906,7 +837,6 @@ app.post('/api/profiles/:id/sds-upload', upload.array('sdsFiles', 10), function(
   saveProfiles(profiles);
   res.json({ sdsAttachments: profile.sdsAttachments, added: added });
 });
-
 app.delete('/api/profiles/:id/sds/:sdsId', function(req, res) {
   var profile = profiles.find(function(p) { return p.id === req.params.id; });
   if (!profile) return res.status(404).json({ error: 'Profile not found' });
@@ -921,12 +851,10 @@ app.delete('/api/profiles/:id/sds/:sdsId', function(req, res) {
   saveProfiles(profiles);
   res.json({ sdsAttachments: profile.sdsAttachments });
 });
-
 // Helper: merge SDS PDF attachments into a generated profile PDF buffer
 function mergeSdsIntoPdf(profilePdfBuffer, sdsAttachments) {
   if (!pdfLib) return Promise.resolve(profilePdfBuffer);
   if (!sdsAttachments || sdsAttachments.length === 0) return Promise.resolve(profilePdfBuffer);
-
   return pdfLib.PDFDocument.load(profilePdfBuffer).then(function(mergedDoc) {
     var chain = Promise.resolve();
     sdsAttachments.forEach(function(sds) {
@@ -953,12 +881,10 @@ function mergeSdsIntoPdf(profilePdfBuffer, sdsAttachments) {
     });
   });
 }
-
 // ======== EWS PDF GENERATION ========
 app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   var profile = profiles.find(function(p) { return p.id === req.params.id; });
   if (!profile) return res.status(404).json({error:'Not found'});
-
   var doc = new PDFDocument({ size: 'LETTER', margins: { top: 40, bottom: 40, left: 50, right: 50 } });
   var sigFontPath = path.join(__dirname, 'DancingScript-Regular.ttf');
   if (fs.existsSync(sigFontPath)) {
@@ -985,13 +911,11 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
       res.send(pdfData);
     });
   });
-
   var LM = 50;           // left margin
   var RM = 50;            // right margin
   var W = 612 - LM - RM; // usable width = 512
   var y = 40;
   var logoPath = path.join(__dirname, 'ews-logo.jpg');
-
   // ---- Checkbox drawing helpers (PDFKit Helvetica doesn't support Unicode checkboxes) ----
   function drawCheckbox(cx, cy, checked, size) {
     size = size || 8;
@@ -1006,7 +930,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     doc.restore();
     return cx + size + 3; // return x position after checkbox
   }
-
   // ---- Draw a bordered row with bold-italic label + regular value ----
   function formRow(label, value, opts) {
     opts = opts || {};
@@ -1021,24 +944,20 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     }
     y += rowH;
   }
-
   // ---- Section header: bold, underlined ----
   function sectionHeader(num, title) {
     doc.font('Helvetica-Bold').fontSize(11).fillColor('#000')
       .text(num + '.  ' + title, LM, y, { underline: true });
     y += 16;
   }
-
   // ---- Draw the top header row (used on both pages) ----
   function drawPageHeader() {
     var isNew = profile.profileIsNew !== 'Recertification';
-
     // "New Profile" checkbox - RED bold
     doc.fillColor('#cc0000');
     var afterNewCb = drawCheckbox(LM, y + 1, isNew, 10);
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#cc0000')
       .text('New Profile', afterNewCb, y, { continued: false });
-
     // "Recertification" checkbox - RED bold, right-aligned
     doc.font('Helvetica-Bold').fontSize(10);
     var recertLabel = 'Recertification';
@@ -1048,7 +967,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     drawCheckbox(recertCbX, y + 1, !isNew, 10);
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#cc0000')
       .text(recertLabel, recertTextX, y, { lineBreak: false });
-
     // EWS logo centered
     try {
       if (fs.existsSync(logoPath)) {
@@ -1058,23 +976,18 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
         doc.image(logoPath, logoX, y - 4, { width: logoW, height: logoH });
       }
     } catch(e) { /* logo not available, skip */ }
-
     y += 62;
     doc.fillColor('#000');
   }
-
   // ============================================================
   //  PAGE 1
   // ============================================================
-
   // ===== TOP HEADER =====
   drawPageHeader();
-
   // ===== TITLE =====
   doc.font('Helvetica-Bold').fontSize(14).fillColor('#000')
     .text('GENERATOR WASTE PROFILE SHEET', LM, y, { width: W, align: 'center' });
   y += 18;
-
   // Profile Number / EWS initials underline fields
   doc.font('Helvetica-Bold').fontSize(9);
   doc.text('Profile Number: ', LM + 100, y, { continued: false });
@@ -1082,20 +995,17 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   doc.moveTo(LM + 100 + pnLabelW, y + 10).lineTo(LM + 100 + pnLabelW + 100, y + 10).stroke('#000');
   doc.font('Helvetica').fontSize(9)
     .text(profile.profileNumber || '', LM + 100 + pnLabelW + 2, y);
-
   doc.font('Helvetica-Bold').fontSize(9);
   var ewsInitX = LM + 320;
   doc.text('EWS initials: ', ewsInitX, y, { continued: false });
   var eiLabelW = doc.widthOfString('EWS initials: ');
   doc.moveTo(ewsInitX + eiLabelW, y + 10).lineTo(ewsInitX + eiLabelW + 80, y + 10).stroke('#000');
   y += 16;
-
   // Instruction line - italic, centered
   doc.font('Helvetica-Oblique').fontSize(8).fillColor('#000')
     .text('Please carefully read instructions before completing this form. All sections MUST be completed.',
       LM, y, { width: W, align: 'center' });
   y += 14;
-
   // ===== SECTION 1: BILLING INFORMATION =====
   sectionHeader('1', 'Billing Information');
   formRow('1. Billing Party Name:', 'Independence Environmental Services');
@@ -1103,12 +1013,10 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   formRow('3. Contact:', 'Keith Higgins');
   formRow('4. Phone:', '(559) 243-6169');
   y += 6;
-
   // ===== SECTION 2: GENERATOR INFORMATION =====
   sectionHeader('2', 'Generator Information');
   formRow('1. Generator Name:', profile.customer || '');
   formRow('2. Generator Site Address:', profile.generatorSiteAddress || '');
-
   // Row 3: City / State / Zip
   var rowH3 = 18;
   doc.lineWidth(0.5).rect(LM, y, W, rowH3).stroke('#000');
@@ -1123,10 +1031,8 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   doc.font('Helvetica-BoldOblique').fontSize(9).text('Zip:', LM + thirdW * 2 + 4, y + 4);
   doc.font('Helvetica').fontSize(9).text(profile.generatorZip || '', LM + thirdW * 2 + 28, y + 4, { width: thirdW - 32 });
   y += rowH3;
-
   formRow('4. Generator US EPA Identification Number:', profile.epaId || '');
   formRow('5. Generator Mailing Address (if Different):', profile.generatorMailingAddress || '');
-
   // Row 6: Mailing City / Country / State / Zip
   var rowH6 = 18;
   doc.lineWidth(0.5).rect(LM, y, W, rowH6).stroke('#000');
@@ -1143,15 +1049,12 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   doc.font('Helvetica-BoldOblique').fontSize(9).text('Zip:', LM + qW * 3 + 4, y + 4);
   doc.font('Helvetica').fontSize(9).text(profile.generatorMailingZip || '', LM + qW * 3 + 28, y + 4, { width: qW - 32 });
   y += rowH6;
-
   formRow('7. Generator Contact Name:', profile.technicalContact || 'Keith Higgins');
   formRow('8. Phone Number:', profile.generatorPhone || '(559) 243-6169');
   y += 6;
-
   // ===== SECTION 3: WASTE PROPERTIES AND COMPOSITION =====
   sectionHeader('3', 'Waste Properties and Composition');
   formRow('9. Process Generating Waste:', profile.processGenerating || '', { height: 28 });
-
   // Row 10: hazardous waste yes/no
   var hazVal = profile.hazardousWaste || 'No';
   var rowH10 = 18;
@@ -1161,11 +1064,9 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   doc.font('Helvetica-Bold').fontSize(9)
     .text(hazVal, LM + W - 60, y + 4, { width: 56, align: 'center' });
   y += rowH10;
-
   formRow('11. State Codes:', profile.stateCodes || '');
   formRow('12. Common Waste Name:', profile.commonName || '');
   formRow('13. US DOT Proper Shipping Name:', profile.properShippingName || '');
-
   // Row 14: Physical State checkboxes
   var ps = profile.physicalState || '';
   var rowH14 = 18;
@@ -1180,7 +1081,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     psX = afterCb + doc.widthOfString(s + '   ');
   });
   y += rowH14;
-
   // Row 15: Method of Shipment
   var ms = profile.methodOfShipment || '';
   var rowH15 = 30;
@@ -1200,7 +1100,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     msX = afterCb + doc.widthOfString(s + '   ');
   });
   y += rowH15;
-
   // Row 16: Frequency of Shipment
   var freq = profile.frequency || '';
   var rowH16 = 18;
@@ -1216,10 +1115,8 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     freqX = afterCb + doc.widthOfString(s + '   ');
   });
   y += rowH16;
-
   // Row 17: Special Handling Instructions
   formRow('17. Special Handling Instructions:', profile.specialHandling || 'WEAR CORRECT PPE');
-
   // Row 18: Waste Composition
   var chems = profile.chemicals || [];
   var chemLineH = 13;
@@ -1238,19 +1135,15 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     cy += chemLineH;
   });
   y += compH;
-
   // ============================================================
   //  PAGE 2
   // ============================================================
   doc.addPage();
   y = 40;
-
   // ===== TOP HEADER (repeat) =====
   drawPageHeader();
-
   // ===== SECTION 4: SAMPLING INFORMATION =====
   sectionHeader('4', 'Sampling Information');
-
   // Sample Type checkboxes
   var st = profile.sampleType || '';
   var stRowH = 20;
@@ -1266,7 +1159,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     stX = afterCb + doc.widthOfString(s + '  ');
   });
   y += stRowH;
-
   // Row 19: Sampling Source | 19(a) Date Sampled
   var halfW = Math.floor(W / 2);
   var rowH19 = 18;
@@ -1281,7 +1173,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   doc.font('Helvetica').fontSize(9)
     .text(profile.dateSampled || '', LM + halfW + 158, y + 4, { width: halfW - 162 });
   y += rowH19;
-
   // Row 19(b): Sampler's Name | SDS Product name
   var rowH19b = 18;
   doc.lineWidth(0.5).rect(LM, y, W, rowH19b).stroke('#000');
@@ -1297,10 +1188,8 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     .text(profile.sdsProductName || '', LM + halfW + 120, y + 4, { width: halfW - 124 });
   y += rowH19b;
   y += 6;
-
   // ===== SECTION 5: CHARACTERISTIC COMPONENTS =====
   sectionHeader('5', 'Characteristic Components');
-
   // 7-column characteristics header + values
   var colW = Math.floor(W / 7);
   var charRowH = 38;
@@ -1325,7 +1214,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
       .text(cf.value, cx + 3, y + 16, { width: colW - 6, align: 'center' });
   });
   y += charRowH;
-
   // Liquid Phases sub-labels (Single Layer / Double Layer / Multi-Layer)
   var phasesRowH = 14;
   doc.lineWidth(0.5).rect(LM, y, W, phasesRowH).stroke('#000');
@@ -1343,7 +1231,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
       .text(opt, afterCb, y + 3, { width: lpSubW - (afterCb - oX) - 2 });
   });
   y += phasesRowH;
-
   // ===== YES / NO REGULATORY QUESTIONS =====
   var yesNoQs = [
     { key: 'containsRegulatedHazWaste', text: 'Does this waste contain regulated concentrations of listed hazardous wastes defined by § 40 CFR 261.31.261.32.261.33 including RCRA F Listed Solvents' },
@@ -1352,7 +1239,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     { key: 'radioactive', text: 'Does this waste exhibit any characteristics of Radioactivity as defined by State or Federal Regulations?' },
     { key: 'infectiousMedical', text: 'Does this waste contain any Infectious or Medical Waste as defined by State or Federal Regulations?' }
   ];
-
   // Yes/No column header row
   var ynHeaderH = 14;
   var ynColW = 40;
@@ -1364,7 +1250,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     .text('Yes', LM + ynTextW, y + 3, { width: ynColW, align: 'center' })
     .text('No', LM + ynTextW + ynColW, y + 3, { width: ynColW, align: 'center' });
   y += ynHeaderH;
-
   yesNoQs.forEach(function(q) {
     var ans = profile[q.key] || 'No';
     var isYes = (ans === 'Yes' || ans === 'yes' || ans === true);
@@ -1379,14 +1264,12 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     y += rH;
   });
   y += 10;
-
   // ===== PAYMENT TERMS =====
   doc.font('Helvetica').fontSize(7).fillColor('#000').text(
     'Payment on this project is due net 30 days, unless agreed otherwise in writing. Certificates will be issued once payment for the above job is paid in full. Client/generator will be responsible for all the collection fees and late payment charges. Environmental Waste Solutions (EWS) reserves the right to test all or any inbound loads before acceptance.',
     LM, y, { width: W }
   );
   y += 32;
-
   // ===== GENERATOR CERTIFICATION =====
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#000')
     .text('Generator Certification', LM, y, { underline: true });
@@ -1396,7 +1279,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     LM, y, { width: W }
   );
   y += 44;
-
   // ===== SIGNATURE LINES =====
   var sigLineLen1 = 170;
   var sigLineLen2 = 180;
@@ -1405,7 +1287,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
   var sigX1 = LM;
   var sigX2 = sigX1 + sigLineLen1 + sigGap;
   var sigX3 = sigX2 + sigLineLen2 + sigGap;
-
   // Write signature data above the lines if available
   var sigName = profile.signatureName || '';
   var sigDate = profile.signatureDate || '';
@@ -1427,7 +1308,6 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     doc.font('Helvetica').fontSize(9).fillColor('#000')
       .text(sigDate, sigX3, y - 12, { width: sigLineLen3, align: 'center', lineBreak: false });
   }
-
   doc.lineWidth(0.75);
   doc.moveTo(sigX1, y).lineTo(sigX1 + sigLineLen1, y).stroke('#000');
   doc.moveTo(sigX2, y).lineTo(sigX2 + sigLineLen2, y).stroke('#000');
@@ -1437,14 +1317,11 @@ app.get('/api/profiles/:id/ews-pdf', function(req, res) {
     .text('Signature', sigX1, y, { width: sigLineLen1, align: 'center' })
     .text('Printed (or typed) name and title', sigX2, y, { width: sigLineLen2, align: 'center' })
     .text('Date', sigX3, y, { width: sigLineLen3, align: 'center' });
-
   doc.end();
 });
-
 // SDS PARSING
 var pdfParse;
 try { pdfParse = require('pdf-parse'); } catch(e) { console.log('pdf-parse not available, SDS parsing disabled'); }
-
 function parseSDS(text) {
   var result = {
     chemicals: [],
@@ -1466,10 +1343,8 @@ function parseSDS(text) {
     incompatibles: '',
     stabilityNotes: ''
   };
-
   // Normalize text
   var t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
   // Extract sections - prioritize "SECTION N" format, fall back to "N." at line start
   function getSection(num) {
     var startIdx = -1;
@@ -1503,18 +1378,15 @@ function parseSDS(text) {
     }
     return t.substring(startIdx, endIdx);
   }
-
   // Section 3: Composition
   var sec3 = getSection(3);
   if (sec3) {
     var lines = sec3.split('\n');
-
     // Detect if section header indicates percentages (so bare numbers = %)
     var sec3lower = sec3.toLowerCase();
     var headerHasPct = sec3lower.indexOf('% w') >= 0 || sec3lower.indexOf('%[weight') >= 0
       || sec3lower.indexOf('concentration') >= 0 || sec3lower.indexOf('% weight') >= 0
       || sec3lower.indexOf('percent') >= 0 || sec3lower.indexOf('w/w') >= 0;
-
     // Helper: find percentage/concentration in text
     function findPct(s) {
       // Range with inequality signs: ">= 60 - <= 80" or ">= 60 - < = 80"
@@ -1538,7 +1410,6 @@ function parseSDS(text) {
       }
       return '';
     }
-
     // Helper: clean up chemical name
     function cleanChemName(raw) {
       return raw
@@ -1550,32 +1421,26 @@ function parseSDS(text) {
         .replace(/\*+/g, '')        // Remove asterisks
         .trim();
     }
-
     // Helper: check if a line is a header/metadata line (skip these)
     function isHeaderLine(l) {
       return /^(chemical\s+name|cas\s+no|component|ingredient|substance|concentration|content|hazardous|formula|\*\s*indicates|tsc[\s-]|legend)/i.test(l.trim());
     }
-
     // Parse each line that contains a CAS number
     for (var li = 0; li < lines.length; li++) {
       var line = lines[li].trim();
       if (!line || isHeaderLine(line)) continue;
-
       // Find CAS number — allow trailing asterisk or other markers
       var lineCas = line.match(/(\d{2,7}-\d{2}-\d)\s*\*?/);
       if (!lineCas) continue;
-
       var cas = lineCas[1];
       var casIdx = line.indexOf(lineCas[0]);
       var casEnd = casIdx + lineCas[0].length;
       var pct = '';
       var chemName = '';
-
       // Everything after the CAS+marker
       var afterCas = line.substring(casEnd);
       // Everything before the CAS
       var beforeCas = line.substring(0, casIdx).trim();
-
       // --- Find percentage ---
       // pdf-parse often concatenates columns: "64-19-7100acetic acid glacial"
       // Check if afterCas starts with digits (number jammed right after CAS)
@@ -1584,13 +1449,10 @@ function parseSDS(text) {
         pct = jammedNum[1] + '%';
         afterCas = afterCas.substring(jammedNum[1].length);
       }
-
       // If not jammed, look for concentration in afterCas text
       if (!pct) pct = findPct(afterCas);
-
       // Try full line if still nothing
       if (!pct) pct = findPct(line);
-
       // Try next 1-2 lines (table layouts split across lines)
       if (!pct) {
         for (var ahead = 1; ahead <= 2 && (li + ahead) < lines.length; ahead++) {
@@ -1600,11 +1462,9 @@ function parseSDS(text) {
           if (pct) break;
         }
       }
-
       // --- Find chemical name ---
       // Clean beforeCas
       beforeCas = cleanChemName(beforeCas);
-
       // Also check afterCas for name text (CAS-first layouts like "64-19-7 100 acetic acid glacial")
       var afterName = '';
       if (afterCas) {
@@ -1621,7 +1481,6 @@ function parseSDS(text) {
           afterName = nameCandidate;
         }
       }
-
       // Prefer beforeCas name if it's substantial, otherwise use afterCas name
       if (beforeCas && beforeCas.length > 2 && /[a-zA-Z]{2,}/.test(beforeCas)) {
         chemName = beforeCas;
@@ -1630,7 +1489,6 @@ function parseSDS(text) {
       } else if (beforeCas && beforeCas.length > 1) {
         chemName = beforeCas;
       }
-
       // If still no name, check previous lines
       if (!chemName || chemName.length <= 1) {
         for (var back = li - 1; back >= Math.max(0, li - 3); back--) {
@@ -1641,12 +1499,10 @@ function parseSDS(text) {
           if (candidate.length > 2 && /[a-zA-Z]{2,}/.test(candidate)) { chemName = candidate; break; }
         }
       }
-
       // Remove percentage from name if it leaked in
       if (pct && chemName.indexOf(pct.replace('%','')) >= 0) {
         chemName = cleanChemName(chemName.replace(pct.replace('%',''), ''));
       }
-
       if (chemName && chemName.length > 1 && chemName.length < 120) {
         var dupCheck = result.chemicals.some(function(c) { return c.cas === cas; });
         if (!dupCheck) {
@@ -1654,7 +1510,6 @@ function parseSDS(text) {
         }
       }
     }
-
     // Fallback: percentage-based parsing if no CAS results
     if (result.chemicals.length === 0) {
       for (var li = 0; li < lines.length; li++) {
@@ -1674,13 +1529,11 @@ function parseSDS(text) {
       }
     }
   }
-
   // Section 14: Transport
   var sec14 = getSection(14);
   if (sec14) {
     var unMatch = sec14.match(/UN\s*(\d{4})/i);
     if (unMatch) result.unNumber = 'UN' + unMatch[1];
-
     var shipMatch = sec14.match(/(?:proper\s+shipping\s+name|shipping\s+name)[:\s]*([^\n]+)/i);
     if (shipMatch) {
       var shipName = shipMatch[1].trim().replace(/^[:\s]+/, '');
@@ -1689,10 +1542,8 @@ function parseSDS(text) {
       }
       result.properShippingName = shipName;
     }
-
     var hcMatch = sec14.match(/(?:hazard\s+class|class)[:\s]*(\d+\.?\d*)/i);
     if (hcMatch) result.hazardClass = hcMatch[1];
-
     var pgMatch = sec14.match(/(?:packing\s+group|pkg\.?\s*group|PG)[:\s]*(I{1,3}|[123])/i);
     if (pgMatch) {
       var pg = pgMatch[1];
@@ -1702,7 +1553,6 @@ function parseSDS(text) {
       result.packingGroup = pg;
     }
   }
-
   // Section 9: Physical properties
   var sec9 = getSection(9);
   if (sec9) {
@@ -1743,7 +1593,6 @@ function parseSDS(text) {
         }
       }
     }
-
     // pH extraction — handle "pH (as supplied)\n2.4" and "pH: 2.4" and "pH\n:\n2.4"
     var phMatch = sec9.match(/(?:^|\s)pH\s*(?:\([^)]*\))?\s*[:\s]*(\d+\.?\d*(?:\s*[-–]\s*\d+\.?\d*)?)/im);
     if (!phMatch) {
@@ -1752,7 +1601,6 @@ function parseSDS(text) {
       if (phLineMatch) phMatch = phLineMatch;
     }
     if (phMatch) result.pH = phMatch[1].trim();
-
     var stateMatch = sec9.match(/(?:physical\s+state|\bform\b|\bappearance\b)[:\s]*([^\n]{3,30})/i);
     if (stateMatch) {
       var st = stateMatch[1].toLowerCase();
@@ -1762,37 +1610,30 @@ function parseSDS(text) {
       else if (st.includes('powder')) result.physicalState = 'Solid';
       else result.physicalState = stateMatch[1].trim();
     }
-
     var colorMatch = sec9.match(/(?:color|colour)[:\s]*([^\n]{2,30})/i);
     if (colorMatch) result.color = colorMatch[1].trim();
-
     var odorMatch = sec9.match(/(?:odor|odour|smell)[:\s]*([^\n]{2,30})/i);
     if (odorMatch) result.odor = odorMatch[1].trim();
   }
-
   // Section 15: Regulatory
   var sec15 = getSection(15);
   if (sec15) {
     var rcraMatch = sec15.match(/[DFKPU]\d{3}/g);
     if (rcraMatch) result.epaWasteCodes = Array.from(new Set(rcraMatch));
   }
-
   // Section 2: Hazard statements
   var sec2 = getSection(2);
   if (sec2) {
     var hStatements = sec2.match(/H\d{3}/g);
     if (hStatements) result.hazardStatements = Array.from(new Set(hStatements));
   }
-
   // Section 10: Stability and Reactivity
   var sec10 = getSection(10);
   if (sec10) {
     var incompMatch = sec10.match(/(?:incompatible|incompatibility|materials to avoid)[:\s]*([^\n]+(?:\n(?!SECTION)[^\n]+)*)/i);
     if (incompMatch) result.incompatibles = incompMatch[1].trim().replace(/\n/g, '; ').substring(0, 200);
-
     var stabMatch = sec10.match(/(?:conditions to avoid|hazardous decomposition|thermal decomposition)[:\s]*([^\n]+)/i);
     if (stabMatch) result.stabilityNotes = stabMatch[1].trim().substring(0, 200);
-
     // Check for reactivity keywords
     var sec10lower = sec10.toLowerCase();
     if (sec10lower.includes('water reactive') || sec10lower.includes('reacts with water') || sec10lower.includes('reacts violently with water'))
@@ -1806,7 +1647,6 @@ function parseSDS(text) {
     if (sec10lower.includes('polymeriz'))
       result.reactivityFlags.push('May polymerize');
   }
-
   // Section 11: Toxicological Information
   var sec11 = getSection(11);
   if (sec11) {
@@ -1821,7 +1661,6 @@ function parseSDS(text) {
         species: ''
       });
     }
-
     // Extract LC50 values
     var lc50Pattern = /LC50\s*(?:\(([^)]+)\))?\s*[:\s]*([^\n]*\d[\d,.\s]*(?:mg\/[Lm]|ppm)[^\n]*)/gi;
     var lc50Match;
@@ -1833,7 +1672,6 @@ function parseSDS(text) {
         species: ''
       });
     }
-
     // Check for acute toxicity category
     var sec11lower = sec11.toLowerCase();
     if (sec11lower.includes('category 1') || sec11lower.includes('fatal'))
@@ -1841,15 +1679,11 @@ function parseSDS(text) {
     else if (sec11lower.includes('category 2') && sec11lower.includes('fatal'))
       result.reactivityFlags.push('Acute Toxicity Cat 2 (Fatal)');
   }
-
   // Suggest waste codes based on findings
   suggestWasteCodes(result);
-
   estimateMixtureProps(result);
-
   return result;
 }
-
 // RCRA D-code lookup by CAS number
 var RCRA_TC_LOOKUP = {
   '7440-38-2': 'D004', // Arsenic
@@ -1891,7 +1725,6 @@ var RCRA_TC_LOOKUP = {
   '75-01-4': 'D043',   // Vinyl chloride
   '93-72-1': 'D017',   // 2,4,5-TP (Silvex)
 };
-
 var UHC_LOOKUP = {
   // D004-D011 Metals
   '7440-38-2': { name: 'Arsenic', code: 'D004', wwStd: '5.0', nwStd: '5.0', units: 'mg/L TCLP', technology: 'Stabilization' },
@@ -1960,7 +1793,6 @@ var UHC_LOOKUP = {
   '108-95-2': { name: 'Phenol', code: 'U188', wwStd: '6.2', nwStd: '6.2', units: 'mg/L / mg/kg', technology: 'Incineration' },
   '1336-36-3': { name: 'PCBs', code: 'U209', wwStd: '0.01', nwStd: '2.0', units: 'mg/L / mg/kg', technology: 'Incineration/TSCA' },
 };
-
 var WATER_REACTIVE = {
   '7440-23-5': 'Sodium metal',
   '7440-09-7': 'Potassium metal',
@@ -1979,7 +1811,6 @@ var WATER_REACTIVE = {
   '7719-12-2': 'Phosphorus trichloride',
   '10025-87-3': 'Phosphorus oxychloride',
 };
-
 var OXIDIZER_CAS = {
   '7722-84-1': 'Hydrogen peroxide',
   '7601-90-3': 'Perchloric acid',
@@ -1998,7 +1829,6 @@ var OXIDIZER_CAS = {
   '7664-93-9': 'Sulfuric acid (conc.)',
   '7783-06-4': 'Hydrogen sulfide',
 };
-
 var AIR_REACTIVE = {
   '7440-23-5': 'Sodium metal',
   '7440-09-7': 'Potassium metal',
@@ -2008,7 +1838,6 @@ var AIR_REACTIVE = {
   '75-44-5': 'Phosgene',
   '7803-62-5': 'Silane',
 };
-
 // Known flash points by CAS (in deg F) for mixture estimation
 var FLASH_POINT_DB = {
   '67-64-1': -4,     // Acetone
@@ -2051,7 +1880,6 @@ var FLASH_POINT_DB = {
   '71-23-8': 59,     // n-Propanol
   '123-86-4': 72,    // n-Butyl acetate
 };
-
 // Known pH values for common chemicals (pure or standard concentration)
 var PH_DB = {
   '7664-93-9': 0.3,   // Sulfuric acid (conc.)
@@ -2067,11 +1895,9 @@ var PH_DB = {
   '7664-41-7': 11.6,  // Ammonia (conc.)
   '7681-52-9': 12.0,  // Sodium hypochlorite
 };
-
 function suggestWasteCodes(result) {
   var suggested = result.epaWasteCodes.slice();
   var caSuggested = result.caWasteCodes.slice();
-
   // Check chemicals against RCRA TC lookup
   result.chemicals.forEach(function(chem) {
     if (chem.cas && RCRA_TC_LOOKUP[chem.cas]) {
@@ -2079,7 +1905,6 @@ function suggestWasteCodes(result) {
       if (suggested.indexOf(code) === -1) suggested.push(code);
     }
   });
-
   // D001 - Ignitability (flash point < 140F / 60C)
   var d001Triggered = false;
   if (result.flashPointNumF != null) {
@@ -2118,7 +1943,6 @@ function suggestWasteCodes(result) {
       }
     });
   }
-
   // D002 - Corrosivity (pH <= 2 or pH >= 12.5)
   var d002Triggered = false;
   if (result.pH) {
@@ -2148,7 +1972,6 @@ function suggestWasteCodes(result) {
       }
     });
   }
-
   // California waste codes based on physical state and content
   var hasMetals = result.chemicals.some(function(c) {
     return ['7439-92-1','7440-47-3','7440-43-9','7440-38-2','7439-97-6','7782-49-2','7440-22-4','7440-39-3'].indexOf(c.cas) !== -1;
@@ -2158,22 +1981,18 @@ function suggestWasteCodes(result) {
   });
   var hasSolvents = result.hazardClass === '3' || (result.properShippingName || '').toLowerCase().includes('solvent');
   var isLiquid = (result.physicalState || '').toLowerCase() === 'liquid';
-
   if (hasMetals && isLiquid && caSuggested.indexOf('721') === -1) caSuggested.push('721');
   if (hasMetals && !isLiquid && caSuggested.indexOf('181') === -1) caSuggested.push('181');
   if (hasOrganics && isLiquid && caSuggested.indexOf('741') === -1) caSuggested.push('741');
   if (hasSolvents && caSuggested.indexOf('214') === -1) caSuggested.push('214');
   if (isLiquid && !hasMetals && !hasOrganics && caSuggested.indexOf('151') === -1) caSuggested.push('151');
-
   result.epaWasteCodes = suggested;
   result.caWasteCodes = caSuggested;
 }
-
 function estimateMixtureProps(result) {
   result.estimatedFlashPoint = '';
   result.estimatedPH = '';
   result.uhcMatches = [];
-
   // --- Flash Point Estimation ---
   // Uses FLASH_POINT_DB lookup first, then falls back to SDS Section 9 value per chemical
   var fpComponents = [];
@@ -2191,7 +2010,6 @@ function estimateMixtureProps(result) {
       fpComponents.push({ fp: fp, pct: pct, name: chem.name, fromSDS: !FLASH_POINT_DB[chem.cas] });
     }
   });
-
   if (fpComponents.length > 0) {
     // Use lowest flash point component weighted by concentration
     fpComponents.sort(function(a, b) { return a.fp - b.fp; });
@@ -2213,13 +2031,11 @@ function estimateMixtureProps(result) {
       }
     }
   }
-
   // --- pH Estimation ---
   var acidPH = null;
   var basePH = null;
   var maxAcidPct = 0;
   var maxBasePct = 0;
-
   result.chemicals.forEach(function(chem) {
     if (!chem.cas || !PH_DB[chem.cas]) return;
     var pctMatch = (chem.percentage || '').match(/(\d+\.?\d*)/);
@@ -2229,7 +2045,6 @@ function estimateMixtureProps(result) {
     if (knownPH < 7 && pct > maxAcidPct) { acidPH = knownPH; maxAcidPct = pct; }
     if (knownPH > 7 && pct > maxBasePct) { basePH = knownPH; maxBasePct = pct; }
   });
-
   if (acidPH !== null && basePH === null) {
     // Acid dominant
     if (maxAcidPct > 50) result.estimatedPH = 'Est. pH ~' + (acidPH + 0.5).toFixed(1) + ' (concentrated acid, ' + maxAcidPct + '%)';
@@ -2242,7 +2057,6 @@ function estimateMixtureProps(result) {
   } else if (acidPH !== null && basePH !== null) {
     result.estimatedPH = 'Mixed acid/base — test required (acid at ' + maxAcidPct + '%, base at ' + maxBasePct + '%)';
   }
-
   // --- UHC Matching ---
   result.chemicals.forEach(function(chem) {
     if (!chem.cas) return;
@@ -2260,7 +2074,6 @@ function estimateMixtureProps(result) {
       });
     }
   });
-
   // --- Reactivity flag from chemical lookups ---
   result.chemicals.forEach(function(chem) {
     if (!chem.cas) return;
@@ -2274,7 +2087,6 @@ function estimateMixtureProps(result) {
       result.reactivityFlags.push('Air-reactive (' + AIR_REACTIVE[chem.cas] + ')');
     }
   });
-
   // D003 Reactivity suggestion
   if (result.reactivityFlags.some(function(f) { return f.includes('Water-reactive') || f.includes('Explosive') || f.includes('Shock'); })) {
     if (result.epaWasteCodes.indexOf('D003') === -1) result.epaWasteCodes.push('D003');
@@ -2284,43 +2096,34 @@ function estimateMixtureProps(result) {
     result.caWasteCodes.push('133');
   }
 }
-
 // ---- PRR PDF Generation (fills Blank-PRR-Profile Form template via pdf-lib) ----
 app.get('/api/profiles/:id/prr-pdf', function(req, res) {
   if (!pdfLib) return res.status(500).json({ error: 'pdf-lib is not installed. Run: npm install pdf-lib' });
-
   var profile = profiles.find(function(p) { return p.id === req.params.id; });
   if (!profile) return res.status(404).json({ error: 'Profile not found' });
-
   var templatePath = path.join(__dirname, 'Blank-PRR-Profile Form 2026.pdf');
   if (!fs.existsSync(templatePath)) return res.status(500).json({ error: 'PRR template PDF not found on server' });
-
   var templateBytes = fs.readFileSync(templatePath);
   var p = profile;
-
   pdfLib.PDFDocument.load(templateBytes).then(function(pdfDoc) {
     var form = pdfDoc.getForm();
-
     // --- Helper functions ---
     function safeSetText(fieldName, value) {
       try {
         if (value) form.getTextField(fieldName).setText(String(value));
       } catch(e) { /* field not found, skip */ }
     }
-
     function safeSetDropdown(fieldName, value) {
       try {
         if (value && value !== 'Select' && value !== '') form.getDropdown(fieldName).select(value);
       } catch(e) { /* field not found or invalid option, skip */ }
     }
-
     function safeSetCheckbox(fieldName, checked) {
       try {
         if (checked) { form.getCheckBox(fieldName).check(); }
         else { form.getCheckBox(fieldName).uncheck(); }
       } catch(e) { /* skip */ }
     }
-
     // --- Text Fields ---
     safeSetText('Generator', p.customer || '');
     safeSetText('Site Address', p.siteAddress || '');
@@ -2373,7 +2176,6 @@ app.get('/api/profiles/:id/prr-pdf', function(req, res) {
     safeSetText('Samp IDs', p.sampleIds || '');
     safeSetText('Text69', p.volumeToShip || '');
     safeSetText('Date1_af_date', p.signatureDate || '');
-
     // --- Dropdown Fields ---
     safeSetDropdown('Site State', p.siteState);
     safeSetDropdown('Mailing State', p.mailingState);
@@ -2408,7 +2210,6 @@ app.get('/api/profiles/:id/prr-pdf', function(req, res) {
     safeSetDropdown('Dropdown94', p.transportation);
     safeSetDropdown('Sample', p.sampleType);
     safeSetDropdown('Approval Status', 'New');
-
     // --- Checkbox Fields ---
     safeSetCheckbox('Explosive', p.propExplosive);
     safeSetCheckbox('Radioactive', p.propRadioactive);
@@ -2433,7 +2234,6 @@ app.get('/api/profiles/:id/prr-pdf', function(req, res) {
     safeSetCheckbox('Reactive Cyanides', p.propReactiveCyanides);
     safeSetCheckbox('Reactive Sulfides', p.propReactiveSulfides);
     safeSetCheckbox('Total PPM/TCLP', p.metalsTotalOrTCLP === 'tclp');
-
     // --- Chemical Composition Rows (up to 18) ---
     var chems = p.chemicals || [];
     for (var i = 0; i < Math.min(chems.length, 18); i++) {
@@ -2446,9 +2246,7 @@ app.get('/api/profiles/:id/prr-pdf', function(req, res) {
       if (chems[i].unitType) safeSetDropdown('Unit Type' + idx, chems[i].unitType);
       if (chems[i].tri) safeSetCheckbox('Check Box CPC' + idx, true);
     }
-
     // Do NOT flatten - keep form editable in Adobe Acrobat
-
     return pdfDoc.save();
   }).then(function(pdfBytes) {
     var safeName = (p.name || p.profileName || 'PRR-Profile').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -2466,11 +2264,9 @@ app.get('/api/profiles/:id/prr-pdf', function(req, res) {
     res.status(500).json({ error: 'Failed to generate PRR PDF: ' + err.message });
   });
 });
-
 app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
   if (!pdfParse) return res.status(500).json({ error: 'pdf-parse not installed' });
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-
   var allResults = [];
   var mergedResult = {
     chemicals: [],
@@ -2496,7 +2292,6 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
     estimatedPH: '',
     uhcMatches: []
   };
-
   for (var i = 0; i < req.files.length; i++) {
     var file = req.files[i];
     try {
@@ -2506,7 +2301,6 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
       parsed.fileName = file.originalname;
       allResults.push(parsed);
       mergedResult.sdsFiles.push({ id: 'sds' + Date.now() + i, name: file.originalname, filename: file.filename });
-
       // Merge chemicals (avoid duplicates by CAS)
       // Tag each chemical with its SDS flash point for mixture estimation
       parsed.chemicals.forEach(function(c) {
@@ -2514,7 +2308,6 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
         var exists = mergedResult.chemicals.some(function(mc) { return mc.cas && mc.cas === c.cas; });
         if (!exists) mergedResult.chemicals.push(c);
       });
-
       // Take first non-empty values
       if (!mergedResult.unNumber && parsed.unNumber) mergedResult.unNumber = parsed.unNumber;
       if (!mergedResult.properShippingName && parsed.properShippingName) mergedResult.properShippingName = parsed.properShippingName;
@@ -2528,12 +2321,10 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
       if (!mergedResult.physicalState && parsed.physicalState) mergedResult.physicalState = parsed.physicalState;
       if (!mergedResult.color && parsed.color) mergedResult.color = parsed.color;
       if (!mergedResult.odor && parsed.odor) mergedResult.odor = parsed.odor;
-
       // Merge waste codes
       parsed.epaWasteCodes.forEach(function(c) { if (mergedResult.epaWasteCodes.indexOf(c) === -1) mergedResult.epaWasteCodes.push(c); });
       parsed.caWasteCodes.forEach(function(c) { if (mergedResult.caWasteCodes.indexOf(c) === -1) mergedResult.caWasteCodes.push(c); });
       parsed.hazardStatements.forEach(function(h) { if (mergedResult.hazardStatements.indexOf(h) === -1) mergedResult.hazardStatements.push(h); });
-
       // Merge toxicity
       parsed.toxicity.forEach(function(t) { mergedResult.toxicity.push(t); });
       // Merge reactivity flags
@@ -2546,15 +2337,11 @@ app.post('/api/sds/parse', upload.array('files', 10), async function(req, res) {
       allResults.push({ fileName: file.originalname, error: e.message });
     }
   }
-
   // Re-run waste code suggestions on merged result
   suggestWasteCodes(mergedResult);
-
   estimateMixtureProps(mergedResult);
-
   res.json({ merged: mergedResult, individual: allResults });
 });
-
 function getLocalIP() {
   var interfaces = os.networkInterfaces();
   var keys = Object.keys(interfaces);
@@ -2566,7 +2353,6 @@ function getLocalIP() {
   }
   return 'localhost';
 }
-
 app.listen(PORT, '0.0.0.0', function() {
   var ip = getLocalIP();
   console.log('');
