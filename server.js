@@ -95,6 +95,9 @@ console.log('Drivers count: ' + data.drivers.length);
 console.log('Jobs count: ' + data.jobs.length);
 createBackup();
 setInterval(createBackup, 3600000);
+// Offsite Dropbox backup (set DROPBOX_ACCESS_TOKEN in Railway env vars)
+var dropboxBackup = require('./backup-dropbox');
+dropboxBackup.start();
 var clients = [];
 function broadcast(msg) {
   var payload = 'data: ' + JSON.stringify(msg) + '\n\n';
@@ -181,6 +184,7 @@ app.get('/api/events', function(req, res) {
   });
 });
 app.get('/api/data', function(req, res) { res.json(data); });
+app.post('/api/backup-now', function(req, res) { dropboxBackup.runNow(); res.json({ ok: true, message: 'Dropbox backup triggered' }); });
 // PRINT JOB PAGE - serves a clean printable page via POST with multiple customers
 app.use(express.urlencoded({extended:true}));
 app.post('/print-job', function(req, res) {
