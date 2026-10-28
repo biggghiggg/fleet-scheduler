@@ -1,66 +1,152 @@
 RouteBoard - Fleet Scheduler App
 Independence Environmental Services, LLC
 =========================================
+Updated: October 2026
 
 HOSTING & DEPLOYMENT
-- Hosted on Railway.app, deployed from GitHub
-- RAILWAY_VOLUME_MOUNT_PATH=/data (persistent storage)
-- Upload index.html to public/ folder on GitHub
-- Upload server.js and package.json to root folder on GitHub
-- Deploy triggers automatically after GitHub commit
+- Hosted on Railway.app, auto-deploys from GitHub (biggghiggg/fleet-scheduler)
+- RAILWAY_VOLUME_MOUNT_PATH=/data (persistent storage for data.json, backups, uploads)
+- The volume is the single source of truth — if you redeploy, the data survives;
+  if the volume dies, the data is gone (see BACKUPS below)
+- To deploy: commit changes to GitHub → Railway auto-deploys in ~60 seconds
+- Healthcheck: GET /api/data (configured in railway.toml)
 
-FILES
-- index.html (public/) - Entire frontend: React 18 + Babel standalone
-- server.js (root) - Express server with all API endpoints
-- package.json (root) - Dependencies: express, multer
+WHAT TO UPLOAD TO GITHUB
+- public/index.html  — the entire frontend (React + Babel, single file)
+- server.js           — Express backend with all API endpoints
+- package.json        — dependencies
+- backup-dropbox.js   — offsite backup module (if enabled)
+- Everything else (data.json, uploads/, backups/) lives on the Railway volume,
+  NOT in GitHub
+
+FILES IN THE REPO
+- public/index.html   — Frontend: React 18 + Babel standalone, JSX in a <script type="text/babel"> tag, no build step
+- server.js            — Express server, all API routes, print endpoints, PDF generation
+- backup-dropbox.js    — Nightly offsite backup to Dropbox (requires DROPBOX_ACCESS_TOKEN env var)
+- package.json         — Dependencies: express, multer, pdfkit, pdf-lib, pdf-parse
+- railway.toml         — Railway deploy config
+- Procfile             — "web: node server.js"
+- Blank-PRR-Profile Form 2026.pdf — template for PRR PDF generation
+- ews-logo.jpg, prr-logo.png, DancingScript-Regular.ttf — assets for PDF generation
+
+DATA STORAGE (on Railway volume, NOT in GitHub)
+- /data/data.json       — all app data (drivers, trucks, trailers, jobs, customers, pickups, bins, vendors, waste profiles, equipment, locations)
+- /data/documents.json  — document/file metadata
+- /data/uploads/        — uploaded files (PDFs, images, etc.)
+- /data/backups/        — local daily backups of data.json (30 days, hourly check)
+
+BACKUPS
+- Local: data.json backed up to /data/backups/ daily (kept 30 days) — but these
+  are on the same Railway volume, so they die with the volume
+- Offsite (Dropbox): backup-dropbox.js uploads data.json to Dropbox nightly,
+  keeps 90 days. Requires DROPBOX_ACCESS_TOKEN env var in Railway.
+  Folder: /RouteBoard Backups (configurable via DROPBOX_BACKUP_FOLDER env var)
+- Manual trigger: POST /api/backup-now
+
+AUTH / PASSWORD PROTECTION
+- Set APP_PASSWORD env var in Railway to enable shared-password login
+- Users see a login page; cookie keeps them signed in for 30 days
+- GET /logout clears the session
+- If APP_PASSWORD is not set, the app is open (no login required)
+
+ENVIRONMENT VARIABLES (set in Railway dashboard)
+- APP_PASSWORD           — shared login password (required for security)
+- DROPBOX_ACCESS_TOKEN   — Dropbox API token for offsite backups
+- DROPBOX_BACKUP_FOLDER  — Dropbox folder path (default: /RouteBoard Backups)
+- BACKUP_RETENTION_DAYS  — days to keep Dropbox backups (default: 90)
+- PORT                   — set automatically by Railway
 
 TECH STACK
 - Frontend: React 18 with Babel standalone (JSX in script tag), no build step
-- Backend: Node.js + Express
-- Real-time sync: Server-Sent Events (SSE) - all tabs update live
+- Backend: Node.js + Express (ES5 syntax throughout server.js)
+- Real-time sync: Server-Sent Events (SSE) via /api/events — all open tabs update live
 - File uploads: Multer library
-- Excel/CSV import: SheetJS (xlsx) loaded from CDN
-- Data storage: JSON file on Railway volume (/data/fleet-data.json)
-- Documents stored in /data/uploads/
+- PDF generation: pdfkit (EWS profiles), pdf-lib (PRR profiles)
+- Excel/CSV import: SheetJS (xlsx) loaded from CDN in the frontend
+- Data: JSON file on Railway volume (/data/data.json)
 
-TABS
-1. Weekly Schedule - Main scheduling grid, color-coded cells, copy/paste jobs
-2. People (Roster) - Add/edit/reorder drivers and staff
-3. Trucks & Trailers - Fleet management, active/inactive status
-4. Route View - Horizontal weekly view, all drivers shown every day
-5. Customers - Full CRUD, search, import from Excel, print cards
-6. Documents - Upload/view/download PDFs, Word docs, images, etc.
+TABS (9 total, defined in the App component)
+1. Weekly Schedule   — main scheduling grid; drivers as rows, Mon–Sun columns;
+                       color-coded cells by location; copy/paste jobs; print job
+                       cards; Route Planner toggle for area-grouped daily view
+2. Job Requests      — incoming pickup requests; grouped by salesperson; PIN-based
+                       driver assignment; file attachments; auto-creates schedule
+                       entry on assign; archive/restore workflow
+3. Capitol Calendar  — dedicated calendar view for Capitol Environmental jobs
+4. Roll-Off Bins     — bin inventory tracker; customer assignments; billing period
+                       reports with Excel export; unbilled activity tracking
+5. People            — driver/staff roster; roles: Driver, Tech, Warehouse,
+                       Sales/Driver, Salesperson; 4-digit PIN for job operations;
+                       drag to reorder
+6. Trucks & Trailers — fleet management; truck/trailer CRUD; equipment list
+                       management; TSDF location list management
+7. Customers         — full CRUD; search; Excel/CSV import (QuickBooks compatible);
+                       print customer cards; address = pickup address
+8. Documents         — upload/view/download files (PDFs, Word, images, etc.);
+                       category tagging; inline PDF viewing
+9. Waste Profiles    — EWS and PRR waste profile management; chemical constituent
+                       tracking; waste stream profiles; server-side PDF generation;
+                       generator/facility/transporter lookups
 
 KEY FEATURES
-- Print Job: POST to /print-job endpoint, opens clean page in new tab
-- Print Customer: GET to /print-customer endpoint
-- Documents: GET /api/documents/:id/view opens inline in browser
-- Multi-customer per job: Each customer gets their own page when printing
-- Per-customer fields: time window, equipment, placards, job notes
-- Searchable customer dropdown in Add Job popup
-- Copy/Paste job across drivers with clipboard
-- Multiple jobs per driver per day (+ button)
-- CSV/Excel import for bulk customer upload (QuickBooks compatible)
+- Print Job: POST /print-job — opens clean printable page in new tab (one page per customer)
+- Print Route Plan: client-side print from Route Planner view
+- Print Customer Cards: GET /print-customer
+- Roll-Off Bin Billing Report: POST /print-bins — monthly billing summary
+- Multi-customer per job: each customer has their own time window, equipment, placards, job notes
+- Searchable customer dropdown in job modals
+- Copy/paste jobs across drivers with clipboard
+- Multiple jobs per driver per day
+- CSV/Excel import for bulk customer upload
 - Hazmat placards: DOT hazard classes + 4-digit UN numbers, per-customer
-- Confirmation popup when updating existing jobs
+- Dynamic salesperson dropdowns: filters People list by role containing "sales"
+- EWS PDF generation: full EPA waste profile with chemical constituents, certifications
+- PRR PDF generation: profile/recertification request forms
 
 COLOR CODING (Weekly Schedule cells)
-- Red (#fca5a5) = Coast
+- Red (#fca5a5)    = Coast
 - Orange (#fed7aa) = Vac
 - Purple (#e9d5ff) = Roll Off
-- Pink (#fce7f3) = EWS, LA TSDF, PRR, USE
-- Green (#dcfce7) = Custom typed locations
-- Legend bar shown below Prev/Today/Next buttons
+- Pink (#fce7f3)   = EWS / LA TSDF / PRR / USE
+- Green (#dcfce7)  = Custom typed locations
+- Legend bar shown below week navigation buttons
+
+API ROUTES (all prefixed with /api/ except print endpoints)
+- GET  /api/data                — full data dump (also serves as healthcheck)
+- GET  /api/events              — SSE stream for real-time updates
+- CRUD /api/drivers             — people/roster
+- CRUD /api/trucks, /api/trailers
+- CRUD /api/jobs                — weekly schedule jobs
+- CRUD /api/customers           — customer records
+- CRUD /api/pickups             — job requests
+- PUT  /api/pickups/:id/assign  — assign driver to pickup (creates schedule job)
+- PUT  /api/pickups/:id/archive, /unarchive
+- CRUD /api/bins                — roll-off bin records
+- CRUD /api/vendors, /api/unbilled
+- CRUD /api/documents           — file upload/download
+- CRUD /api/profiles            — waste profiles (EWS + PRR)
+- GET  /api/profiles/:id/ews-pdf, /prr-pdf — PDF generation
+- CRUD /api/waste-streams       — waste stream profiles
+- POST /api/locations           — TSDF location management
+- POST /api/equipment           — equipment list management
+- POST /print-job               — printable job card
+- GET  /print-customer          — printable customer card
+- POST /print-bins              — printable bin billing report
+- POST /api/backup-now          — trigger manual Dropbox backup
 
 SAFARI COMPATIBILITY
 - window.print() and window.open() don't work from React in Safari
-- Solution: Server-side endpoints serve clean HTML pages
-- Print buttons use <a target="_blank"> links or hidden POST forms
+- Solution: server-side endpoints serve clean HTML pages
+- Print buttons use hidden POST forms with target="_blank"
+- "Back to RouteBoard" links on print pages use window.close()
 
 TIPS FOR FUTURE CHANGES
-- Upload index.html and server.js to a new Claude chat
+- Upload public/index.html and server.js to a new Claude chat
 - Include this notes file for quick context
 - All API calls go through the api() helper function in index.html
 - All tabs are separate React function components
-- Locations list is user-managed (added in Trucks & Trailers tab)
-- Equipment list is also user-managed
+- server.js uses ES5 syntax (var, function, no arrow functions) — keep it consistent
+- Locations and equipment lists are user-managed (added in Trucks & Trailers tab)
+- The salesperson dropdown dynamically filters from People by role containing "sales"
+- Customer address/city/state/zip = "Pickup Address" (single address per customer)
+- Jobs have: driverId, date, location (TSDF), customerIds (array with per-customer fields), truckId, trailerId, notes, status
