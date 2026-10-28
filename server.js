@@ -104,6 +104,75 @@ function broadcast(msg) {
   clients.forEach(function(res) { res.write(payload); });
 }
 app.use(express.json({ limit: '5mb' }));
+
+// ── Simple shared-password protection ──────────────────────────────
+// Set APP_PASSWORD in Railway env vars to enable.
+// Users see a login page; a cookie keeps them in for 30 days.
+var APP_PASSWORD = process.env.APP_PASSWORD || '';
+var COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
+var AUTH_COOKIE = 'rb_auth';
+
+function hashToken(pw) {
+  return require('crypto').createHash('sha256').update('routeboard:' + pw).digest('hex').slice(0, 16);
+}
+
+// Login page — self-contained, no external deps
+app.get('/login', function(req, res) {
+  res.setHeader('Content-Type', 'text/html');
+  res.send('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RouteBoard Login</title>' +
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh}' +
+    '.box{background:#fff;border-radius:12px;padding:40px;width:340px;box-shadow:0 4px 24px rgba(0,0,0,.3);text-align:center}' +
+    'h1{font-size:22px;margin-bottom:6px;color:#1e293b}p{font-size:13px;color:#64748b;margin-bottom:20px}' +
+    'input{width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:8px;font-size:16px;margin-bottom:12px;text-align:center}' +
+    'input:focus{outline:none;border-color:#3b82f6}' +
+    'button{width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}' +
+    'button:hover{background:#2563eb}.err{color:#dc2626;font-size:13px;margin-bottom:10px;display:none}</style></head>' +
+    '<body><div class="box"><h1>RouteBoard</h1><p>Independence Environmental Services</p>' +
+    '<div class="err" id="err">Incorrect password</div>' +
+    '<form method="POST" action="/login"><input type="password" name="password" placeholder="Enter password" autofocus autocomplete="current-password"/>' +
+    '<button type="submit">Sign In</button></form></div>' +
+    '<script>if(location.search.includes("fail"))document.getElementById("err").style.display="block"</script></body></html>');
+});
+
+app.post('/login', express.urlencoded({ extended: false }), function(req, res) {
+  if (req.body.password === APP_PASSWORD) {
+    res.cookie(AUTH_COOKIE, hashToken(APP_PASSWORD), { maxAge: COOKIE_MAX_AGE, httpOnly: true, sameSite: 'lax' });
+    res.redirect('/');
+  } else {
+    res.redirect('/login?fail=1');
+  }
+});
+
+app.get('/logout', function(req, res) {
+  res.clearCookie(AUTH_COOKIE);
+  res.redirect('/login');
+});
+
+// Auth middleware — only active when APP_PASSWORD is set
+app.use(function(req, res, next) {
+  if (!APP_PASSWORD) return next(); // no password configured = open access (dev mode)
+  // Allow healthcheck through
+  if (req.path === '/api/data' && req.method === 'GET') return next();
+  if (req.path === '/login') return next();
+  // Check cookie
+  var cookies = {};
+  (req.headers.cookie || '').split(';').forEach(function(c) {
+    var parts = c.trim().split('=');
+    if (parts.length === 2) cookies[parts[0]] = parts[1];
+  });
+  if (cookies[AUTH_COOKIE] === hashToken(APP_PASSWORD)) return next();
+  // Not authenticated
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
+  res.redirect('/login');
+});
+
+if (APP_PASSWORD) {
+  console.log('Password protection ENABLED');
+} else {
+  console.log('WARNING: APP_PASSWORD not set — app is open to the internet!');
+  console.log('Set APP_PASSWORD in Railway env vars to protect customer data.');
+}
+
 app.use(express.static(path.join(__dirname, 'public')));
 // DOCUMENTS / FILE UPLOADS
 var UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
