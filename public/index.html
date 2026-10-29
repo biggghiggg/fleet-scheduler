@@ -519,12 +519,15 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             {conf&&<div className="cbadge">TRUCK CONFLICT</div>}
             {jobs.map(job=>{
               const truck=data.trucks.find(t=>t.id===job.truckId);const trailer=data.trailers.find(t=>t.id===job.trailerId);
+              const custEntries=(job.customerIds||[]).map(x=>typeof x==='string'?{id:x}:x);
+              const custNames=custEntries.map(x=>(data.customers||[]).find(c=>c.id===x.id)).filter(Boolean).map(c=>c.name);
               const sc=job.status?(job.status.toLowerCase().replace(/\s/g,'')):'';
               const loc=(job.location||'').trim().toLowerCase();
               const pinkLocs=['ews','la tsdf','prr','use'];
               const locColor=loc==='coast'?'#fca5a5':loc==='vac'?'#fed7aa':loc==='roll off'?'#e9d5ff':pinkLocs.includes(loc)?'#fce7f3':(job.location&&!(data.locations||[]).some(l=>l===job.location))?'#dcfce7':null;
               return(<div key={job.id} className={'chip '+sc} style={locColor?{background:locColor}:{}} onClick={e=>openEdit(job,e)}>
                 {job.location&&<div className="loc">{job.location}</div>}
+                {custNames.length>0&&<div style={{fontSize:job.location?10:11,fontWeight:job.location?400:600,color:job.location?'#555':'#1e40af'}}>{custNames.join(', ')}</div>}
                 {truck&&<div className="trk">{truck.name}</div>}
                 {trailer&&<div className="trk">{trailer.name}</div>}
                 {job.timeWindow&&<div className="tm">{job.timeWindow}</div>}
