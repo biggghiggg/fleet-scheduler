@@ -87,6 +87,8 @@ if (!data.pickups) { data.pickups = []; saveData(data); }
 if (!data.bins) { data.bins = []; saveData(data); }
 if (!data.vendors) { data.vendors = []; saveData(data); }
 if (!data.unbilled) { data.unbilled = []; saveData(data); }
+if (!data.settings) { data.settings = {}; saveData(data); }
+if (!data.equipTags) { data.equipTags = ['Box truck','Vac truck','Oil tanker','Roll-off','Flatbed','53 footer','Pickup']; saveData(data); }
 console.log('DATA_DIR = ' + DATA_DIR);
 console.log('DATA_FILE = ' + DATA_FILE);
 console.log('RAILWAY_VOLUME_MOUNT_PATH = ' + (process.env.RAILWAY_VOLUME_MOUNT_PATH || 'NOT SET'));
@@ -95,84 +97,12 @@ console.log('Drivers count: ' + data.drivers.length);
 console.log('Jobs count: ' + data.jobs.length);
 createBackup();
 setInterval(createBackup, 3600000);
-// Offsite Dropbox backup (set DROPBOX_ACCESS_TOKEN in Railway env vars)
-var dropboxBackup = require('./backup-dropbox');
-dropboxBackup.start();
 var clients = [];
 function broadcast(msg) {
   var payload = 'data: ' + JSON.stringify(msg) + '\n\n';
   clients.forEach(function(res) { res.write(payload); });
 }
 app.use(express.json({ limit: '5mb' }));
-
-// ── Simple shared-password protection ──────────────────────────────
-// Set APP_PASSWORD in Railway env vars to enable.
-// Users see a login page; a cookie keeps them in for 30 days.
-var APP_PASSWORD = process.env.APP_PASSWORD || '';
-var COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
-var AUTH_COOKIE = 'rb_auth';
-
-function hashToken(pw) {
-  return require('crypto').createHash('sha256').update('routeboard:' + pw).digest('hex').slice(0, 16);
-}
-
-// Login page — self-contained, no external deps
-app.get('/login', function(req, res) {
-  res.setHeader('Content-Type', 'text/html');
-  res.send('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RouteBoard Login</title>' +
-    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh}' +
-    '.box{background:#fff;border-radius:12px;padding:40px;width:340px;box-shadow:0 4px 24px rgba(0,0,0,.3);text-align:center}' +
-    'h1{font-size:22px;margin-bottom:6px;color:#1e293b}p{font-size:13px;color:#64748b;margin-bottom:20px}' +
-    'input{width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:8px;font-size:16px;margin-bottom:12px;text-align:center}' +
-    'input:focus{outline:none;border-color:#3b82f6}' +
-    'button{width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}' +
-    'button:hover{background:#2563eb}.err{color:#dc2626;font-size:13px;margin-bottom:10px;display:none}</style></head>' +
-    '<body><div class="box"><h1>RouteBoard</h1><p>Independence Environmental Services</p>' +
-    '<div class="err" id="err">Incorrect password</div>' +
-    '<form method="POST" action="/login"><input type="password" name="password" placeholder="Enter password" autofocus autocomplete="current-password"/>' +
-    '<button type="submit">Sign In</button></form></div>' +
-    '<script>if(location.search.includes("fail"))document.getElementById("err").style.display="block"</script></body></html>');
-});
-
-app.post('/login', express.urlencoded({ extended: false }), function(req, res) {
-  if (req.body.password === APP_PASSWORD) {
-    res.cookie(AUTH_COOKIE, hashToken(APP_PASSWORD), { maxAge: COOKIE_MAX_AGE, httpOnly: true, sameSite: 'lax' });
-    res.redirect('/');
-  } else {
-    res.redirect('/login?fail=1');
-  }
-});
-
-app.get('/logout', function(req, res) {
-  res.clearCookie(AUTH_COOKIE);
-  res.redirect('/login');
-});
-
-// Auth middleware — only active when APP_PASSWORD is set
-app.use(function(req, res, next) {
-  if (!APP_PASSWORD) return next(); // no password configured = open access (dev mode)
-  // Allow healthcheck through
-  if (req.path === '/api/data' && req.method === 'GET') return next();
-  if (req.path === '/login') return next();
-  // Check cookie
-  var cookies = {};
-  (req.headers.cookie || '').split(';').forEach(function(c) {
-    var parts = c.trim().split('=');
-    if (parts.length === 2) cookies[parts[0]] = parts[1];
-  });
-  if (cookies[AUTH_COOKIE] === hashToken(APP_PASSWORD)) return next();
-  // Not authenticated
-  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
-  res.redirect('/login');
-});
-
-if (APP_PASSWORD) {
-  console.log('Password protection ENABLED');
-} else {
-  console.log('WARNING: APP_PASSWORD not set — app is open to the internet!');
-  console.log('Set APP_PASSWORD in Railway env vars to protect customer data.');
-}
-
 app.use(express.static(path.join(__dirname, 'public')));
 // DOCUMENTS / FILE UPLOADS
 var UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
@@ -253,7 +183,6 @@ app.get('/api/events', function(req, res) {
   });
 });
 app.get('/api/data', function(req, res) { res.json(data); });
-app.post('/api/backup-now', function(req, res) { dropboxBackup.runNow(); res.json({ ok: true, message: 'Dropbox backup triggered' }); });
 // PRINT JOB PAGE - serves a clean printable page via POST with multiple customers
 app.use(express.urlencoded({extended:true}));
 app.post('/print-job', function(req, res) {
@@ -301,6 +230,7 @@ app.post('/print-job', function(req, res) {
       if(cust.address) html += '<div style="font-size:12px;margin-bottom:1px">' + cust.address + '</div>';
       if(cust.phone) html += '<div style="font-size:12px;margin-bottom:1px">Phone: ' + cust.phone + '</div>';
       if(cust.contact) html += '<div style="font-size:12px;margin-bottom:1px">Contact: ' + cust.contact + '</div>';
+      if(cust.epaId || cust.stateId || cust.generatorStatus) html += '<div style="font-size:12px;margin-bottom:1px;font-weight:700">' + [cust.epaId?('EPA ID: '+cust.epaId):'', cust.stateId?('State ID: '+cust.stateId):'', cust.generatorStatus||''].filter(Boolean).join(' \u2022 ') + '</div>';
       if(cust.pricing) html += '<div style="font-size:11px;margin-top:4px;padding-top:4px;border-top:1px solid #93c5fd;white-space:pre-wrap">' + cust.pricing + '</div>';
       html += '</div>';
     }
@@ -375,6 +305,100 @@ app.get('/print-customer', function(req, res) {
   html += '</body></html>';
   res.send(html);
 });
+// ===== TEAMUP CALENDAR FEED (read-only; shown on the Weekly Schedule) =====
+var TEAMUP_DEFAULT = 'https://ics.teamup.com/feed/ks4a3273e79f731304/0.ics';
+var nodeIcal = null;
+try { nodeIcal = require('node-ical'); } catch (e) { console.log('node-ical not installed, Teamup feed disabled'); }
+var teamupCache = {t: 0, events: []};
+function laDate(d) { try { return new Date(d).toLocaleDateString('en-CA', {timeZone: 'America/Los_Angeles'}); } catch (e) { return ''; } }
+function laTime(d) { try { return new Date(d).toLocaleTimeString('en-US', {timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit'}); } catch (e) { return ''; } }
+app.get('/api/teamup', async function(req, res) {
+  if (!nodeIcal) return res.json({events: [], error: 'node-ical is not installed on the server'});
+  var url = (data.settings && data.settings.teamupFeed) || TEAMUP_DEFAULT;
+  var now = Date.now();
+  if (now - teamupCache.t > 10 * 60 * 1000) { // refetch at most every 10 minutes
+    try {
+      var r = await fetch(url, {headers: {'User-Agent': 'RouteBoard/1.0 (Independence Environmental Services)'}});
+      var txt = await r.text();
+      var parsed = nodeIcal.sync.parseICS(txt);
+      var evs = [];
+      var rs = new Date(); rs.setDate(rs.getDate() - 7);
+      var re2 = new Date(); re2.setDate(re2.getDate() + 60);
+      Object.keys(parsed).forEach(function(k) {
+        var ev = parsed[k];
+        if (!ev || ev.type !== 'VEVENT') return;
+        var title = String(ev.summary || '').trim(); if (!title) return;
+        var allDay = ev.datetype === 'date';
+        var exdates = {};
+        if (ev.exdate) Object.keys(ev.exdate).forEach(function(x) { exdates[laDate(ev.exdate[x])] = true; });
+        function push(d) {
+          var day = allDay ? new Date(d).toISOString().slice(0, 10) : laDate(d);
+          if (exdates[day]) return;
+          var cal = Array.isArray(ev.categories) ? ev.categories.join(', ') : String(ev.categories || '');
+          evs.push({date: day, start: allDay ? '' : laTime(d), title: title, location: String(ev.location || ''), calendar: cal});
+        }
+        if (ev.rrule) { try { ev.rrule.between(rs, re2, true).forEach(push); } catch (e) {} }
+        else if (ev.start >= rs && ev.start <= re2) push(ev.start);
+      });
+      evs.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+      teamupCache = {t: now, events: evs};
+    } catch (e) {
+      if (!teamupCache.events.length) return res.json({events: [], error: 'Could not reach the Teamup feed: ' + e.message});
+    }
+  }
+  var qs = req.query.start, qe = req.query.end;
+  res.json({events: teamupCache.events.filter(function(ev) { return (!qs || ev.date >= qs) && (!qe || ev.date <= qe); }), fetched: new Date(teamupCache.t).toISOString()});
+});
+
+// ===== APP SETTINGS (Route Planner yard address, etc.) =====
+app.put('/api/settings', function(req, res) {
+  data.settings = Object.assign({}, data.settings || {}, req.body);
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json(data.settings);
+});
+
+// ===== GEOCODING (Route Planner) — Nominatim lookups with a permanent cache on the volume =====
+const GEO_FILE = path.join(DATA_DIR, 'geocache.json');
+var geoCache = {};
+try { if (fs.existsSync(GEO_FILE)) geoCache = JSON.parse(fs.readFileSync(GEO_FILE, 'utf8')); } catch (e) { geoCache = {}; }
+function saveGeoCache() { try { fs.writeFileSync(GEO_FILE, JSON.stringify(geoCache)); } catch (e) {} }
+function geoNorm(s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+var geoInFlight = false;
+app.post('/api/geocode', async function(req, res) {
+  var list = (req.body && req.body.addresses) || [];
+  var results = {}, toFetch = [], now = Date.now();
+  list.forEach(function(a) {
+    if (!a || !a.key || !a.text) return;
+    var c = geoCache[geoNorm(a.text)];
+    if (c && c.lat != null) results[a.key] = {lat: c.lat, lon: c.lon};
+    else if (c && c.miss && now - (c.t || 0) < 30 * 24 * 3600 * 1000) results[a.key] = null; // known miss; retried after 30 days
+    else toFetch.push(a);
+  });
+  if (!toFetch.length) return res.json({results: results, partial: false});
+  if (geoInFlight) return res.json({results: results, partial: true}); // another tab is already geocoding; caller retries
+  geoInFlight = true;
+  try {
+    var batch = toFetch.slice(0, 20); // stay polite to the free Nominatim service; the client loops for the rest
+    for (var i = 0; i < batch.length; i++) {
+      var a = batch[i];
+      try {
+        var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' + encodeURIComponent(a.text);
+        var r = await fetch(url, {headers: {'User-Agent': 'RouteBoard/1.0 (Independence Environmental Services dispatch board)'}});
+        var j = r.ok ? await r.json() : [];
+        if (j && j[0] && j[0].lat) {
+          geoCache[geoNorm(a.text)] = {lat: parseFloat(j[0].lat), lon: parseFloat(j[0].lon), t: Date.now()};
+          results[a.key] = {lat: parseFloat(j[0].lat), lon: parseFloat(j[0].lon)};
+        } else {
+          geoCache[geoNorm(a.text)] = {miss: true, t: Date.now()};
+          results[a.key] = null;
+        }
+      } catch (e) { /* transient network error — not cached, tried again next call */ }
+      if (i < batch.length - 1) await new Promise(function(ok) { setTimeout(ok, 1100); });
+    }
+    saveGeoCache();
+  } finally { geoInFlight = false; }
+  res.json({results: results, partial: toFetch.length > 20});
+});
+
 // JOBS
 app.post('/api/jobs', function(req, res) {
   var job = Object.assign({}, req.body, { id: 'j' + Date.now() + Math.random().toString(36).slice(2) });
@@ -463,6 +487,17 @@ app.delete('/api/equipment/:name', function(req, res) {
   saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
 });
 // LOCATIONS
+// ROUTER EQUIPMENT TAGS (simple capability tags: Box truck, Vac truck, ...)
+app.post('/api/equiptags', function(req, res) {
+  if (req.body.name && data.equipTags.indexOf(req.body.name) === -1) {
+    data.equipTags.push(req.body.name); saveData(data); broadcast({type:'full-sync',data:data});
+  }
+  res.json({ok:true});
+});
+app.delete('/api/equiptags/:name', function(req, res) {
+  data.equipTags = data.equipTags.filter(function(e) { return e !== req.params.name; });
+  saveData(data); broadcast({type:'full-sync',data:data}); res.json({ok:true});
+});
 app.post('/api/locations', function(req, res) {
   if (req.body.name && data.locations.indexOf(req.body.name) === -1) {
     data.locations.push(req.body.name); data.locations.sort();
