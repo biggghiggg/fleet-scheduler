@@ -477,7 +477,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
 
   const checkPin=(pin)=>{return data.drivers.some(d=>d.pin&&d.pin===pin);};
 
-  const requirePin=(actionFn)=>{setPinPrompt({action:actionFn,pin:''});setPinError('');};
+  const requirePin=(actionFn)=>{actionFn();}; /* per-change PINs removed (Keith, Nov 3) - the shared login password protects the app */
   const submitPin=()=>{
     if(!pinPrompt)return;
     if(checkPin(pinPrompt.pin)){pinPrompt.action();setPinPrompt(null);setPinError('');}
@@ -821,7 +821,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
                 {jobs.some(j2=>!j2.equipTag)&&<div style={{fontSize:9,color:'#b45309',fontWeight:700}}>&#9888; equipment tag missing</div>}
                 {tws.length>0&&<div className="tm">{tws[0]}{tws.length>1?' +':''}</div>}
                 {jobs.length===1&&eqL.length>0&&<div style={{fontSize:9,color:'#888'}}>{eqL.join(', ')}</div>}
-                {jobs.length===1&&notesL&&<div style={{fontSize:10,color:'#666',marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{notesL}</div>}
+                {jobs.length===1&&notesL&&<div style={{fontSize:10,color:'#666',marginTop:1,display:'-webkit-box',WebkitLineClamp:1,WebkitBoxOrient:'vertical',overflow:'hidden',wordBreak:'break-word'}}>{notesL}</div>}
                 {jobs.length>1&&<div style={{fontSize:9,color:'#7c3aed',fontWeight:700,marginTop:2}}>{jobs.length} jobs — click to manage</div>}
                 {jobs.length===1&&<span className="x" onClick={e=>{e.stopPropagation();del(firstJob.id);}}>&#10005;</span>}
               </div>);
