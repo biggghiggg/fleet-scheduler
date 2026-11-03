@@ -60,7 +60,13 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 .grid td:first-child{font-weight:600;font-size:13px;padding:10px 14px;background:#f8fafc;border-right:2px solid var(--border);min-width:120px;width:120px}
 .grid tr:hover td:first-child{background:#eef2ff}
 
-.cell{min-height:60px;padding:4px;cursor:pointer;transition:background .1s}
+.cell{min-height:96px;max-height:150px;overflow:hidden;padding:4px;cursor:pointer;transition:background .1s;position:relative}
+/* TV Mode: only the schedule grid, full screen */
+body.tvmode .app-header,body.tvmode .tabs,body.tvmode .week-nav,body.tvmode .legend-row{display:none !important}
+body.tvmode .main{padding:6px 8px}
+body.tvmode .cell{min-height:0;max-height:150px}
+body.tvmode .grid td:first-child{padding:4px 6px}
+body.tvmode body,body.tvmode .main{overflow-x:hidden}
 .cell:hover{background:#f0f7ff}
 .cell.conflict{background:#fef2f2}
 .cell.today{background:#fffbeb}
@@ -193,6 +199,8 @@ function App(){
   const [clip,setClip]=useState(null);
   const [conn,setConn]=useState(false);
   const [toast,setToast]=useState(null);
+  const [tv,setTv]=useState(()=>{try{return localStorage.getItem('rbTv')==='1';}catch(e){return false;}});
+  useEffect(()=>{document.body.classList.toggle('tvmode',tv);try{localStorage.setItem('rbTv',tv?'1':'0');}catch(e){}if(tv)setTab('schedule');},[tv]);
   const tt=useRef(null);
   const show=(m)=>{setToast(m);if(tt.current)clearTimeout(tt.current);tt.current=setTimeout(()=>setToast(null),3000);};
 
@@ -239,6 +247,7 @@ function App(){
         <h1>RouteBoard</h1>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <button onClick={()=>{document.body.classList.toggle('dark');}} style={{background:'rgba(255,255,255,.2)',color:'#fff',padding:'4px 12px',borderRadius:20,fontSize:11,fontWeight:600,border:'1px solid rgba(255,255,255,.3)'}}>{'\u263D'} Dark Mode</button>
+          <button onClick={()=>setTv(true)} title="Show only the driver schedule — for the shop TV" style={{background:'rgba(255,255,255,.2)',color:'#fff',padding:'4px 12px',borderRadius:20,fontSize:11,fontWeight:600,border:'1px solid rgba(255,255,255,.3)',cursor:'pointer'}}>&#128250; TV Mode</button>
           <span className={'conn-status '+(conn?'ok':'bad')}>{conn?'Live':'Reconnecting...'}</span>
         </div>
       </div>
@@ -258,6 +267,7 @@ function App(){
         {tab==='docs'&&<Documents/>}
         {tab==='profiles'&&<WasteProfiles data={data}/>}
       </div>
+      {tv&&<button onClick={()=>setTv(false)} style={{position:'fixed',top:8,right:10,zIndex:4000,background:'rgba(30,41,59,.75)',color:'#fff',border:'1px solid rgba(255,255,255,.35)',borderRadius:20,padding:'4px 14px',fontSize:12,fontWeight:700,cursor:'pointer',opacity:.75}}>Exit TV</button>}
       {toast&&<div className="toast">{toast}</div>}
     </div>
   );
@@ -277,21 +287,210 @@ const PLACARD_LIST=[
   {cat:'Class 7 - Radioactive',items:['2982 Class 7 Radioactive','2910 Class 7 Radioactive','3321 Class 7 Radioactive']}
 ];
 
+/* ── Route optimizer helpers (geocoded straight-line miles × 1.3 road factor) ── */
+const ROAD_F=1.3, AVG_MPH=45, ONSITE_HR=0.5, MAX_DAY_HR=11;
+function gk(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();}
+function havMi(a,b){if(!a||!b||a.lat==null||b.lat==null)return 0;const R=3958.8,r=Math.PI/180;const dLa=(b.lat-a.lat)*r,dLo=(b.lon-a.lon)*r;const x=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)*Math.sin(dLo/2);return 2*R*Math.asin(Math.sqrt(x));}
+function parseApptMin(s){if(!s)return null;const m=String(s).match(/(\d{1,2})(?::(\d{2}))?\s*(a\.?m|p\.?m)/i);if(!m)return null;let hh=parseInt(m[1],10)%12;if(/^p/i.test(m[3]))hh+=12;return hh*60+(m[2]?parseInt(m[2],10):0);}
+function routeDist(pts,yard){let t=0,prev=yard;pts.forEach(p=>{if(p.lat!=null){t+=havMi(prev,p);prev=p;}});t+=havMi(prev,yard);return t;}
+const DAY_START_MIN=6*60; /* assume wheels roll from the yard at 6:00 AM */
+function simETA(route,yard){/* walks the route at 45 mph (straight-line × 1.3) + 30 min/stop; returns first missed appointment or null */
+  let t=DAY_START_MIN,prev=yard;
+  for(const s of route){
+    if(s.lat!=null&&prev){t+=havMi(prev,s)*ROAD_F/AVG_MPH*60;prev=s;}
+    if(s.appt!=null){if(t>s.appt+15)return s; if(t<s.appt)t=s.appt;}
+    t+=ONSITE_HR*60;
+  }
+  return null;
+}
+function simLate(route,yard){let t=DAY_START_MIN,prev=yard,late=0;for(const s of route){if(s.lat!=null&&prev){t+=havMi(prev,s)*ROAD_F/AVG_MPH*60;prev=s;}if(s.appt!=null){if(t>s.appt)late+=t-s.appt;else t=s.appt;}t+=ONSITE_HR*60;}return late;}
+function orderStops(yard,stops){
+  const anchored=stops.filter(s=>s.appt!=null&&s.lat!=null).sort((a,b)=>a.appt-b.appt);
+  const freeGeo=stops.filter(s=>s.appt==null&&s.lat!=null);
+  const noGeo=stops.filter(s=>s.lat==null);
+  let route=anchored.slice();
+  freeGeo.forEach(s=>{
+    let best=-1,bestD=Infinity;
+    for(let i=0;i<=route.length;i++){const trial=route.slice(0,i).concat([s],route.slice(i));if(simETA(trial,yard))continue;const d=routeDist(trial,yard);if(d<bestD){bestD=d;best=i;}}
+    if(best<0){let bestL=Infinity;for(let i=0;i<=route.length;i++){const trial=route.slice(0,i).concat([s],route.slice(i));const L=simLate(trial,yard);const d=routeDist(trial,yard);if(L<bestL-0.01||(Math.abs(L-bestL)<=0.01&&d<bestD)){bestL=L;bestD=d;best=i;}}}
+    route.splice(best,0,s);
+  });
+  if(anchored.length===0&&route.length>3){let improved=true,guard=0;while(improved&&guard<30){guard++;improved=false;for(let i=0;i<route.length-1;i++)for(let k2=i+1;k2<route.length;k2++){const trial=route.slice(0,i).concat(route.slice(i,k2+1).reverse(),route.slice(k2+1));if(routeDist(trial,yard)<routeDist(route,yard)-0.01){route=trial;improved=true;}}}}
+  return route.concat(noGeo);
+}
+
+/* Build one driver's day: stops in optimized (or hand-set) order, totals and flags */
+function buildDriverDay(data,geo,dr,k8,mo){
+  const djobs=data.jobs.filter(j=>j.driverId===dr.id&&j.date===k8);
+  if(!djobs.length)return null;
+  const yardA=(data.settings&&data.settings.yardAddress)||'Fresno, CA';
+  const yardPt=geo[gk(yardA)]||null;
+  const dstops=[];
+  djobs.forEach(j=>{
+    const entries=(j.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
+    if(!entries.length){dstops.push({job:j,customer:null,entry:null,custName:'(Empty slot)',address:'',lat:null,lon:null,appt:null,key:j.id+'_x'});return;}
+    entries.forEach(en=>{
+      const c=(data.customers||[]).find(x=>x.id===en.id);if(!c)return;
+      const address=[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ');
+      const g=address?(geo[gk(address)]||null):null;
+      const tk2=data.trucks.find(t=>t.id===j.truckId);const tl2=data.trailers.find(t=>t.id===j.trailerId);
+      dstops.push({job:j,customer:c,entry:en,custName:c.name,address,truckName:tk2?tk2.name:'',trailerName:tl2?tl2.name:'',lat:g?g.lat:null,lon:g?g.lon:null,appt:parseApptMin((en&&en.timeWindow)||j.timeWindow),key:j.id+'_'+c.id});
+    });
+  });
+  const optimal=yardPt?orderStops(yardPt,dstops):dstops;
+  let ordered=optimal;
+  if(mo){const map={};dstops.forEach(s=>{map[s.key]=s;});ordered=mo.map(k2=>map[k2]).filter(Boolean);dstops.forEach(s=>{if(mo.indexOf(s.key)===-1)ordered.push(s);});}
+  let prev=yardPt;ordered.forEach(s=>{if(s.lat!=null&&prev){s.leg=havMi(prev,s)*ROAD_F;prev=s;}else{s.leg=null;}});
+  const backLeg=(yardPt&&prev&&prev!==yardPt)?havMi(prev,yardPt)*ROAD_F:0;
+  const miles=yardPt?routeDist(ordered,yardPt)*ROAD_F:0;
+  const optMiles=yardPt?routeDist(optimal,yardPt)*ROAD_F:0;
+  const hrs=miles/AVG_MPH+ordered.length*ONSITE_HR;
+  const flags=[];
+  if(yardPt){
+    if(hrs>MAX_DAY_HR)flags.push({sev:'red',txt:'Over hours — ~'+hrs.toFixed(1)+' hr day (drive time + ~30 min per stop)'});
+    else if(hrs>8.5)flags.push({sev:'amber',txt:'Long day — ~'+hrs.toFixed(1)+' hr estimated'});
+    const miss=simETA(ordered,yardPt);
+    if(miss){const mm=miss.appt;const hh12=((Math.floor(mm/60)+11)%12)+1;const ampm=mm<720?'AM':'PM';flags.push({sev:'red',txt:'Appointment at risk — cannot reach '+miss.custName+' by '+hh12+':'+String(mm%60).padStart(2,'0')+' '+ampm+' in this order (45 mph est., 6:00 AM start)'});}
+  }
+  const noGeoCt=ordered.filter(s=>s.lat==null&&s.customer).length;
+  if(noGeoCt)flags.push({sev:'amber',txt:noGeoCt+' stop'+(noGeoCt>1?'s':'')+' missing a locatable street address — listed last, not routed'});
+  djobs.forEach(j=>{
+    const req=j.equipTag||'';
+    const t2=data.trucks.find(t=>t.id===j.truckId);const tl2=data.trailers.find(t=>t.id===j.trailerId);
+    if(!req){flags.push({sev:'amber',txt:'No equipment tag on the '+(j.location||'un-labeled')+' job — open it and pick one'});return;}
+    const tags=[t2&&t2.tag,tl2&&tl2.tag].filter(Boolean);
+    if((t2||tl2)&&tags.length&&tags.indexOf(req)===-1)flags.push({sev:'red',txt:'Needs a '+req+' — '+[t2?(t2.name+' is tagged '+(t2.tag||'untagged')):'',tl2?(tl2.name+': '+(tl2.tag||'untagged')):''].filter(Boolean).join(', ')});
+  });
+  return {dateKey:k8,driver:dr,truck:data.trucks.find(t=>t.id===djobs[0].truckId),trailer:data.trailers.find(t=>t.id===djobs[0].trailerId),jobs:djobs,stops:ordered,miles,optMiles,backLeg,hrs,flags,yardPt,manual:!!mo,moKey:dr.id+'_'+k8};
+}
+
+/* Print route sheets — one page per driver per day (Safari-safe window.open pattern) */
+function printSheets(items){
+  if(!items.length)return;
+  var html='<!DOCTYPE html><html><head><title>Driver Route Sheets</title><style>';
+  html+='*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111}';
+  html+='.sheet{padding:26px 30px;page-break-after:always}.sheet:last-child{page-break-after:auto}';
+  html+='h1{font-size:20px}h2{font-size:13px;font-weight:400;color:#555;margin-top:2px}';
+  html+='.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1e293b;padding-bottom:8px;margin-bottom:10px}';
+  html+='.rig{font-size:14px;font-weight:700;text-align:right}.tot{font-size:11px;color:#555;text-align:right;margin-top:2px}';
+  html+='.flag{background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;font-size:11px;font-weight:600;padding:4px 10px;border-radius:4px;margin-bottom:4px}';
+  html+='.flag.amber{background:#fffbeb;border-color:#fcd34d;color:#92400e}';
+  html+='table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}th{background:#f1f5f9;text-align:left;padding:5px 8px;border:1px solid #cbd5e1;font-size:11px}';
+  html+='td{padding:6px 8px;border:1px solid #e2e8f0;vertical-align:top}.seq{font-size:15px;font-weight:700;text-align:center;width:28px}';
+  html+='.sm{font-size:10px;color:#555}.pr{font-size:10px;color:#1d4ed8;font-style:italic;white-space:pre-wrap;border-top:1px dotted #93c5fd;margin-top:2px;padding-top:2px}';
+  html+='.pl{display:inline-block;background:#fef3c7;border:1px solid #d97706;border-radius:4px;padding:0 5px;font-weight:700;font-size:10px;margin:1px 2px 1px 0}';
+  html+='.st{display:inline-block;background:#e0e7ff;border-radius:4px;padding:0 5px;font-weight:700;font-size:10px;margin-left:4px}.jn{white-space:pre-wrap}';
+  html+='.cn{font-weight:700}.ad{font-size:11px;color:#555}.sig{margin-top:26px;font-size:12px;color:#555;display:flex;gap:40px}';
+  html+='.sig span{border-top:1px solid #999;padding-top:4px;flex:1;text-align:center}';
+  html+='@media print{.sheet{padding:10px 6px}}</style></head><body>';
+  items.forEach(it=>{
+    var dd=it.dd;
+    html+='<div class="sheet"><div class="hdr"><div><h1>'+dd.driver.name+' — Route Sheet</h1><h2>'+it.dateLong+' • Independence Environmental Services</h2></div>';
+    html+='<div><div class="rig">'+[(dd.truck?dd.truck.name:''),(dd.trailer?dd.trailer.name:'')].filter(Boolean).join(' + ')+'</div>';
+    html+='<div class="tot">'+dd.stops.length+' stops'+(dd.yardPt?' • ~'+Math.round(dd.miles)+' mi • ~'+dd.hrs.toFixed(1)+' hr est.':'')+'</div></div></div>';
+    dd.flags.forEach(f=>{html+='<div class="flag'+(f.sev==='amber'?' amber':'')+'">'+f.txt+'</div>';});
+    html+='<table><tr><th>#</th><th>Customer / Address</th><th>Time</th><th>Destination</th><th>Equipment / Placards</th><th>Notes</th><th style="width:60px">Done</th></tr>';
+    dd.stops.forEach((s,si)=>{
+      var c2=s.customer||{};
+      var tw=(s.entry&&s.entry.timeWindow)||s.job.timeWindow||'';
+      var eq=[(s.job.equipTag?'['+s.job.equipTag+']':'')].concat((s.entry&&s.entry.equipment)||s.job.equipment||[]).filter(Boolean).join(', ');
+      var pls=((s.entry&&s.entry.placards)||[]);
+      var jn=(s.entry&&s.entry.jobNotes)||'';
+      var gn=s.job.notes||'';
+      var hdrRig=[(dd.truck?dd.truck.name:''),(dd.trailer?dd.trailer.name:'')].filter(Boolean).join(' + ');
+      var rig=[s.truckName||'',s.trailerName||''].filter(Boolean).join(' + ');
+      html+='<tr><td class="seq">'+(si+1)+'</td>';
+      html+='<td><div class="cn">'+s.custName+'</div><div class="ad">'+(s.address||'')+'</div>';
+      if(c2.phone||c2.contact)html+='<div class="sm">'+[c2.phone?'Ph: '+c2.phone:'',c2.contact?'Contact: '+c2.contact:''].filter(Boolean).join(' • ')+'</div>';
+      if(c2.epaId||c2.stateId||c2.generatorStatus)html+='<div class="sm"><strong>'+[c2.epaId?'EPA ID: '+c2.epaId:'',c2.stateId?'State ID: '+c2.stateId:'',c2.generatorStatus?c2.generatorStatus:''].filter(Boolean).join(' • ')+'</strong></div>';
+      if(c2.pricing||c2.notes)html+='<div class="pr">'+(c2.pricing||c2.notes)+'</div>';
+      html+='</td>';
+      html+='<td>'+(tw||'-')+'</td>';
+      html+='<td>'+(s.job.location||'-')+(s.job.status&&s.job.status!=='Scheduled'?'<span class="st">'+s.job.status+'</span>':'')+(rig&&rig!==hdrRig?'<div class="sm">'+rig+'</div>':'')+'</td>';
+      html+='<td>'+(eq||'')+(pls.length?'<div>'+pls.map(function(p){return '<span class="pl">'+p+'</span>';}).join('')+'</div>':'')+((!eq&&!pls.length)?'-':'')+'</td>';
+      html+='<td class="jn">'+[jn,gn?(jn?'Job: ':'')+gn:''].filter(Boolean).join('\n')+'</td><td></td></tr>';
+    });
+    html+='</table><div class="sig"><span>Driver signature</span><span>Start time / miles</span><span>End time / miles</span></div></div>';
+  });
+  html+='</body></html>';
+  var win=window.open('','_blank');win.document.write(html);win.document.close();
+  setTimeout(function(){win.print();},500);
+}
+
 function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}){
   const end=new Date(ws);end.setDate(end.getDate()+6);
   const [showPlacards,setShowPlacards]=useState(null); /* null or customer id */
+  const [eqWarn,setEqWarn]=useState(false);
+  const [okFlash,setOkFlash]=useState(null);
+  const okTimer=useRef(null);
+  const flashOk=(msg)=>{setOkFlash(msg);if(okTimer.current)clearTimeout(okTimer.current);okTimer.current=setTimeout(()=>setOkFlash(null),1400);};
   const [custSearch,setCustSearch]=useState('');
   const [custDropOpen,setCustDropOpen]=useState(false);
+  const [pinPrompt,setPinPrompt]=useState(null); /* null or {action: function, pin: ''} */
+  const [pinError,setPinError]=useState('');
   const [showRoutePlanner,setShowRoutePlanner]=useState(false);
   const [rpDay,setRpDay]=useState(null); /* index into dates[], null = all week */
+  const [rpMode,setRpMode]=useState('driver'); /* 'driver' = ordered routes per driver, 'area' = grouped by city */
+  const [geo,setGeo]=useState({});            /* geocode results: gk(address) -> {lat,lon} | null */
+  const [geoLoading,setGeoLoading]=useState(false);
+  const [manualOrder,setManualOrder]=useState({}); /* driverId_date -> [stop keys] (hand-reordered) */
+  const [yardDraft,setYardDraft]=useState(null);
+  const [tuEvents,setTuEvents]=useState({});  /* Teamup feed: date -> [{start,title,location}] */
+  const [tuOn,setTuOn]=useState(true);
+  const [tuErr,setTuErr]=useState('');
+  const [tuExpand,setTuExpand]=useState(false); /* Teamup row: show all vs first 4 */
+  const [tuFull,setTuFull]=useState(false);   /* popup: week grouped by calendar */
+  useEffect(()=>{ /* pull the Teamup schedule for the visible week */
+    let dead=false;
+    (async()=>{try{
+      const r=await api('GET','/teamup?start='+dk(dates[0])+'&end='+dk(dates[6]));
+      if(dead||!r)return;
+      if(r.error&&!(r.events||[]).length){setTuErr(r.error);setTuEvents({});return;}
+      const by={};(r.events||[]).forEach(ev=>{(by[ev.date]=by[ev.date]||[]).push(ev);});
+      setTuEvents(by);setTuErr('');
+    }catch(e){if(!dead)setTuErr(String(e));}})();
+    return()=>{dead=true;};
+  },[ws,data.settings]);
+  const geoRef=useRef(false);
+  useEffect(()=>{ /* geocode every address on the visible week (server caches permanently) */
+    if(!showRoutePlanner&&!modal)return;
+    const addrs={};
+    const yardA=(data.settings&&data.settings.yardAddress)||'Fresno, CA';
+    addrs[gk(yardA)]=yardA;
+    const wk=dates.map(d=>dk(d));
+    data.jobs.filter(j=>wk.indexOf(j.date)!==-1).forEach(j=>{(j.customerIds||[]).forEach(x=>{const id=typeof x==='string'?x:x.id;const c=(data.customers||[]).find(cc=>cc.id===id);if(!c)return;const t=[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ');if(t)addrs[gk(t)]=t;});});
+    const need=Object.keys(addrs).filter(k2=>geo[k2]===undefined);
+    if(!need.length||geoRef.current)return;
+    geoRef.current=true;setGeoLoading(true);
+    (async()=>{try{
+      let pending=need.map(k2=>({key:k2,text:addrs[k2]}));let rounds=0;
+      while(pending.length&&rounds<10){rounds++;
+        const r=await api('POST','/geocode',{addresses:pending});
+        if(!r||!r.results)break;
+        setGeo(g=>Object.assign({},g,r.results));
+        if(!r.partial)break;
+        pending=pending.filter(p=>r.results[p.key]===undefined);
+        await new Promise(ok=>setTimeout(ok,1500));
+      }
+    }catch(e){}finally{geoRef.current=false;setGeoLoading(false);}})();
+  },[showRoutePlanner,modal,data.jobs,data.customers,ws,data.settings]);
 
-  const openAdd=(did,date)=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}};
+  const checkPin=(pin)=>{return data.drivers.some(d=>d.pin&&d.pin===pin);};
+
+  const requirePin=(actionFn)=>{setPinPrompt({action:actionFn,pin:''});setPinError('');};
+  const submitPin=()=>{
+    if(!pinPrompt)return;
+    if(checkPin(pinPrompt.pin)){pinPrompt.action();setPinPrompt(null);setPinError('');}
+    else{setPinError('Invalid PIN');}
+  };
+
+  const openAdd=(did,date)=>{requirePin(()=>{setEid(null);if(clip){setModal({...clip,driverId:did,date:dk(date)});}else{setModal({driverId:did,date:dk(date),location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});}});};
   const getCustEntries=()=>(modal.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
-  const copyJob=()=>{if(!modal)return;const c={location:modal.location,customerIds:getCustEntries().map(x=>({...x})),truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
+  const copyJob=()=>{if(!modal)return;const c={location:modal.location,equipTag:modal.equipTag||'',customerIds:getCustEntries().map(x=>({...x})),truckId:modal.truckId,trailerId:modal.trailerId,timeWindow:modal.timeWindow,equipment:[...(modal.equipment||[])],placards:[...(modal.placards||[])],notes:modal.notes,status:modal.status||'Scheduled'};setClip(c);setModal(null);setEid(null);if(show)show('Job copied! Click any cell to paste.');};
   const clearClip=()=>{setClip(null);if(show)show('Clipboard cleared.');};
-  const openEdit=(job,e)=>{e.stopPropagation();setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);};
-  const save=async()=>{if(eid){if(!confirm('Are you sure you want to update this job?'))return;await api('PUT','/jobs/'+eid,modal);}else{await api('POST','/jobs',modal);}setModal(null);setEid(null);};
-  const del=async(id,e)=>{if(e)e.stopPropagation();await api('DELETE','/jobs/'+id);};
+  const openEdit=(job,e)=>{e.stopPropagation();requirePin(()=>{setEid(job.id);setModal({...job,customerIds:job.customerIds||[]});setCustSearch('');setCustDropOpen(false);});};
+  const save=async()=>{if(!modal.equipTag){setEqWarn(true);return;}if(eid){if(!confirm('Are you sure you want to update this job?'))return;await api('PUT','/jobs/'+eid,modal);setModal(null);setEid(null);}else{await api('POST','/jobs',modal);flashOk('Job added');setModal({driverId:modal.driverId,date:modal.date,location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled',equipTag:modal.equipTag});setCustSearch('');setCustDropOpen(false);}};
+  const del=async(id,e)=>{if(e)e.stopPropagation();const j=(data.jobs||[]).find(x=>x.id===id);const nm=j?('the '+(j.location?j.location+' job':'job')+' on '+(j.date||'this day')):'this job';if(!confirm('Delete '+nm+'? This cannot be undone.'))return;await api('DELETE','/jobs/'+id);};
   const moveDriver=async(idx,dir)=>{
     const newIdx=idx+dir;
     if(newIdx<0||newIdx>=data.drivers.length)return;
@@ -306,6 +505,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       <button onClick={now} style={{background:'#16a34a'}}>Today</button>
       <div className="week-label">{fmt(ws)} &mdash; {fmt(end)}</div>
       <button onClick={next}>Next &#9654;</button>
+      <button onClick={()=>setTuOn(!tuOn)} title={tuErr?('Teamup feed problem: '+tuErr):'Show or hide the Teamup schedule row'} style={{background:tuOn?'#0f766e':'#f3f4f6',color:tuOn?'#fff':'#374151',padding:'6px 14px',borderRadius:6,fontSize:13,fontWeight:600,border:'1px solid '+(tuOn?'#0f766e':'#d1d5db'),cursor:'pointer',marginLeft:12}}>Teamup {tuOn?'✓':''}</button>
       <button onClick={()=>{setShowRoutePlanner(!showRoutePlanner);setRpDay(null);}} style={{background:showRoutePlanner?'#dc2626':'#7c3aed',color:'#fff',padding:'6px 16px',borderRadius:6,fontSize:13,fontWeight:700,border:'none',cursor:'pointer',marginLeft:12}}>{showRoutePlanner?'← Back to Schedule':'Route Planner'}</button>
     </div>
     {showRoutePlanner ? (()=>{
@@ -345,6 +545,90 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         cityMap[key].stops.push(s);
       });
       const cityGroups = Object.values(cityMap).sort((a,b)=>a.city.localeCompare(b.city));
+
+      /* ── Driver Routes: ordered stop list per driver per day ── */
+      const yardAddr=(data.settings&&data.settings.yardAddress)||'Fresno, CA';
+      const yardPt=geo[gk(yardAddr)]||null;
+      const driverDays=[];
+      rpDates.forEach(d8=>{const k8=dk(d8);
+        data.drivers.forEach(dr=>{
+          const dd=buildDriverDay(data,geo,dr,k8,manualOrder[dr.id+'_'+k8]);
+          if(dd){dd.date=d8;driverDays.push(dd);}
+        });
+      });
+      const moveStop=(dd,idx,dir)=>{const keys=dd.stops.map(s=>s.key);const ni=idx+dir;if(ni<0||ni>=keys.length)return;const t=keys[idx];keys[idx]=keys[ni];keys[ni]=t;const mo2=Object.assign({},manualOrder);mo2[dd.moKey]=keys;setManualOrder(mo2);};
+      const resetOrder=(dd)=>{const mo2=Object.assign({},manualOrder);delete mo2[dd.moKey];setManualOrder(mo2);};
+      const printDriverSheets=()=>{printSheets(driverDays.map(dd=>({dd,dateLong:fmtLong(dd.date)})));};
+
+      /* Driver Routes view */
+      const renderDriverRoutes=()=>{
+        let lastKey=null;
+        return <div>
+          <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12,flexWrap:'wrap',fontSize:13}}>
+            <span style={{fontWeight:700}}>Start / end (yard):</span>
+            <input value={yardDraft!==null?yardDraft:yardAddr} onChange={e=>setYardDraft(e.target.value)} style={{width:320,maxWidth:'60vw'}} placeholder="Yard address for route start/end"/>
+            {yardDraft!==null&&yardDraft!==yardAddr&&<button className="bp" style={{fontSize:12,padding:'4px 12px'}} onClick={async()=>{await api('PUT','/settings',{yardAddress:yardDraft});setGeo({});setYardDraft(null);}}>Save</button>}
+            {geoLoading&&<span style={{color:'#7c3aed',fontWeight:600}}>Locating addresses…</span>}
+            {!geoLoading&&!yardPt&&<span style={{color:'#dc2626',fontWeight:600}}>Can't locate the yard address — stops are listed but not optimized</span>}
+            <span style={{color:'#9ca3af',fontSize:11}}>Miles are estimates (straight-line × 1.3); order respects time windows like "8:00 AM"</span>
+          </div>
+          {driverDays.length===0?<div style={{textAlign:'center',padding:40,color:'#9ca3af'}}>No jobs scheduled for {rpDay!==null?DAYS_SHORT[rpDay]:'this week'}.</div>:
+            driverDays.map(dd=>{
+              const dayHdr=rpDay===null&&dd.dateKey!==lastKey;lastKey=dd.dateKey;
+              return <React.Fragment key={dd.driver.id+'_'+dd.dateKey}>
+                {dayHdr&&<div style={{fontSize:14,fontWeight:800,color:'#334155',margin:'14px 0 8px',borderBottom:'2px solid #cbd5e1',paddingBottom:4}}>{fmtLong(dd.date)}</div>}
+                <div style={{border:'1px solid #e5e7eb',borderRadius:10,marginBottom:14,overflow:'hidden',boxShadow:'0 1px 3px rgba(0,0,0,.06)'}}>
+                  <div style={{background:'#1e293b',color:'#fff',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                      <span style={{fontSize:16,fontWeight:700}}>{dd.driver.name}</span>
+                      <span style={{background:'rgba(255,255,255,.2)',padding:'2px 10px',borderRadius:12,fontSize:12}}>{[(dd.truck?dd.truck.name:null),(dd.trailer?dd.trailer.name:null)].filter(Boolean).join(' + ')||'no truck assigned'}</span>
+                    </div>
+                    <div style={{fontSize:12,display:'flex',gap:14,alignItems:'center',flexWrap:'wrap'}}>
+                      <span><strong>{dd.stops.length}</strong> stops</span>
+                      {yardPt&&<span><strong>{Math.round(dd.miles)}</strong> est mi</span>}
+                      {yardPt&&<span><strong>{dd.hrs.toFixed(1)}</strong> est hr</span>}
+                      {dd.manual&&<span style={{background:'#f59e0b',padding:'2px 10px',borderRadius:12,fontWeight:700}}>hand-ordered {dd.miles-dd.optMiles>0.5?'(+'+Math.round(dd.miles-dd.optMiles)+' mi vs optimal)':''}<span onClick={()=>resetOrder(dd)} style={{cursor:'pointer',marginLeft:8,textDecoration:'underline'}}>reset</span></span>}
+                    </div>
+                  </div>
+                  {dd.flags.map((f,fi)=><div key={fi} style={{padding:'5px 16px',fontSize:12,fontWeight:600,background:f.sev==='red'?'#fef2f2':'#fffbeb',color:f.sev==='red'?'#b91c1c':'#92400e',borderBottom:'1px solid '+(f.sev==='red'?'#fecaca':'#fde68a')}}>&#9888; {f.txt}</div>)}
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                    <thead><tr style={{background:'#f8fafc'}}>
+                      <th style={{padding:'6px 10px',width:30,borderBottom:'1px solid #e5e7eb'}}>#</th>
+                      <th style={{padding:'6px 10px',width:46,borderBottom:'1px solid #e5e7eb'}}></th>
+                      <th style={{padding:'6px 10px',textAlign:'left',borderBottom:'1px solid #e5e7eb'}}>Customer</th>
+                      <th style={{padding:'6px 10px',textAlign:'left',borderBottom:'1px solid #e5e7eb'}}>Address</th>
+                      <th style={{padding:'6px 10px',textAlign:'left',width:90,borderBottom:'1px solid #e5e7eb'}}>Time</th>
+                      <th style={{padding:'6px 10px',textAlign:'right',width:70,borderBottom:'1px solid #e5e7eb'}}>Leg</th>
+                      <th style={{padding:'6px 10px',textAlign:'left',width:100,borderBottom:'1px solid #e5e7eb'}}>Destination</th>
+                      <th style={{padding:'6px 10px',textAlign:'left',borderBottom:'1px solid #e5e7eb'}}>Notes</th>
+                    </tr></thead>
+                    <tbody>
+                      {dd.stops.map((s,si)=>{
+                        const tw=(s.entry&&s.entry.timeWindow)||s.job.timeWindow||'';
+                        const notes=[(s.entry&&s.entry.jobNotes)||'',s.job.notes||''].filter(Boolean).join(' | ');
+                        return <tr key={s.key} style={{background:si%2?'#f9fafb':'#fff'}}>
+                          <td style={{padding:'6px 10px',textAlign:'center',fontWeight:800,color:'#7c3aed'}}>{si+1}</td>
+                          <td style={{padding:'2px 4px',textAlign:'center',whiteSpace:'nowrap'}}>
+                            <span onClick={()=>moveStop(dd,si,-1)} style={{cursor:si>0?'pointer':'default',opacity:si>0?1:.2,userSelect:'none',padding:'0 3px'}}>&#9650;</span>
+                            <span onClick={()=>moveStop(dd,si,1)} style={{cursor:si<dd.stops.length-1?'pointer':'default',opacity:si<dd.stops.length-1?1:.2,userSelect:'none',padding:'0 3px'}}>&#9660;</span>
+                          </td>
+                          <td style={{padding:'6px 10px',fontWeight:600}}>{s.custName}{s.lat==null&&s.customer?<span style={{marginLeft:6,background:'#fffbeb',border:'1px solid #fcd34d',color:'#92400e',fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:8}}>no address</span>:null}</td>
+                          <td style={{padding:'6px 10px',fontSize:12,color:'#6b7280'}}>{s.address||'-'}</td>
+                          <td style={{padding:'6px 10px',fontSize:12}}>{tw?<span style={{background:s.appt!=null?'#ede9fe':'transparent',padding:s.appt!=null?'1px 7px':'0',borderRadius:8,fontWeight:s.appt!=null?700:400}}>{tw}</span>:'-'}</td>
+                          <td style={{padding:'6px 10px',textAlign:'right',fontSize:12,color:'#475569'}}>{s.leg!=null?Math.round(s.leg)+' mi':'-'}</td>
+                          <td style={{padding:'6px 10px',fontSize:12,fontWeight:600}}>{s.job.location||'-'}</td>
+                          <td style={{padding:'6px 10px',fontSize:11,color:'#6b7280',maxWidth:220}}>{notes||'-'}</td>
+                        </tr>;
+                      })}
+                      {yardPt&&dd.backLeg>0&&<tr><td colSpan={5} style={{padding:'5px 10px',fontSize:11,color:'#94a3b8',textAlign:'right'}}>back to yard</td><td style={{padding:'5px 10px',textAlign:'right',fontSize:11,color:'#94a3b8'}}>{Math.round(dd.backLeg)} mi</td><td colSpan={2}></td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </React.Fragment>;
+            })}
+        </div>;
+      };
+
 
       /* Print handler - client-side */
       const printRoutePlan=()=>{
@@ -396,12 +680,18 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       return <div>
         {/* Day picker */}
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+          <span style={{display:'inline-flex',border:'1px solid #7c3aed',borderRadius:6,overflow:'hidden',marginRight:10}}>
+            <button onClick={()=>setRpMode('driver')} style={{padding:'6px 14px',fontSize:12,fontWeight:700,background:rpMode==='driver'?'#7c3aed':'#fff',color:rpMode==='driver'?'#fff':'#7c3aed',border:'none',cursor:'pointer'}}>Driver Routes</button>
+            <button onClick={()=>setRpMode('area')} style={{padding:'6px 14px',fontSize:12,fontWeight:700,background:rpMode==='area'?'#7c3aed':'#fff',color:rpMode==='area'?'#fff':'#7c3aed',border:'none',cursor:'pointer'}}>By Area</button>
+          </span>
           <span style={{fontWeight:700,fontSize:13,color:'#374151',marginRight:4}}>View:</span>
           <button onClick={()=>setRpDay(null)} style={{padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:rpDay===null?700:400,background:rpDay===null?'#7c3aed':'#f3f4f6',color:rpDay===null?'#fff':'#374151',border:'1px solid '+(rpDay===null?'#7c3aed':'#d1d5db'),cursor:'pointer'}}>Full Week</button>
           {dates.map((d,i)=><button key={i} onClick={()=>setRpDay(i)} style={{padding:'6px 14px',borderRadius:6,fontSize:12,fontWeight:rpDay===i?700:400,background:rpDay===i?'#7c3aed':(dk(d)===today?'#fef9c3':'#f3f4f6'),color:rpDay===i?'#fff':'#374151',border:'1px solid '+(rpDay===i?'#7c3aed':dk(d)===today?'#fbbf24':'#d1d5db'),cursor:'pointer'}}>{DAYS_SHORT[i]} {d.getMonth()+1}/{d.getDate()}</button>)}
-          <button onClick={printRoutePlan} style={{marginLeft:'auto',background:'#475569',color:'#fff',padding:'6px 16px',borderRadius:6,fontSize:13,fontWeight:600,border:'none',cursor:'pointer'}}>🖨 Print Route Plan</button>
+          {rpMode==='area'?<button onClick={printRoutePlan} style={{marginLeft:'auto',background:'#475569',color:'#fff',padding:'6px 16px',borderRadius:6,fontSize:13,fontWeight:600,border:'none',cursor:'pointer'}}>🖨 Print Area Plan</button>:<button onClick={printDriverSheets} style={{marginLeft:'auto',background:'#16a34a',color:'#fff',padding:'6px 16px',borderRadius:6,fontSize:13,fontWeight:700,border:'none',cursor:'pointer'}}>🖨 Print All Driver Sheets</button>}
         </div>
 
+        {rpMode==='driver'&&renderDriverRoutes()}
+        {rpMode==='area'&&<React.Fragment>
         {/* Summary bar */}
         <div style={{display:'flex',gap:16,marginBottom:16,padding:'10px 16px',background:'#f0fdf4',border:'1px solid #86efac',borderRadius:8,fontSize:13,flexWrap:'wrap'}}>
           <span><strong>{rpJobs.length}</strong> jobs</span>
@@ -478,9 +768,10 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             </div>;
           })
         }
+        </React.Fragment>}
       </div>;
     })() :
-    <div style={{display:'flex',gap:10,marginBottom:8,flexWrap:'wrap',alignItems:'center',fontSize:11}}>
+    <div className="legend-row" style={{display:'flex',gap:10,marginBottom:8,flexWrap:'wrap',alignItems:'center',fontSize:11}}>
       <span style={{fontWeight:700,color:'#666'}}>Legend:</span>
       <span style={{background:'#fca5a5',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Coast</span>
       <span style={{background:'#fed7aa',padding:'2px 8px',borderRadius:4,fontWeight:600}}>Vac</span>
@@ -495,6 +786,9 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
     {!showRoutePlanner&&<div className="grid"><table><thead><tr><th>Person</th>
       {dates.map((d,i)=>(<th key={i} style={dk(d)===today?{background:'#fffbeb'}:{}}>{DAYS[i]}<br/><span style={{fontWeight:400,fontSize:11}}>{d.getMonth()+1}/{d.getDate()}</span></th>))}
     </tr></thead><tbody>
+      {tuOn&&Object.keys(tuEvents).length>0&&<tr><td style={{background:'#f0fdfa',cursor:'pointer'}} onClick={()=>setTuExpand(!tuExpand)} title="Click to expand or collapse the Teamup row"><div style={{fontWeight:700,fontSize:12,color:'#0f766e'}}>Teamup {tuExpand?'▴':'▾'}</div><div style={{fontSize:9,color:'var(--text-muted)'}}>{tuExpand?'click to collapse':'scheduled / call-ins'}</div></td>
+        {dates.map((d,i)=>{const evs=tuEvents[dk(d)]||[];return(<td key={i} style={{background:'#f0fdfa',verticalAlign:'top',cursor:'pointer'}} onClick={()=>setTuExpand(!tuExpand)} title="Click to expand or collapse">{(tuExpand?evs:evs.slice(0,4)).map((ev,k2)=>(<div key={k2} style={{background:'#ccfbf1',border:'1px solid #5eead4',borderRadius:4,padding:'1px 5px',marginBottom:2,fontSize:10,color:'#115e59',fontWeight:600}}>{ev.start?ev.start+' · ':''}{tuExpand?ev.title:(ev.title.length>34?ev.title.slice(0,34)+'…':ev.title)}</div>))}{!tuExpand&&evs.length>4?<div style={{fontSize:9,color:'#0f766e',fontWeight:700}}>+{evs.length-4} more — click</div>:null}</td>);})}
+      </tr>}
       {data.drivers.map((driver,dIdx)=>(<tr key={driver.id}><td><div style={{display:'flex',alignItems:'center',gap:4}}>
             <div style={{display:'flex',flexDirection:'column',gap:1}}>
               <span onClick={()=>moveDriver(dIdx,-1)} style={{cursor:dIdx>0?'pointer':'default',opacity:dIdx>0?1:0.2,fontSize:10,lineHeight:1,userSelect:'none'}}>&#9650;</span>
@@ -506,25 +800,32 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
           const jobs=cellJobs(driver.id,date);const conf=cellConflict(driver.id,date);const ist=dk(date)===today;
           return(<td key={i}><div className={'cell'+(conf?' conflict':'')+(ist?' today':'')} onClick={()=>openAdd(driver.id,date)}>
             {conf&&<div className="cbadge">TRUCK CONFLICT</div>}
-            {jobs.map(job=>{
-              const truck=data.trucks.find(t=>t.id===job.truckId);const trailer=data.trailers.find(t=>t.id===job.trailerId);
-              const custEntries=(job.customerIds||[]).map(x=>typeof x==='string'?{id:x}:x);
-              const custNames=custEntries.map(x=>(data.customers||[]).find(c=>c.id===x.id)).filter(Boolean).map(c=>c.name);
-              const sc=job.status?(job.status.toLowerCase().replace(/\s/g,'')):'';
-              const loc=(job.location||'').trim().toLowerCase();
+            {jobs.length>0&&(()=>{
+              const locs=[...new Set(jobs.map(j=>(j.location||'').trim()).filter(Boolean))];
+              const custNames=[];jobs.forEach(j=>(j.customerIds||[]).forEach(x=>{const cid=typeof x==='string'?x:x.id;const cc=(data.customers||[]).find(c2=>c2.id===cid);if(cc)custNames.push(cc.name);}));
+              const trucksL=[...new Set(jobs.map(j=>{const t=data.trucks.find(tt=>tt.id===j.truckId);return t?t.name:null;}).filter(Boolean))];
+              const trailersL=[...new Set(jobs.map(j=>{const t=data.trailers.find(tt=>tt.id===j.trailerId);return t?t.name:null;}).filter(Boolean))];
+              const eqL=[...new Set(jobs.reduce((a,j)=>a.concat(j.equipment||[]),[]))];
+              const notesL=jobs.map(j=>j.notes||'').filter(Boolean).join(' | ');
+              const tws=[...new Set(jobs.map(j=>j.timeWindow||'').filter(Boolean))];
+              const sc=jobs.length===1&&jobs[0].status?jobs[0].status.toLowerCase().replace(/\s/g,''):'';
+              const loc0=locs.length===1?locs[0].toLowerCase():'';
               const pinkLocs=['ews','la tsdf','prr','use'];
-              const locColor=loc==='coast'?'#fca5a5':loc==='vac'?'#fed7aa':loc==='roll off'?'#e9d5ff':pinkLocs.includes(loc)?'#fce7f3':(job.location&&!(data.locations||[]).some(l=>l===job.location))?'#dcfce7':null;
-              return(<div key={job.id} className={'chip '+sc} style={locColor?{background:locColor}:{}} onClick={e=>openEdit(job,e)}>
-                {job.location&&<div className="loc">{job.location}</div>}
-                {custNames.length>0&&<div style={{fontSize:job.location?10:11,fontWeight:job.location?400:600,color:job.location?'#555':'#1e40af'}}>{custNames.join(', ')}</div>}
-                {truck&&<div className="trk">{truck.name}</div>}
-                {trailer&&<div className="trk">{trailer.name}</div>}
-                {job.timeWindow&&<div className="tm">{job.timeWindow}</div>}
-                {job.equipment&&job.equipment.length>0&&<div style={{fontSize:9,color:'#888'}}>{job.equipment.join(', ')}</div>}
-                {job.notes&&<div style={{fontSize:10,color:'#666',marginTop:1}}>{job.notes.length>50?job.notes.slice(0,50)+'...':job.notes}</div>}
-                <span className="x" onClick={e=>{e.stopPropagation();del(job.id);}}>&#10005;</span>
+              const locColor=loc0==='coast'?'#fca5a5':loc0==='vac'?'#fed7aa':loc0==='roll off'?'#e9d5ff':pinkLocs.includes(loc0)?'#fce7f3':(locs.length===1&&!(data.locations||[]).some(l=>l===locs[0]))?'#dcfce7':null;
+              const firstJob=jobs[0];
+              return(<div className={'chip '+sc} style={locColor?{background:locColor}:{}} onClick={e=>{if(jobs.length===1){openEdit(firstJob,e);}else{e.stopPropagation();openAdd(driver.id,date);}}}>
+                {locs.length>0&&<div className="loc">{locs.slice(0,2).join(' / ')}{locs.length>2?' …':''}</div>}
+                {custNames.length>0&&<div style={{fontWeight:600,fontSize:11,color:'#1e293b',wordBreak:'break-word',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{custNames.slice(0,3).join(', ')}{custNames.length>3?' +'+(custNames.length-3)+' more':''}</div>}
+                {(trucksL.length||trailersL.length)?<div className="trk">{[...trucksL,...trailersL].join(' + ')}</div>:null}
+                {(()=>{const tg=[...new Set(jobs.map(j2=>j2.equipTag).filter(Boolean))];return tg.length?<div style={{fontSize:9,color:'#0369a1',fontWeight:700}}>{tg.join(' · ')}</div>:null;})()}
+                {jobs.some(j2=>!j2.equipTag)&&<div style={{fontSize:9,color:'#b45309',fontWeight:700}}>&#9888; equipment tag missing</div>}
+                {tws.length>0&&<div className="tm">{tws[0]}{tws.length>1?' +':''}</div>}
+                {jobs.length===1&&eqL.length>0&&<div style={{fontSize:9,color:'#888'}}>{eqL.join(', ')}</div>}
+                {jobs.length===1&&notesL&&<div style={{fontSize:10,color:'#666',marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{notesL}</div>}
+                {jobs.length>1&&<div style={{fontSize:9,color:'#7c3aed',fontWeight:700,marginTop:2}}>{jobs.length} jobs — click to manage</div>}
+                {jobs.length===1&&<span className="x" onClick={e=>{e.stopPropagation();del(firstJob.id);}}>&#10005;</span>}
               </div>);
-            })}
+            })()}
             {jobs.length>0&&<div style={{color:'var(--primary)',fontSize:10,textAlign:'center',marginTop:4,cursor:'pointer',fontWeight:600}} onClick={e=>{e.stopPropagation();openAdd(driver.id,date);}}>+</div>}
           </div></td>);
         })}
@@ -538,9 +839,52 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       </div>);
     })}
 
-    {modal&&(<div className="overlay" onClick={()=>{setModal(null);setEid(null);}}>
+    {pinPrompt&&(<div className="overlay">
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:340,textAlign:'center'}}>
+        <h2 style={{marginBottom:4}}>Enter PIN</h2>
+        <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:16}}>Enter your 4-digit PIN to continue</p>
+        <input type="password" maxLength={4} value={pinPrompt.pin} autoFocus
+          onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,4);setPinPrompt({...pinPrompt,pin:v});setPinError('');}}
+          onKeyDown={e=>{if(e.key==='Enter')submitPin();if(e.key==='Escape'){setPinPrompt(null);setPinError('');}}}
+          style={{fontSize:28,textAlign:'center',letterSpacing:12,width:140,padding:'8px 12px',border:'2px solid '+(pinError?'#dc2626':'var(--border)'),borderRadius:8}}
+          placeholder="••••"/>
+        {pinError&&<div style={{color:'#dc2626',fontSize:13,marginTop:8,fontWeight:600}}>{pinError}</div>}
+        <div style={{marginTop:16,display:'flex',gap:8,justifyContent:'center'}}>
+          <button className="bc" onClick={()=>{setPinPrompt(null);setPinError('');}}>Cancel</button>
+          <button className="bp" onClick={submitPin}>Submit</button>
+        </div>
+      </div>
+    </div>)}
+    {modal&&(<div className="overlay">
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <h2>{eid?'Edit Job':'Add Job'}</h2>
+        {(()=>{const dr=data.drivers.find(d=>d.id===modal.driverId);const dd=dr&&modal.date?buildDriverDay(data,geo,dr,modal.date,manualOrder[dr.id+'_'+modal.date]):null;
+          const tul=(tuEvents[modal.date]||[]);
+          return <React.Fragment>
+          {Object.keys(tuEvents).length>0&&<div style={{background:'#f0fdfa',border:'1px solid #99f6e4',borderRadius:8,padding:'8px 12px',marginBottom:10,fontSize:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+              <div style={{flex:1,minWidth:200}}><strong style={{color:'#0f766e'}}>On Teamup this day:</strong><span style={{color:'#115e59'}}> {tul.length?tul.map(ev=>(ev.start?ev.start+' ':'')+ev.title).join('  —  '):'nothing scheduled'}</span></div>
+              <button onClick={()=>setTuFull(!tuFull)} style={{background:tuFull?'#0f766e':'#fff',color:tuFull?'#fff':'#0f766e',border:'1px solid #0f766e',borderRadius:5,padding:'2px 10px',fontSize:11,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>{tuFull?'Hide week':'Week by calendar'}</button>
+            </div>
+            {tuFull&&(()=>{const all=[];dates.forEach(d2=>{(tuEvents[dk(d2)]||[]).forEach(ev=>all.push(ev));});
+              const by={};all.forEach(ev=>{String(ev.calendar||'Main').split(',').forEach(c2=>{const k2=c2.trim()||'Main';(by[k2]=by[k2]||[]).push(ev);});});
+              const dowOf=ds=>new Date(ds+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'});
+              return <div style={{marginTop:8,display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:10}}>{Object.keys(by).sort().map(c2=><div key={c2}>
+                <div style={{fontWeight:800,fontSize:11,color:'#134e4a',borderBottom:'2px solid #5eead4',marginBottom:3,textTransform:'uppercase',letterSpacing:'.4px'}}>{c2} · {by[c2].length} this week</div>
+                {by[c2].map((ev,k3)=><div key={k3} style={{fontSize:11,color:'#115e59',padding:'1px 0'}}><span style={{fontWeight:700,display:'inline-block',width:30}}>{dowOf(ev.date)}</span>{ev.start?ev.start+' · ':''}{ev.title.length>52?ev.title.slice(0,52)+'…':ev.title}</div>)}
+              </div>)}</div>;})()}
+          </div>}
+          {dd?<div style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:8,padding:'8px 12px',marginBottom:10,fontSize:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:6}}>
+              <strong style={{color:'#5b21b6'}}>{dr.name} — {dd.jobs.length} saved job{dd.jobs.length>1?'s':''} / {dd.stops.length} stop{dd.stops.length!==1?'s':''} this day{dd.yardPt?' · ~'+Math.round(dd.miles)+' mi · ~'+dd.hrs.toFixed(1)+' hr':''}</strong>
+              <button onClick={()=>printSheets([{dd,dateLong:fmtLong(new Date(modal.date+'T00:00:00'))}])} style={{background:'#16a34a',color:'#fff',border:'none',padding:'4px 12px',borderRadius:5,fontSize:12,fontWeight:700,cursor:'pointer'}}>🖨 Print Day Route</button>
+            </div>
+            <div style={{marginTop:4,lineHeight:1.9}}>{dd.stops.map((s,i2)=><span key={s.key}><span onClick={()=>{setEid(s.job.id);setModal({...s.job,customerIds:s.job.customerIds||[]});setCustSearch('');setCustDropOpen(false);}} title="Edit this stop's job" style={{color:'#6d28d9',cursor:'pointer',textDecoration:'underline',fontWeight:s.job.id===eid?800:600}}>{(i2+1)+'. '+s.custName}</span>{i2<dd.stops.length-1?' → ':''}</span>)}</div>
+            <div style={{marginTop:2,fontSize:10,color:'#8b5cf6'}}>Click a stop above to open and edit its job</div>
+            {geoLoading&&<div style={{color:'#7c3aed',marginTop:2}}>Locating addresses…</div>}
+            {dd.flags.map((f,fi)=><div key={fi} style={{color:f.sev==='red'?'#b91c1c':'#92400e',fontWeight:600,marginTop:2}}>&#9888; {f.txt}</div>)}
+          </div>:null}
+          </React.Fragment>;})()}
         <div className="mrow"><label>Date</label>
           <input type="date" value={modal.date||''} onChange={e=>setModal({...modal,date:e.target.value})}/>
         </div>
@@ -551,7 +895,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mrow"><label>Location / Job</label>
           <select value={(data.locations||[]).includes(modal.location)?modal.location:'__custom'} onChange={e=>{
             if(e.target.value==='__custom') setModal({...modal,location:''});
-            else setModal({...modal,location:e.target.value});
+            else {const v2=e.target.value;const inf=v2==='Vac'?'Vac truck':v2==='Roll Off'?'Roll-off':'';setModal({...modal,location:v2,equipTag:modal.equipTag||inf});}
           }}>
             <option value="">-- Select Location --</option>
             {(data.locations||[]).map(l=><option key={l} value={l}>{l}</option>)}
@@ -611,6 +955,27 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
             <option value="">-- None --</option>
             {data.trailers.map(t=><option key={t.id} value={t.id}>{t.name} ({t.type})</option>)}
           </select></div>
+        <div className="mrow"><label>Equipment needed *</label>
+          <select value={modal.equipTag||''} onChange={e=>setModal({...modal,equipTag:e.target.value})} style={modal.equipTag?{}:{border:'2px solid #d97706'}}>
+            <option value="">-- pick the equipment type --</option>
+            {(data.equipTags||[]).map(g=><option key={g} value={g}>{g}</option>)}
+          </select>
+          {!modal.equipTag&&<div style={{fontSize:11,color:'#b45309',marginTop:2,fontWeight:600}}>Required — the router uses this to match the stop to a compatible truck. Jobs can't save without it.</div>}</div>
+          {eqWarn&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.6)',zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setEqWarn(false)}>
+            <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderTop:'6px solid #d97706',borderRadius:12,padding:'22px 26px',maxWidth:420,width:'90%',boxShadow:'0 12px 40px rgba(0,0,0,.35)',textAlign:'center'}}>
+              <div style={{fontSize:42,lineHeight:1}}>&#9888;&#65039;</div>
+              <div style={{fontSize:20,fontWeight:800,color:'#92400e',margin:'8px 0 6px'}}>Equipment needed</div>
+              <div style={{fontSize:14,color:'#374151',marginBottom:16,lineHeight:1.45}}>This job can't save yet — pick the equipment it needs (Box truck, Vac truck, Roll-off…). The router uses it to match the stop to a compatible truck.</div>
+              <button onClick={()=>setEqWarn(false)} style={{background:'#d97706',color:'#fff',border:'none',borderRadius:8,padding:'10px 28px',fontSize:15,fontWeight:700,cursor:'pointer'}}>OK — pick equipment</button>
+            </div>
+          </div>}
+          {okFlash&&<div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:3000,display:'flex',alignItems:'center',justifyContent:'center',pointerEvents:'none'}}>
+            <div style={{background:'#fff',borderTop:'6px solid #16a34a',borderRadius:12,padding:'24px 40px',boxShadow:'0 12px 40px rgba(0,0,0,.35)',textAlign:'center'}}>
+              <div style={{fontSize:44,lineHeight:1,color:'#16a34a',fontWeight:800}}>&#10003;</div>
+              <div style={{fontSize:21,fontWeight:800,color:'#166534',margin:'8px 0 2px'}}>{okFlash}</div>
+              <div style={{fontSize:13,color:'#374151'}}>Ready for the next one</div>
+            </div>
+          </div>}
         {showPlacards&&(()=>{const pcid=showPlacards;const pEntry=getCustEntries().find(x=>x.id===pcid);const pCust=(data.customers||[]).find(x=>x.id===pcid);const curPl=pEntry?pEntry.placards||[]:[];
           const togglePl=(p)=>{const updated=getCustEntries().map(x=>x.id===pcid?{...x,placards:curPl.includes(p)?curPl.filter(z=>z!==p):[...curPl,p]}:x);setModal({...modal,customerIds:updated});};
           return <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,.5)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setShowPlacards(null)}>
@@ -647,12 +1012,13 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mrow"><label>Notes</label>
           <textarea value={modal.notes} onChange={e=>setModal({...modal,notes:e.target.value})} rows={3} placeholder="Special instructions, reference numbers, etc."/></div>
         <div className="mactions">
-          <button className="bc" onClick={()=>{setModal(null);setEid(null);}}>Cancel</button>
+          {eid&&<button style={{background:'#dc2626',color:'#fff',padding:'6px 14px',borderRadius:6,fontSize:13,border:'none',cursor:'pointer',fontWeight:600}} onClick={async()=>{if(!confirm('Delete this job?'))return;await api('DELETE','/jobs/'+eid);setEid(null);setModal({driverId:modal.driverId,date:modal.date,location:'',customerIds:[],truckId:'',trailerId:'',timeWindow:'',equipment:[],notes:'',status:'Scheduled'});setCustSearch('');if(show)show('Job deleted');}}>Delete Job</button>}
+          <button className="bc" onClick={()=>{setModal(null);setEid(null);}}>Close</button>
           {eid&&<button className="bd" onClick={async()=>{await del(eid);setModal(null);setEid(null);}}>Delete</button>}
           <button style={{background:'#7c3aed',color:'#fff'}} onClick={copyJob}>Copy Job</button>
           <button onClick={()=>{
             const entries=getCustEntries();
-            const custs=entries.map(entry=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?{name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),phone:c.phone||'',contact:c.contact||'',pricing:c.pricing||c.notes||'',jobNotes:entry.jobNotes||'',timeWindow:entry.timeWindow||'',equipment:(entry.equipment||[]).join(', ')||'None',placards:(entry.placards||[]).join(', ')||'None'}:null;}).filter(Boolean);
+            const custs=entries.map(entry=>{const c=(data.customers||[]).find(x=>x.id===entry.id);return c?{name:c.name,address:[c.address,c.city,c.state,c.zip].filter(Boolean).join(', '),phone:c.phone||'',contact:c.contact||'',epaId:c.epaId||'',stateId:c.stateId||'',generatorStatus:c.generatorStatus||'',pricing:c.pricing||c.notes||'',jobNotes:entry.jobNotes||'',timeWindow:entry.timeWindow||'',equipment:(entry.equipment||[]).join(', ')||'None',placards:(entry.placards||[]).join(', ')||'None'}:null;}).filter(Boolean);
             const jobData={
               date:modal.date?(modal.date.split('-')[1]+'/'+modal.date.split('-')[2]+'/'+modal.date.split('-')[0]):'',
               driver:(data.drivers.find(d=>d.id===modal.driverId)||{}).name||'',
@@ -703,7 +1069,12 @@ function Roster({data}){
           <select value={d.role} onChange={e=>api('PUT','/drivers/'+d.id,{role:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:4}}>
             <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Sales/Driver</option><option>Salesperson</option>
           </select>
-
+          <div style={{marginTop:4,display:'flex',alignItems:'center',gap:4}}>
+            <label style={{fontSize:11,fontWeight:600,color:'#6b7280'}}>PIN:</label>
+            <input type="password" maxLength={4} value={d.pin||''} placeholder="----"
+              onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,4);api('PUT','/drivers/'+d.id,{pin:v});}}
+              style={{width:60,padding:'2px 6px',fontSize:12,textAlign:'center',letterSpacing:4,border:'1px solid var(--border)',borderRadius:4}}/>
+          </div>
         </div>
         <div className="acts"><button style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>remove(d)}>Remove</button></div>
       </div>))}
@@ -716,6 +1087,7 @@ function Fleet({data}){
   const [trn,setTrn]=useState('');const [trt,setTrt]=useState('Standard');
   const [eq,setEq]=useState('');
   const [newLoc,setNewLoc]=useState('');
+  const [ntag,setNtag]=useState('');
   const [editingLoc,setEditingLoc]=useState(null);
   const [editLocName,setEditLocName]=useState('');
   const [editing,setEditing]=useState(null);
@@ -744,6 +1116,10 @@ function Fleet({data}){
           <div style={{marginTop:2}}>
             <select value={t.type} onChange={e=>api('PUT','/trucks/'+t.id,{type:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11}}>
               <option>Standard</option><option>Flatbed</option><option>Vac Truck</option><option>Tanker</option><option>Box Truck</option>
+            </select>
+            <select value={t.tag||''} onChange={e=>api('PUT','/trucks/'+t.id,{tag:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginLeft:6,border:'1px solid #7dd3fc',color:'#075985'}} title="Router equipment tag — what the routing helper matches jobs against">
+              <option value="">— router tag —</option>
+              {(data.equipTags||[]).map(g=><option key={g} value={g}>{g}</option>)}
             </select>
             <span style={{fontSize:11,marginLeft:8,color:t.status==='Active'?'var(--success)':'var(--danger)'}}>{t.status}</span>
           </div>
@@ -777,9 +1153,23 @@ function Fleet({data}){
           <select value={t.type} onChange={e=>api('PUT','/trailers/'+t.id,{type:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:2}}>
             <option>Standard</option><option>Flatbed</option><option>Tanker</option><option>Enclosed</option><option>Dump</option>
           </select>
+          <select value={t.tag||''} onChange={e=>api('PUT','/trailers/'+t.id,{tag:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:2,marginLeft:6,border:'1px solid #7dd3fc',color:'#075985'}} title="Router equipment tag">
+            <option value="">— router tag —</option>
+            {(data.equipTags||[]).map(g=><option key={g} value={g}>{g}</option>)}
+          </select>
         </div>
         <div className="acts"><button style={{background:'#fee2e2',color:'var(--danger)'}} onClick={async()=>{if(confirm('Remove '+t.name+'?'))await api('DELETE','/trailers/'+t.id);}}>Remove</button></div>
       </div>))}
+    </div>
+
+    <div className="stitle" style={{marginTop:28}}>Router Equipment Tags</div>
+    <p style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 8px'}}>Simple capability tags — Box truck, Vac truck, Oil tanker — that the routing helper matches jobs to trucks with. Every job must carry one; tag each truck and trailer above.</p>
+    <div className="addrow">
+      <input value={ntag} onChange={e=>setNtag(e.target.value)} placeholder="New tag (e.g. 53 footer)" onKeyDown={e=>{if(e.key==='Enter'&&ntag.trim()){api('POST','/equiptags',{name:ntag.trim()});setNtag('');}}}/>
+      <button className="bp" onClick={()=>{if(ntag.trim()){api('POST','/equiptags',{name:ntag.trim()});setNtag('');}}}>Add</button>
+    </div>
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6,marginBottom:4}}>
+      {(data.equipTags||[]).map(g=><span key={g} style={{background:'#e0f2fe',border:'1px solid #7dd3fc',borderRadius:12,padding:'3px 10px',fontSize:12,fontWeight:600,color:'#075985'}}>{g} <span onClick={()=>{if(confirm('Remove tag '+g+'?'))api('DELETE','/equiptags/'+encodeURIComponent(g));}} style={{cursor:'pointer',color:'#dc2626',fontWeight:700,marginLeft:4}}>&times;</span></span>)}
     </div>
 
     <div className="stitle" style={{marginTop:28}}>Equipment Types</div>
@@ -4789,9 +5179,26 @@ function Pickups({data}) {
 
   const removeAttachment = (docId) => { setAttachments(prev => prev.filter(a => a.id !== docId)); };
 
+  const [pinPrompt, setPinPrompt] = useState(null); /* null or {pickupId, pin} */
+  const [pinError, setPinError] = useState('');
+
+  const checkPin = (pin) => data.drivers.some(d => d.pin && d.pin === pin);
+
   const startAssign = (pickupId, requestedDate) => {
-    setAssigningId(pickupId);
-    setAssignDate(requestedDate || '');
+    setPinPrompt({ pickupId, requestedDate: requestedDate || '', pin: '' });
+    setPinError('');
+  };
+
+  const submitAssignPin = () => {
+    if (!pinPrompt) return;
+    if (checkPin(pinPrompt.pin)) {
+      setAssigningId(pinPrompt.pickupId);
+      setAssignDate(pinPrompt.requestedDate);
+      setPinPrompt(null);
+      setPinError('');
+    } else {
+      setPinError('Invalid PIN');
+    }
   };
 
   const getCustEntries = () => (form.customerIds || []).map(x => typeof x === 'string' ? { id: x, jobNotes: '' } : x);
@@ -5052,6 +5459,26 @@ function Pickups({data}) {
             </div>
           );
         })}
+      </div>
+    )}
+
+    {/* PIN Prompt for Assign */}
+    {pinPrompt && (
+      <div className="overlay">
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, textAlign: 'center' }}>
+          <h2 style={{ marginBottom: 4 }}>Enter PIN</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Enter your 4-digit PIN to assign this job</p>
+          <input type="password" maxLength={4} value={pinPrompt.pin} autoFocus
+            onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); setPinPrompt({ ...pinPrompt, pin: v }); setPinError(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') submitAssignPin(); if (e.key === 'Escape') { setPinPrompt(null); setPinError(''); } }}
+            style={{ fontSize: 28, textAlign: 'center', letterSpacing: 12, width: 140, padding: '8px 12px', border: '2px solid ' + (pinError ? '#dc2626' : 'var(--border)'), borderRadius: 8 }}
+            placeholder="••••" />
+          {pinError && <div style={{ color: '#dc2626', fontSize: 13, marginTop: 8, fontWeight: 600 }}>{pinError}</div>}
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="bc" onClick={() => { setPinPrompt(null); setPinError(''); }}>Cancel</button>
+            <button className="bp" onClick={submitAssignPin}>Submit</button>
+          </div>
+        </div>
       </div>
     )}
 
