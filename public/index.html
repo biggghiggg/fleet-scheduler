@@ -328,7 +328,7 @@ function buildDriverDay(data,geo,dr,k8,mo){
   const dstops=[];
   djobs.forEach(j=>{
     const entries=(j.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
-    if(!entries.length){dstops.push({job:j,customer:null,entry:null,custName:'(Empty slot)',address:'',lat:null,lon:null,appt:null,key:j.id+'_x'});return;}
+    if(!entries.length){dstops.push({job:j,customer:null,entry:null,custName:(j.location||'(Empty slot)'),address:'',lat:null,lon:null,appt:null,key:j.id+'_x'});return;}
     entries.forEach(en=>{
       const c=(data.customers||[]).find(x=>x.id===en.id);if(!c)return;
       const address=[c.address,c.city,c.state,c.zip].filter(Boolean).join(', ');
@@ -526,7 +526,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         const trailer = data.trailers.find(t=>t.id===j.trailerId);
         const entries = (j.customerIds||[]).map(x=>typeof x==='string'?{id:x,jobNotes:''}:x);
         if(entries.length===0){
-          stops.push({job:j,driver,truck,trailer,customer:null,entry:null,city:'No Customer Assigned',address:'',custName:'(Empty slot)'});
+          stops.push({job:j,driver,truck,trailer,customer:null,entry:null,city:'No Customer Assigned',address:'',custName:(j.location||'(Empty slot)')});
         } else {
           entries.forEach(entry=>{
             const c=(data.customers||[]).find(x=>x.id===entry.id);
