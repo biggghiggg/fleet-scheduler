@@ -358,6 +358,7 @@ function buildDriverDay(data,geo,dr,k8,mo){
     const req=j.equipTag||'';
     const t2=data.trucks.find(t=>t.id===j.truckId);const tl2=data.trailers.find(t=>t.id===j.trailerId);
     if(!req){flags.push({sev:'amber',txt:'No equipment tag on the '+(j.location||'un-labeled')+' job — open it and pick one'});return;}
+    if(req==='No Equipment Necessary')return; /* tech/labor-only stop — no truck match needed */
     const tags=[t2&&t2.tag,tl2&&tl2.tag].filter(Boolean);
     if((t2||tl2)&&tags.length&&tags.indexOf(req)===-1)flags.push({sev:'red',txt:'Needs a '+req+' — '+[t2?(t2.name+' is tagged '+(t2.tag||'untagged')):'',tl2?(tl2.name+': '+(tl2.tag||'untagged')):''].filter(Boolean).join(', ')});
   });
@@ -817,7 +818,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
                 {locs.length>0&&<div className="loc">{locs.slice(0,2).join(' / ')}{locs.length>2?' …':''}</div>}
                 {custNames.length>0&&<div style={{fontWeight:600,fontSize:11,color:'#1e293b',wordBreak:'break-word',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{custNames.slice(0,3).join(', ')}{custNames.length>3?' +'+(custNames.length-3)+' more':''}</div>}
                 {(trucksL.length||trailersL.length)?<div className="trk">{[...trucksL,...trailersL].join(' + ')}</div>:null}
-                {(()=>{const tg=[...new Set(jobs.map(j2=>j2.equipTag).filter(Boolean))];return tg.length?<div style={{fontSize:9,color:'#0369a1',fontWeight:700}}>{tg.join(' · ')}</div>:null;})()}
+                {(()=>{const all=jobs.map(j2=>j2.equipTag).filter(Boolean);const tg=[...new Set(all.filter(g=>g!=='No Equipment Necessary'))];const ne=all.indexOf('No Equipment Necessary')!==-1;return <React.Fragment>{tg.length?<div style={{fontSize:9,color:'#0369a1',fontWeight:700}}>{tg.join(' · ')}</div>:null}{ne?<div style={{fontSize:9,color:'#64748b',fontWeight:600}}>no equipment</div>:null}</React.Fragment>;})()}
                 {jobs.some(j2=>!j2.equipTag)&&<div style={{fontSize:9,color:'#b45309',fontWeight:700}}>&#9888; equipment tag missing</div>}
                 {tws.length>0&&<div className="tm">{tws[0]}{tws.length>1?' +':''}</div>}
                 {jobs.length===1&&eqL.length>0&&<div style={{fontSize:9,color:'#888'}}>{eqL.join(', ')}</div>}
@@ -958,6 +959,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         <div className="mrow"><label>Equipment needed *</label>
           <select value={modal.equipTag||''} onChange={e=>setModal({...modal,equipTag:e.target.value})} style={modal.equipTag?{}:{border:'2px solid #d97706'}}>
             <option value="">-- pick the equipment type --</option>
+            <option value="No Equipment Necessary">No Equipment Necessary (tech / labor only)</option>
             {(data.equipTags||[]).map(g=><option key={g} value={g}>{g}</option>)}
           </select>
           {!modal.equipTag&&<div style={{fontSize:11,color:'#b45309',marginTop:2,fontWeight:600}}>Required — the router uses this to match the stop to a compatible truck. Jobs can't save without it.</div>}</div>
