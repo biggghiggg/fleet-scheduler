@@ -1523,7 +1523,9 @@ function Bins({data}){
       const haulApplies=drop>=first&&drop<=last;     /* delivery billed in month dropped */
       /* ---- customer revenue: days the bin sat at the customer (drop -> pickup / today) ---- */
       let custDays=0;
-      const custEnd=pd(b.datePickedUp)||now;
+      /* the customer stops paying at pickup — or, if no pickup was ever logged, when the bin went to our inventory or back to the vendor (fixes JC-26-style status/billing disagreements) */
+      const custEnd=pd(b.datePickedUp)||pd(b.dateToInventory)||pd(b.dateReturnedToVendor)||now;
+      const custEndLabel=b.datePickedUp||(b.dateToInventory?b.dateToInventory+' (to inv)':(b.dateReturnedToVendor?b.dateReturnedToVendor+' (to vendor)':''));
       if(drop<=last&&custEnd>=first){
         const ps=drop>first?drop:first;const pe=custEnd<last?custEnd:last;
         custDays=pe>=ps?daysBetween(ps,pe):0;
@@ -1550,7 +1552,7 @@ function Bins({data}){
       if(!billable&&vendorCost===0)return;           /* nothing to show this month */
       const grp=billable?(b.customer||'(no customer)'):IDLE_LABEL;
       if(!byCust[grp])byCust[grp]={customer:grp,rows:[],subtotal:0,vendorCost:0,margin:0,idle:!billable};
-      byCust[grp].rows.push({binNumber:b.binNumber,binSize:b.binSize,vendor:b.vendor,dateDropped:b.dateDropped,datePickedUp:b.datePickedUp,days:custDays,dailyRate,haulFee:haulApplies?haulFee:0,lineTotal,vendorDays,vendorCost,margin,billable});
+      byCust[grp].rows.push({binNumber:b.binNumber,binSize:b.binSize,vendor:b.vendor,dateDropped:b.dateDropped,datePickedUp:custEndLabel,days:custDays,dailyRate,haulFee:haulApplies?haulFee:0,lineTotal,vendorDays,vendorCost,margin,billable});
       byCust[grp].subtotal+=lineTotal;
       byCust[grp].vendorCost+=vendorCost;
       byCust[grp].margin+=margin;
