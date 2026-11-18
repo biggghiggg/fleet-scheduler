@@ -258,6 +258,7 @@ function App(){
         ))}
       </div>
       <div className="main">
+        {tab==='schedule'&&compAl.urgent.length>0&&<div onClick={()=>setTab('compliance')} style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:10,padding:'8px 14px',marginBottom:10,cursor:'pointer',fontSize:13,fontWeight:700,color:'#b91c1c'}}>{'\u26A0\uFE0F'} {compAl.urgent.length} driver credential{compAl.urgent.length>1?'s':''} expired or expiring within 30 days: {compAl.urgent.slice(0,3).map(a=>a.driver+' ('+a.label+')').join(', ')}{compAl.urgent.length>3?' \u2026':''} &mdash; tap to open Compliance</div>}
         {tab==='schedule'&&<Schedule {...{data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}}/>}
         {tab==='pickups'&&<Pickups data={data}/>}
         {tab==='roster'&&<Roster data={data}/>}
@@ -1096,7 +1097,7 @@ function Compliance({data}){
   const al=credAlerts(people);
   return(<div>
     <div className="stitle" style={{margin:0}}>Driver Compliance ({people.length} people)</div>
-    <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Track license, medical card, TSA/hazmat, TWIC and HAZWOPER dates straight off the DMV pull-notice printouts. Red = expired, orange = 30 days or less, yellow = 60 days out. The red badge on this tab's name shows the count of expired or soon-to-expire items.</div>
+    <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Track license, medical card, TSA/hazmat, TWIC and HAZWOPER dates straight off the DMV pull-notice printouts. Red = expired, orange = 30 days or less, yellow = 60 days out. Anything red or orange also flags on the Weekly Schedule, and the red badge on this tab's name shows the count.</div>
     {(al.urgent.length>0||al.soon.length>0)&&<div style={{background:al.urgent.length?'#fef2f2':'#fefce8',border:'1px solid '+(al.urgent.length?'#fecaca':'#fde68a'),borderRadius:10,padding:'10px 14px',marginBottom:14}}>
       {al.urgent.map((a,i)=>(<div key={'u'+i} style={{fontSize:13,fontWeight:700,color:a.days<0?'#b91c1c':'#c2410c'}}>{a.days<0?'⛔':'⚠️'} {a.driver} &mdash; {a.label} {a.days<0?('expired '+Math.abs(a.days)+' days ago ('+a.date+')'):('expires in '+a.days+' days ('+a.date+')')}</div>))}
       {al.soon.map((a,i)=>(<div key={'s'+i} style={{fontSize:12.5,fontWeight:600,color:'#a16207'}}>{'⏳'} {a.driver} &mdash; {a.label} expires in {a.days} days ({a.date})</div>))}
