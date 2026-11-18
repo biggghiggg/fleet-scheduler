@@ -1095,6 +1095,10 @@ function Compliance({data}){
   const rmExtra=async(d,i)=>{const c={...(d.creds||{})};c.extra=(c.extra||[]).filter((_,j)=>j!==i);await api('PUT','/drivers/'+d.id,{creds:c});};
   const al=credAlerts(people);
   const [npName,setNpName]=useState('');const [npRole,setNpRole]=useState('Driver');
+  const [cdocs,setCdocs]=useState([]);
+  const loadCdocs=async()=>{try{const r=await fetch('/api/documents');if(r.ok)setCdocs(await r.json());}catch(e){}};
+  useEffect(()=>{loadCdocs();},[]);
+  const upCert=async(d,file)=>{const fd=new FormData();fd.append('file',file);fd.append('category','Cert: '+d.name);try{const r=await fetch('/api/documents',{method:'POST',body:fd});if(!r.ok)alert('Upload failed — are you logged in?');}catch(e){alert('Upload failed.');}loadCdocs();};
   const addPerson=async()=>{if(!npName.trim())return;await api('POST','/drivers',{name:npName.trim(),role:npRole,skills:[],compOnly:true});setNpName('');};
   return(<div>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
@@ -1128,6 +1132,10 @@ function Compliance({data}){
               <button className="bp" style={{padding:'2px 8px',fontSize:11}} onClick={()=>addExtra(d)}>Add</button>
               <button className="ebtn" onClick={()=>setExtraFor(null)}>Cancel</button>
             </div>):(<button className="ebtn" onClick={()=>{setExtraFor(d.id);setXl('');setXd('');}}>+ item</button>)}
+            <div style={{marginTop:4}}>
+              {cdocs.filter(x=>x.category==='Cert: '+d.name).map(x=>(<div key={x.id} style={{fontSize:10.5,whiteSpace:'nowrap'}}>&#128196; <a href={'/api/documents/'+x.id+'/view'} target="_blank" rel="noreferrer" style={{color:'var(--primary)'}}>{x.name.length>32?x.name.slice(0,30)+'\u2026':x.name}</a></div>))}
+              <label className="ebtn" style={{cursor:'pointer',display:'inline-block'}} title="Attach a training certificate PDF or photo to this person">&#128206; cert<input type="file" accept="application/pdf,image/*" style={{display:'none'}} onChange={e=>{const f=e.target.files&&e.target.files[0];if(f)upCert(d,f);e.target.value='';}}/></label>
+            </div>
           </td>
           <td style={{whiteSpace:'nowrap'}}><button className="ebtn" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>{if(confirm('Remove '+d.name+' from RouteBoard? This also removes any of their scheduled jobs.'))api('DELETE','/drivers/'+d.id);}}>Remove</button></td>
         </tr>);})}
