@@ -793,7 +793,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
       {tuOn&&Object.keys(tuEvents).length>0&&<tr><td style={{background:'#f0fdfa',cursor:'pointer'}} onClick={()=>setTuExpand(!tuExpand)} title="Click to expand or collapse the Teamup row"><div style={{fontWeight:700,fontSize:12,color:'#0f766e'}}>Teamup {tuExpand?'▴':'▾'}</div><div style={{fontSize:9,color:'var(--text-muted)'}}>{tuExpand?'click to collapse':'scheduled / call-ins'}</div></td>
         {dates.map((d,i)=>{const evs=tuEvents[dk(d)]||[];return(<td key={i} style={{background:'#f0fdfa',verticalAlign:'top',cursor:'pointer'}} onClick={()=>setTuExpand(!tuExpand)} title="Click to expand or collapse">{(tuExpand?evs:evs.slice(0,4)).map((ev,k2)=>(<div key={k2} style={{background:'#ccfbf1',border:'1px solid #5eead4',borderRadius:4,padding:'1px 5px',marginBottom:2,fontSize:10,color:'#115e59',fontWeight:600}}>{ev.start?ev.start+' · ':''}{tuExpand?ev.title:(ev.title.length>34?ev.title.slice(0,34)+'…':ev.title)}</div>))}{!tuExpand&&evs.length>4?<div style={{fontSize:9,color:'#0f766e',fontWeight:700}}>+{evs.length-4} more — click</div>:null}</td>);})}
       </tr>}
-      {data.drivers.map((driver,dIdx)=>(<tr key={driver.id}><td><div style={{display:'flex',alignItems:'center',gap:4}}>
+      {data.drivers.map((driver,dIdx)=>driver.compOnly?null:(<tr key={driver.id}><td><div style={{display:'flex',alignItems:'center',gap:4}}>
             <div style={{display:'flex',flexDirection:'column',gap:1}}>
               <span onClick={()=>moveDriver(dIdx,-1)} style={{cursor:dIdx>0?'pointer':'default',opacity:dIdx>0?1:0.2,fontSize:10,lineHeight:1,userSelect:'none'}}>&#9650;</span>
               <span onClick={()=>moveDriver(dIdx,1)} style={{cursor:dIdx<data.drivers.length-1?'pointer':'default',opacity:dIdx<data.drivers.length-1?1:0.2,fontSize:10,lineHeight:1,userSelect:'none'}}>&#9660;</span>
@@ -894,7 +894,7 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         </div>
         <div className="mrow"><label>Person</label>
           <select value={modal.driverId} onChange={e=>setModal({...modal,driverId:e.target.value})}>
-            {data.drivers.map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
+            {data.drivers.filter(d=>!d.compOnly).map(d=><option key={d.id} value={d.id}>{d.name} ({d.role})</option>)}
           </select></div>
         <div className="mrow"><label>Location / Job</label>
           <select value={(data.locations||[]).includes(modal.location)?modal.location:'__custom'} onChange={e=>{
@@ -1095,9 +1095,19 @@ function Compliance({data}){
   const addExtra=async(d)=>{if(!xl.trim()||!xd)return;const c={...(d.creds||{})};c.extra=[...(c.extra||[]),{label:xl.trim(),date:xd}];await api('PUT','/drivers/'+d.id,{creds:c});setXl('');setXd('');setExtraFor(null);};
   const rmExtra=async(d,i)=>{const c={...(d.creds||{})};c.extra=(c.extra||[]).filter((_,j)=>j!==i);await api('PUT','/drivers/'+d.id,{creds:c});};
   const al=credAlerts(people);
+  const [npName,setNpName]=useState('');const [npRole,setNpRole]=useState('Driver');
+  const addPerson=async()=>{if(!npName.trim())return;await api('POST','/drivers',{name:npName.trim(),role:npRole,skills:[],compOnly:true});setNpName('');};
   return(<div>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
     <div className="stitle" style={{margin:0}}>Driver Compliance ({people.length} people)</div>
-    <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Track license, medical card, TSA/hazmat, TWIC and HAZWOPER dates straight off the DMV pull-notice printouts. Red = expired, orange = 30 days or less, yellow = 60 days out. Anything red or orange also flags on the Weekly Schedule, and the red badge on this tab's name shows the count.</div>
+    <div style={{display:'flex',gap:6,alignItems:'center'}}>
+      <input value={npName} onChange={e=>setNpName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addPerson()} placeholder="Add person (compliance only)" style={{width:210,fontSize:12,padding:'6px 8px'}}/>
+      <select value={npRole} onChange={e=>setNpRole(e.target.value)} style={{width:'auto',fontSize:12,padding:'6px 4px'}}>
+        <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Office</option><option>Sales/Driver</option>
+      </select>
+      <button className="bp" style={{whiteSpace:'nowrap'}} onClick={addPerson}>+ Add</button>
+    </div></div>
+    <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Track license, medical card, TSA/hazmat, TWIC and HAZWOPER dates straight off the DMV pull-notice printouts. People added here with “+ Add” are tracked for compliance only and never appear on the Weekly Schedule (flip it any time with the “On Weekly Schedule” box on the People tab). Red = expired, orange = 30 days or less, yellow = 60 days out. Anything red or orange also flags on the Weekly Schedule, and the red badge on this tab's name shows the count.</div>
     {(al.urgent.length>0||al.soon.length>0)&&<div style={{background:al.urgent.length?'#fef2f2':'#fefce8',border:'1px solid '+(al.urgent.length?'#fecaca':'#fde68a'),borderRadius:10,padding:'10px 14px',marginBottom:14}}>
       {al.urgent.map((a,i)=>(<div key={'u'+i} style={{fontSize:13,fontWeight:700,color:a.days<0?'#b91c1c':'#c2410c'}}>{a.days<0?'⛔':'⚠️'} {a.driver} &mdash; {a.label} {a.days<0?('expired '+Math.abs(a.days)+' days ago ('+a.date+')'):('expires in '+a.days+' days ('+a.date+')')}</div>))}
       {al.soon.map((a,i)=>(<div key={'s'+i} style={{fontSize:12.5,fontWeight:600,color:'#a16207'}}>{'⏳'} {a.driver} &mdash; {a.label} expires in {a.days} days ({a.date})</div>))}
@@ -1106,7 +1116,7 @@ function Compliance({data}){
       <thead><tr><th>Person</th>{CRED_DEFS.map(([k,l])=><th key={k}>{l}</th>)}<th>Other / DMV items</th></tr></thead>
       <tbody>
         {people.map(d=>{const c=d.creds||{};return(<tr key={d.id}>
-          <td style={{fontWeight:700,whiteSpace:'nowrap'}}>{d.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:500}}>{d.role}</div></td>
+          <td style={{fontWeight:700,whiteSpace:'nowrap'}}>{d.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:500}}>{d.role}{d.compOnly?<span style={{marginLeft:5,background:'#e0e7ff',color:'#3730a3',padding:'0 5px',borderRadius:6,fontSize:9,fontWeight:700}}>not on schedule</span>:null}</div></td>
           {CRED_DEFS.map(([k,l,kind])=>{const days=credDays(c[k]);const ch=kind==='exp'?credChip(days):(c[k]?{bg:'#dcfce7',fg:'#166534',txt:'completed'}:{bg:'#f1f5f9',fg:'#94a3b8',txt:'not on file'});return(<td key={k} style={{whiteSpace:'nowrap'}}>
             <input type="date" value={c[k]||''} onChange={e=>saveCred(d,k,e.target.value)} style={{fontSize:11,padding:'2px 4px',width:130}}/>
             <div><span style={{background:ch.bg,color:ch.fg,padding:'1px 7px',borderRadius:8,fontSize:10,fontWeight:700}}>{ch.txt}</span></div>
@@ -1156,6 +1166,9 @@ function Roster({data}){
           <select value={d.role} onChange={e=>api('PUT','/drivers/'+d.id,{role:e.target.value})} style={{width:'auto',padding:'2px 6px',fontSize:11,marginTop:4}}>
             <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Sales/Driver</option><option>Salesperson</option>
           </select>
+          <label style={{marginTop:4,display:'flex',alignItems:'center',gap:5,fontSize:11,fontWeight:600,color:'#6b7280',cursor:'pointer'}}>
+            <input type="checkbox" checked={!d.compOnly} onChange={e=>api('PUT','/drivers/'+d.id,{compOnly:!e.target.checked})} style={{width:'auto'}}/>On Weekly Schedule
+          </label>
           <div style={{marginTop:4,display:'flex',alignItems:'center',gap:4}}>
             <label style={{fontSize:11,fontWeight:600,color:'#6b7280'}}>PIN:</label>
             <input type="password" maxLength={4} value={d.pin||''} placeholder="----"
@@ -5543,7 +5556,7 @@ function Pickups({data}) {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <select value={assignDriver} onChange={e => setAssignDriver(e.target.value)} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', minWidth: 180 }}>
                       <option value="">-- Select Driver --</option>
-                      {data.drivers.map(d => (
+                      {data.drivers.filter(d => !d.compOnly).map(d => (
                         <option key={d.id} value={d.id}>{d.name}{d.role ? ' (' + d.role + ')' : ''}</option>
                       ))}
                     </select>
