@@ -1112,7 +1112,7 @@ function Compliance({data}){
       {al.soon.map((a,i)=>(<div key={'s'+i} style={{fontSize:12.5,fontWeight:600,color:'#a16207'}}>{'⏳'} {a.driver} &mdash; {a.label} expires in {a.days} days ({a.date})</div>))}
     </div>}
     <div className="rtable"><table>
-      <thead><tr><th>Person</th>{CRED_DEFS.map(([k,l])=><th key={k}>{l}</th>)}<th>Other / DMV items</th></tr></thead>
+      <thead><tr><th>Person</th>{CRED_DEFS.map(([k,l])=><th key={k}>{l}</th>)}<th>Other / DMV items</th><th></th></tr></thead>
       <tbody>
         {people.map(d=>{const c=d.creds||{};return(<tr key={d.id}>
           <td style={{fontWeight:700,whiteSpace:'nowrap'}}>{d.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:500}}>{d.role}{d.compOnly?<span style={{marginLeft:5,background:'#e0e7ff',color:'#3730a3',padding:'0 5px',borderRadius:6,fontSize:9,fontWeight:700}}>not on schedule</span>:null}</div></td>
@@ -1129,6 +1129,7 @@ function Compliance({data}){
               <button className="ebtn" onClick={()=>setExtraFor(null)}>Cancel</button>
             </div>):(<button className="ebtn" onClick={()=>{setExtraFor(d.id);setXl('');setXd('');}}>+ item</button>)}
           </td>
+          <td style={{whiteSpace:'nowrap'}}><button className="ebtn" style={{background:'#fee2e2',color:'var(--danger)'}} onClick={()=>{if(confirm('Remove '+d.name+' from RouteBoard? This also removes any of their scheduled jobs.'))api('DELETE','/drivers/'+d.id);}}>Remove</button></td>
         </tr>);})}
       </tbody>
     </table></div>
