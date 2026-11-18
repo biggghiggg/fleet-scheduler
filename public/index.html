@@ -1432,6 +1432,7 @@ function Bins({data}){
   const [form,setForm]=useState(empty);
   const [search,setSearch]=useState('');
   const [statusFilter,setStatusFilter]=useState('all');
+  const [groupBy,setGroupBy]=useState('none');
   const [showMargin,setShowMargin]=useState(false);
   const ubEmpty={binNumber:'',vendor:'',amount:'',dateBilled:'',status:'Open',notes:''};
   const [ubForm,setUbForm]=useState(ubEmpty);
@@ -1497,6 +1498,17 @@ function Bins({data}){
     const q=search.toLowerCase();
     return [b.binNumber,b.customer,b.vendor,b.driver,b.binSize].some(v=>(v||'').toLowerCase().includes(q));
   }).sort((a,b)=>(b.dateDropped||'').localeCompare(a.dateDropped||''));
+
+  /* group the table by customer / vendor / status when asked */
+  const STATUS_ORDER=['At customer','Picked up','In inventory','Returned to vendor'];
+  const binRows=(()=>{
+    if(groupBy==='none')return filtered.map(b=>({b}));
+    const m={};
+    filtered.forEach(b=>{const k=groupBy==='status'?binStatus(b):groupBy==='customer'?(b.customer||'(no customer)'):(b.vendor||'(no vendor)');(m[k]=m[k]||[]).push(b);});
+    const keys=Object.keys(m).sort((a,b)=>groupBy==='status'?STATUS_ORDER.indexOf(a)-STATUS_ORDER.indexOf(b):(((a.charAt(0)==='('?1:0)-(b.charAt(0)==='('?1:0))||a.localeCompare(b)));
+    const out=[];keys.forEach(k=>{out.push({hdr:k,n:m[k].length});m[k].forEach(b=>out.push({b}));});
+    return out;
+  })();
 
   /* ---- monthly billing report ---- */
   const IDLE_LABEL='— In inventory (cost only) —';
@@ -1609,6 +1621,12 @@ function Bins({data}){
         <option value="In inventory">In inventory</option>
         <option value="Returned to vendor">Returned to vendor</option>
       </select>
+      <select value={groupBy} onChange={e=>setGroupBy(e.target.value)} style={{maxWidth:190}}>
+        <option value="none">No grouping</option>
+        <option value="status">Group by status</option>
+        <option value="customer">Group by customer</option>
+        <option value="vendor">Group by vendor</option>
+      </select>
     </div>
 
     <div className="rtable">
@@ -1618,7 +1636,7 @@ function Bins({data}){
         </tr></thead>
         <tbody>
           {filtered.length===0&&<tr><td colSpan={11} style={{textAlign:'center',color:'var(--text-muted)',padding:24}}>No bins logged yet. Click "+ Log Bin Movement" to start.</td></tr>}
-          {filtered.map(b=>{const s=binStatus(b);const sc=statusColor(s);return(<tr key={b.id}>
+          {binRows.map(item=>{if(item.hdr!==undefined)return(<tr key={'hdr-'+item.hdr}><td colSpan={11} style={{background:'#eff6ff',borderLeft:'4px solid var(--primary)',fontWeight:800,fontSize:12.5,color:'#1e3a8a',padding:'6px 10px'}}>{item.hdr}<span style={{fontWeight:600,color:'#64748b'}}> &nbsp;({item.n} bin{item.n>1?'s':''})</span></td></tr>);const b=item.b;const s=binStatus(b);const sc=statusColor(s);return(<tr key={b.id}>
             <td style={{fontWeight:700}}><span onClick={()=>openHistory(b.binNumber)} style={{color:'var(--primary)',cursor:'pointer',textDecoration:'underline'}} title="View full history of this bin">{b.binNumber}</span></td>
             <td>{b.binSize}</td>
             <td>{b.customer||<span style={{color:'#bbb'}}>&mdash;</span>}</td>
