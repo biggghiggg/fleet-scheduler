@@ -241,7 +241,7 @@ function App(){
     const c=[];Object.entries(m).forEach(([tid,jobs])=>{if(jobs.length>1){const t=data.trucks.find(x=>x.id===tid);c.push({tn:t?.name||tid,jobs});}});return c;
   };
 
-  const compAl=credAlerts(data.drivers);
+  const compAl=credAlerts(data.drivers,(data.settings||{}).credTypes);
   return(
     <div>
       <div className="app-header">
@@ -1052,6 +1052,7 @@ const CRED_DEFS=[
   ['tsa','TSA / Hazmat Endorsement','exp'],
   ['hw40','HAZWOPER 40-Hr (completed)','info'],
   ['hw8','HAZWOPER 8-Hr Refresher','exp'],
+  ['dot','DOT Training','exp'],
 ];
 function credDays(dateStr){
   if(!dateStr)return null;
@@ -1059,11 +1060,12 @@ function credDays(dateStr){
   const now=new Date();now.setHours(12,0,0,0);
   return Math.round((d-now)/86400000);
 }
-function credAlerts(drivers){
+function credAlerts(drivers,extra){
+  const defs=[...CRED_DEFS,...((extra)||[]).map(x=>[x.key,x.label,'exp'])];
   const urgent=[],soon=[];
   (drivers||[]).forEach(d=>{
     const c=d.creds||{};
-    CRED_DEFS.forEach(([k,label,kind])=>{
+    defs.forEach(([k,label,kind])=>{
       if(kind!=='exp')return;
       const days=credDays(c[k]);
       if(days===null)return;
@@ -1093,7 +1095,14 @@ function Compliance({data}){
   const saveCred=async(d,k,v)=>{const c={...(d.creds||{})};c[k]=v;await api('PUT','/drivers/'+d.id,{creds:c});};
   const addExtra=async(d)=>{if(!xl.trim()||!xd)return;const c={...(d.creds||{})};c.extra=[...(c.extra||[]),{label:xl.trim(),date:xd}];await api('PUT','/drivers/'+d.id,{creds:c});setXl('');setXd('');setExtraFor(null);};
   const rmExtra=async(d,i)=>{const c={...(d.creds||{})};c.extra=(c.extra||[]).filter((_,j)=>j!==i);await api('PUT','/drivers/'+d.id,{creds:c});};
-  const al=credAlerts(people);
+  const credTypes=((data.settings||{}).credTypes)||[];
+  const credDefs=[...CRED_DEFS.map(x=>[x[0],x[1],x[2],false]),...credTypes.map(x=>[x.key,x.label,'exp',true])];
+  const al=credAlerts(people,credTypes);
+  const [ctOpen,setCtOpen]=useState(false);const [ctName,setCtName]=useState('');
+  const addType=async()=>{const n=ctName.trim();if(!n)return;const key='ct'+Date.now().toString(36);await api('PUT','/settings',{credTypes:[...credTypes,{key,label:n}]});setCtName('');setCtOpen(false);};
+  const rmType=async(key,label)=>{if(!confirm('Remove the "'+label+'" column for everyone? Saved dates stay on each person but stop showing.'))return;await api('PUT','/settings',{credTypes:credTypes.filter(x=>x.key!==key)});};
+  const rmDoc=async(x)=>{if(!confirm('Delete "'+x.name+'"? This removes the file for good.'))return;try{await fetch('/api/documents/'+x.id,{method:'DELETE'});}catch(e){}loadCdocs();};
+  const upSlot=async(d,label,file)=>{const fd=new FormData();fd.append('file',file);fd.append('category','Cert: '+d.name+' | '+label);try{const r=await fetch('/api/documents',{method:'POST',body:fd});if(!r.ok)alert('Upload failed \u2014 are you logged in?');}catch(e){alert('Upload failed.');}loadCdocs();};
   const [npName,setNpName]=useState('');const [npRole,setNpRole]=useState('Driver');
   const [cdocs,setCdocs]=useState([]);
   const loadCdocs=async()=>{try{const r=await fetch('/api/documents');if(r.ok)setCdocs(await r.json());}catch(e){}};
@@ -1109,6 +1118,7 @@ function Compliance({data}){
         <option>Driver</option><option>Tech</option><option>Warehouse</option><option>Office</option><option>Sales/Driver</option>
       </select>
       <button className="bp" style={{whiteSpace:'nowrap'}} onClick={addPerson}>+ Add</button>
+      {ctOpen?(<span style={{display:'inline-flex',gap:4,alignItems:'center'}}><input value={ctName} onChange={e=>setCtName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addType()} placeholder="e.g. Forklift Certification" style={{width:180,fontSize:12,padding:'6px 8px'}}/><button className="bp" onClick={addType}>Save</button><button className="ebtn" onClick={()=>setCtOpen(false)}>Cancel</button></span>):(<button className="ebtn" style={{whiteSpace:'nowrap'}} onClick={()=>setCtOpen(true)} title="Add another certificate column that shows for everyone">+ cert column</button>)}
     </div></div>
     <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Track license, medical card, TSA/hazmat, TWIC and HAZWOPER dates straight off the DMV pull-notice printouts. People added here with “+ Add” are tracked for compliance only and never appear on the Weekly Schedule (flip it any time with the “On Weekly Schedule” box on the People tab). Red = expired, orange = 30 days or less, yellow = 60 days out. Anything red or orange also flags on the Weekly Schedule, and the red badge on this tab's name shows the count.</div>
     {(al.urgent.length>0||al.soon.length>0)&&<div style={{background:al.urgent.length?'#fef2f2':'#fefce8',border:'1px solid '+(al.urgent.length?'#fecaca':'#fde68a'),borderRadius:10,padding:'10px 14px',marginBottom:14}}>
@@ -1116,13 +1126,15 @@ function Compliance({data}){
       {al.soon.map((a,i)=>(<div key={'s'+i} style={{fontSize:12.5,fontWeight:600,color:'#a16207'}}>{'⏳'} {a.driver} &mdash; {a.label} expires in {a.days} days ({a.date})</div>))}
     </div>}
     <div className="rtable"><table>
-      <thead><tr><th>Person</th>{CRED_DEFS.map(([k,l])=><th key={k}>{l}</th>)}<th>Other / DMV items</th><th></th></tr></thead>
+      <thead><tr><th>Person</th>{credDefs.map(([k,l,kind,cu])=><th key={k}>{l}{cu?<span onClick={()=>rmType(k,l)} title="Remove this column" style={{cursor:'pointer',color:'var(--danger)',marginLeft:4}}>&times;</span>:null}</th>)}<th>Other / DMV items</th><th></th></tr></thead>
       <tbody>
         {people.map(d=>{const c=d.creds||{};return(<tr key={d.id}>
           <td style={{fontWeight:700,whiteSpace:'nowrap'}}>{d.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:500}}>{d.role}{d.compOnly?<span style={{marginLeft:5,background:'#e0e7ff',color:'#3730a3',padding:'0 5px',borderRadius:6,fontSize:9,fontWeight:700}}>not on schedule</span>:null}</div></td>
-          {CRED_DEFS.map(([k,l,kind])=>{const days=credDays(c[k]);const ch=kind==='exp'?credChip(days):(c[k]?{bg:'#dcfce7',fg:'#166534',txt:'completed'}:{bg:'#f1f5f9',fg:'#94a3b8',txt:'not on file'});return(<td key={k} style={{whiteSpace:'nowrap'}}>
+          {credDefs.map(([k,l,kind])=>{const days=credDays(c[k]);const ch=kind==='exp'?credChip(days):(c[k]?{bg:'#dcfce7',fg:'#166534',txt:'completed'}:{bg:'#f1f5f9',fg:'#94a3b8',txt:'not on file'});return(<td key={k} style={{whiteSpace:'nowrap'}}>
             <input type="date" value={c[k]||''} onChange={e=>saveCred(d,k,e.target.value)} style={{fontSize:11,padding:'2px 4px',width:130}}/>
             <div><span style={{background:ch.bg,color:ch.fg,padding:'1px 7px',borderRadius:8,fontSize:10,fontWeight:700}}>{ch.txt}</span></div>
+            {cdocs.filter(x=>x.category==='Cert: '+d.name+' | '+l).map(x=>(<div key={x.id} style={{fontSize:10,whiteSpace:'nowrap'}}>&#128196; <a href={'/api/documents/'+x.id+'/view'} target="_blank" rel="noreferrer" style={{color:'var(--primary)'}}>view cert</a> <span onClick={()=>rmDoc(x)} title="Delete this file" style={{cursor:'pointer',color:'var(--danger)',fontWeight:700}}>&times;</span></div>))}
+            <div><label style={{cursor:'pointer',fontSize:10,color:'var(--text-muted)'}} title={'Attach the '+l+' certificate for '+d.name}>&#128206; attach<input type="file" accept="application/pdf,image/*" style={{display:'none'}} onChange={e=>{const f=e.target.files&&e.target.files[0];if(f)upSlot(d,l,f);e.target.value='';}}/></label></div>
           </td>);})}
           <td>
             {(c.extra||[]).map((x,i)=>{const days=credDays(x.date);const ch=credChip(days);return(<div key={i} style={{fontSize:11,marginBottom:2,whiteSpace:'nowrap'}}>{x.label}: {x.date} <span style={{background:ch.bg,color:ch.fg,padding:'0 6px',borderRadius:8,fontSize:10,fontWeight:700}}>{ch.txt}</span> <span onClick={()=>rmExtra(d,i)} style={{cursor:'pointer',color:'var(--danger)',fontWeight:700}}>&times;</span></div>);})}
@@ -1133,7 +1145,7 @@ function Compliance({data}){
               <button className="ebtn" onClick={()=>setExtraFor(null)}>Cancel</button>
             </div>):(<button className="ebtn" onClick={()=>{setExtraFor(d.id);setXl('');setXd('');}}>+ item</button>)}
             <div style={{marginTop:4}}>
-              {cdocs.filter(x=>x.category==='Cert: '+d.name).map(x=>(<div key={x.id} style={{fontSize:10.5,whiteSpace:'nowrap'}}>&#128196; <a href={'/api/documents/'+x.id+'/view'} target="_blank" rel="noreferrer" style={{color:'var(--primary)'}}>{x.name.length>32?x.name.slice(0,30)+'\u2026':x.name}</a></div>))}
+              {cdocs.filter(x=>x.category==='Cert: '+d.name).map(x=>(<div key={x.id} style={{fontSize:10.5,whiteSpace:'nowrap'}}>&#128196; <a href={'/api/documents/'+x.id+'/view'} target="_blank" rel="noreferrer" style={{color:'var(--primary)'}}>{x.name.length>32?x.name.slice(0,30)+'\u2026':x.name}</a> <span onClick={()=>rmDoc(x)} title="Delete this file" style={{cursor:'pointer',color:'var(--danger)',fontWeight:700}}>&times;</span></div>))}
               <label className="ebtn" style={{cursor:'pointer',display:'inline-block'}} title="Attach a training certificate PDF or photo to this person">&#128206; cert<input type="file" accept="application/pdf,image/*" style={{display:'none'}} onChange={e=>{const f=e.target.files&&e.target.files[0];if(f)upCert(d,f);e.target.value='';}}/></label>
             </div>
           </td>
