@@ -241,6 +241,7 @@ function App(){
     const c=[];Object.entries(m).forEach(([tid,jobs])=>{if(jobs.length>1){const t=data.trucks.find(x=>x.id===tid);c.push({tn:t?.name||tid,jobs});}});return c;
   };
 
+  const compAl=credAlerts(data.drivers);
   return(
     <div>
       <div className="app-header">
@@ -252,14 +253,16 @@ function App(){
         </div>
       </div>
       <div className="tabs">
-        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['capitol','Capitol Calendar'],['bins','Roll-Off Bins'],['roster','People'],['fleet','Trucks & Trailers'],['customers','Customers'],['docs','Documents'],['profiles','Waste Profiles']].map(([k,v])=>(
-          <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}</div>
+        {[['schedule','Weekly Schedule'],['pickups','Job Requests'],['capitol','Capitol Calendar'],['bins','Roll-Off Bins'],['roster','People'],['compliance','Compliance'],['fleet','Trucks & Trailers'],['customers','Customers'],['docs','Documents'],['profiles','Waste Profiles']].map(([k,v])=>(
+          <div key={k} className={'tab '+(tab===k?'on':'')} onClick={()=>setTab(k)}>{v}{k==='compliance'&&compAl.urgent.length>0?<span style={{background:'#dc2626',color:'#fff',borderRadius:10,padding:'0 6px',fontSize:10,fontWeight:800,marginLeft:5}}>{compAl.urgent.length}</span>:null}</div>
         ))}
       </div>
       <div className="main">
+        {tab==='schedule'&&compAl.urgent.length>0&&<div onClick={()=>setTab('compliance')} style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:10,padding:'8px 14px',marginBottom:10,cursor:'pointer',fontSize:13,fontWeight:700,color:'#b91c1c'}}>{'\u26A0\uFE0F'} {compAl.urgent.length} driver credential{compAl.urgent.length>1?'s':''} expired or expiring within 30 days: {compAl.urgent.slice(0,3).map(a=>a.driver+' ('+a.label+')').join(', ')}{compAl.urgent.length>3?' \u2026':''} &mdash; tap to open Compliance</div>}
         {tab==='schedule'&&<Schedule {...{data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,next,now,modal,setModal,eid,setEid,clip,setClip,show}}/>}
         {tab==='pickups'&&<Pickups data={data}/>}
         {tab==='roster'&&<Roster data={data}/>}
+        {tab==='compliance'&&<Compliance data={data}/>}
         {tab==='fleet'&&<Fleet data={data}/>}
         {tab==='capitol'&&<CapitolCalendar data={data}/>}
         {tab==='bins'&&<Bins data={data}/>}
@@ -1039,6 +1042,88 @@ function Schedule({data,ws,dates,today,cellJobs,cellConflict,dayConflicts,prev,n
         </div>
       </div>
     </div>)}
+  </div>);
+}
+
+/* ===== Driver credential compliance ===== */
+const CRED_DEFS=[
+  ['cdl',"Driver's License (CDL)",'exp'],
+  ['med','DOT Medical Card','exp'],
+  ['tsa','TSA / Hazmat Endorsement','exp'],
+  ['twic','TWIC Card','exp'],
+  ['hw40','HAZWOPER 40-Hr (completed)','info'],
+  ['hw8','HAZWOPER 8-Hr Refresher','exp'],
+];
+function credDays(dateStr){
+  if(!dateStr)return null;
+  const d=new Date(dateStr+'T12:00:00');if(isNaN(d))return null;
+  const now=new Date();now.setHours(12,0,0,0);
+  return Math.round((d-now)/86400000);
+}
+function credAlerts(drivers){
+  const urgent=[],soon=[];
+  (drivers||[]).forEach(d=>{
+    const c=d.creds||{};
+    CRED_DEFS.forEach(([k,label,kind])=>{
+      if(kind!=='exp')return;
+      const days=credDays(c[k]);
+      if(days===null)return;
+      const item={driver:d.name,label,date:c[k],days};
+      if(days<=30)urgent.push(item);else if(days<=60)soon.push(item);
+    });
+    (c.extra||[]).forEach(x=>{
+      const days=credDays(x.date);if(days===null)return;
+      const item={driver:d.name,label:x.label||'Credential',date:x.date,days};
+      if(days<=30)urgent.push(item);else if(days<=60)soon.push(item);
+    });
+  });
+  urgent.sort((a,b)=>a.days-b.days);soon.sort((a,b)=>a.days-b.days);
+  return{urgent,soon};
+}
+function credChip(days){
+  if(days===null)return{bg:'#f1f5f9',fg:'#94a3b8',txt:'not on file'};
+  if(days<0)return{bg:'#fee2e2',fg:'#b91c1c',txt:'EXPIRED '+Math.abs(days)+'d ago'};
+  if(days<=30)return{bg:'#ffedd5',fg:'#c2410c',txt:days+' days left'};
+  if(days<=60)return{bg:'#fef9c3',fg:'#a16207',txt:days+' days'};
+  return{bg:'#dcfce7',fg:'#166534',txt:'OK'};
+}
+function Compliance({data}){
+  const [extraFor,setExtraFor]=useState(null);
+  const [xl,setXl]=useState('');const [xd,setXd]=useState('');
+  const people=data.drivers||[];
+  const saveCred=async(d,k,v)=>{const c={...(d.creds||{})};c[k]=v;await api('PUT','/drivers/'+d.id,{creds:c});};
+  const addExtra=async(d)=>{if(!xl.trim()||!xd)return;const c={...(d.creds||{})};c.extra=[...(c.extra||[]),{label:xl.trim(),date:xd}];await api('PUT','/drivers/'+d.id,{creds:c});setXl('');setXd('');setExtraFor(null);};
+  const rmExtra=async(d,i)=>{const c={...(d.creds||{})};c.extra=(c.extra||[]).filter((_,j)=>j!==i);await api('PUT','/drivers/'+d.id,{creds:c});};
+  const al=credAlerts(people);
+  return(<div>
+    <div className="stitle" style={{margin:0}}>Driver Compliance ({people.length} people)</div>
+    <div style={{fontSize:12,color:'var(--text-muted)',margin:'4px 0 14px'}}>Track license, medical card, TSA/hazmat, TWIC and HAZWOPER dates straight off the DMV pull-notice printouts. Red = expired, orange = 30 days or less, yellow = 60 days out. Anything red or orange also flags on the Weekly Schedule.</div>
+    {(al.urgent.length>0||al.soon.length>0)&&<div style={{background:al.urgent.length?'#fef2f2':'#fefce8',border:'1px solid '+(al.urgent.length?'#fecaca':'#fde68a'),borderRadius:10,padding:'10px 14px',marginBottom:14}}>
+      {al.urgent.map((a,i)=>(<div key={'u'+i} style={{fontSize:13,fontWeight:700,color:a.days<0?'#b91c1c':'#c2410c'}}>{a.days<0?'⛔':'⚠️'} {a.driver} &mdash; {a.label} {a.days<0?('expired '+Math.abs(a.days)+' days ago ('+a.date+')'):('expires in '+a.days+' days ('+a.date+')')}</div>))}
+      {al.soon.map((a,i)=>(<div key={'s'+i} style={{fontSize:12.5,fontWeight:600,color:'#a16207'}}>{'⏳'} {a.driver} &mdash; {a.label} expires in {a.days} days ({a.date})</div>))}
+    </div>}
+    <div className="rtable"><table>
+      <thead><tr><th>Person</th>{CRED_DEFS.map(([k,l])=><th key={k}>{l}</th>)}<th>Other / DMV items</th></tr></thead>
+      <tbody>
+        {people.map(d=>{const c=d.creds||{};return(<tr key={d.id}>
+          <td style={{fontWeight:700,whiteSpace:'nowrap'}}>{d.name}<div style={{fontSize:10,color:'var(--text-muted)',fontWeight:500}}>{d.role}</div></td>
+          {CRED_DEFS.map(([k,l,kind])=>{const days=credDays(c[k]);const ch=kind==='exp'?credChip(days):(c[k]?{bg:'#dcfce7',fg:'#166534',txt:'completed'}:{bg:'#f1f5f9',fg:'#94a3b8',txt:'not on file'});return(<td key={k} style={{whiteSpace:'nowrap'}}>
+            <input type="date" value={c[k]||''} onChange={e=>saveCred(d,k,e.target.value)} style={{fontSize:11,padding:'2px 4px',width:130}}/>
+            <div><span style={{background:ch.bg,color:ch.fg,padding:'1px 7px',borderRadius:8,fontSize:10,fontWeight:700}}>{ch.txt}</span></div>
+          </td>);})}
+          <td>
+            {(c.extra||[]).map((x,i)=>{const days=credDays(x.date);const ch=credChip(days);return(<div key={i} style={{fontSize:11,marginBottom:2,whiteSpace:'nowrap'}}>{x.label}: {x.date} <span style={{background:ch.bg,color:ch.fg,padding:'0 6px',borderRadius:8,fontSize:10,fontWeight:700}}>{ch.txt}</span> <span onClick={()=>rmExtra(d,i)} style={{cursor:'pointer',color:'var(--danger)',fontWeight:700}}>&times;</span></div>);})}
+            {extraFor===d.id?(<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+              <input value={xl} onChange={e=>setXl(e.target.value)} placeholder="e.g. Pull notice review" style={{fontSize:11,width:150}}/>
+              <input type="date" value={xd} onChange={e=>setXd(e.target.value)} style={{fontSize:11,width:125}}/>
+              <button className="bp" style={{padding:'2px 8px',fontSize:11}} onClick={()=>addExtra(d)}>Add</button>
+              <button className="ebtn" onClick={()=>setExtraFor(null)}>Cancel</button>
+            </div>):(<button className="ebtn" onClick={()=>{setExtraFor(d.id);setXl('');setXd('');}}>+ item</button>)}
+          </td>
+        </tr>);})}
+      </tbody>
+    </table></div>
+    <div style={{fontSize:11,color:'var(--text-muted)',marginTop:10}}>HAZWOPER: the 40-hour certificate only stays valid with a current 8-hour refresher (every 12 months) &mdash; when a refresher is completed, set its expiration one year out. TSA hazmat endorsement and TWIC renew every 5 years; DOT medical is typically 2 years (1 with conditions).</div>
   </div>);
 }
 
